@@ -3,6 +3,88 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
+    <string name="language_system">System language</string>
     <string name="language_korean">Korean</string>
     <string name="language_english">English</string>
+    <string name="preferences">Preferences</string>
+    <string name="preferences_description">Make it comfortable for you. Your choices are saved on this phone.</string>
+    <string name="appearance">Appearance</string>
+    <string name="language">Language</string>
+    <string name="close">Close preferences</string>
+    <string name="page_tuner">Tuner</string>
+    <string name="page_metronome">Metronome</string>
+    <string name="page_gallery">Gallery</string>
+    <string name="tuner_title">Find your sound</string>
+    <string name="tuner_subtitle">One note. A little closer to in tune.</string>
+    <string name="metronome_title">Find your rhythm</string>
+    <string name="metronome_subtitle">A comfortable tempo, right at your fingertips.</string>
+    <string name="gallery_title">Made for the everyday</string>
+    <string name="gallery_subtitle">Explore the colors, type, and controls of GuitarLearner.</string>
+    <string name="demo_notice">Interactive design demo. No microphone, audio, or timed playback.</string>
+    <string name="tuner_target">Sample target · A2</string>
+    <string name="note_placeholder" translatable="false">--</string>
+    <string name="note_a2" translatable="false">A2</string>
+    <string name="reference_frequency">Reference · 110 Hz</string>
+    <string name="pitch_low" translatable="false">−50</string>
+    <string name="pitch_center" translatable="false">0</string>
+    <string name="pitch_high" translatable="false">+50</string>
+    <string name="reading_no_signal">No signal</string>
+    <string name="reading_flat">Flat</string>
+    <string name="reading_in_tune">In tune</string>
+    <string name="reading_sharp">Sharp</string>
+    <string name="guidance_no_signal">Choose a sample reading below.</string>
+    <string name="guidance_flat">Tune a little higher.</string>
+    <string name="guidance_in_tune">Right on the note.</string>
+    <string name="guidance_sharp">Tune a little lower.</string>
+    <plurals name="cents_flat">
+        <item quantity="one">%1$d cent flat</item>
+        <item quantity="other">%1$d cents flat</item>
+    </plurals>
+    <plurals name="cents_sharp">
+        <item quantity="one">%1$d cent sharp</item>
+        <item quantity="other">%1$d cents sharp</item>
+    </plurals>
+    <string name="cents_center">0 cents · centered</string>
+    <string name="try_reading">Try a reading</string>
+    <string name="reading_description">These sample states show how pitch feedback will look.</string>
+    <string name="tempo">Tempo</string>
+    <string name="tempo_value">%1$d</string>
+    <string name="beats_per_minute">beats per minute</string>
+    <plurals name="tempo_bpm">
+        <item quantity="one">%1$d beat per minute</item>
+        <item quantity="other">%1$d beats per minute</item>
+    </plurals>
+    <string name="meter_sample">4/4 · quarter notes</string>
+    <string name="state_running">Running · simulated</string>
+    <string name="state_stopped">Stopped · simulated</string>
+    <string name="set_tempo">Set your tempo</string>
+    <string name="decrease_tempo">Decrease tempo by 1 BPM</string>
+    <string name="increase_tempo">Increase tempo by 1 BPM</string>
+    <string name="tempo_range">40–240 BPM. Adjust the tempo while stopped or running.</string>
+    <string name="start_demo">Start demo</string>
+    <string name="stop_demo">Stop demo</string>
+    <string name="metronome_simulation">The beat markers stay still. This demo does not play sound or keep time.</string>
+    <string name="controls">Everyday controls</string>
+    <string name="selected_control">Select this example</string>
+    <string name="switch_on">Example switched on</string>
+    <string name="switch_off">Example switched off</string>
+    <string name="try_motion">Try expressive motion</string>
+    <string name="disabled_control">Unavailable in demo</string>
+    <string name="invalid_tempo" translatable="false">280</string>
+    <string name="tempo_error">Use a tempo between 40 and 240 BPM.</string>
+    <string name="type_and_notation">Type that reads clearly</string>
+    <string name="musical_symbols" translatable="false">F♯ B♭ Am</string>
+    <string name="symbol_names">F sharp · B flat · A minor</string>
+    <string name="typography_description">Musical symbols come first. Simple explanations make room for beginners.</string>
+    <string name="color_and_shape">Color with purpose</string>
+    <string name="color_primary">Primary</string>
+    <string name="color_secondary">Secondary</string>
+    <string name="color_tertiary">Tertiary</string>
+    <string name="shape_small">Small corners</string>
+    <string name="shape_large">Large corners</string>
+    <string name="shape_extra_large">Extra large corners</string>
+    <string name="expressive_motion">A softer response</string>
+    <string name="motion_rounded">Rounded and selected</string>
+    <string name="motion_square">Compact and unselected</string>
+    <string name="motion_description">Tap below and feel the shape respond.</string>
 </resources>

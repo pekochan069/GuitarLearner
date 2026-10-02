@@ -7,29 +7,25 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.core.content.edit
 import androidx.core.os.LocaleListCompat
+import com.pekochan069.guitarlearner.ui.demo.DesignFoundationApp
 import com.pekochan069.guitarlearner.ui.theme.GuitarLearnerTheme
 
 class MainActivity : AppCompatActivity() {
     private val preferences by lazy { getSharedPreferences("appearance", MODE_PRIVATE) }
     private var themeMode by mutableStateOf(ThemeMode.System)
+    private var languageTag by mutableStateOf("")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         themeMode = ThemeMode.read(preferences)
         AppCompatDelegate.setDefaultNightMode(themeMode.nightMode)
         super.onCreate(savedInstanceState)
+        languageTag = AppCompatDelegate.getApplicationLocales().get(0)?.language.orEmpty()
         setContent {
             val darkTheme = isSystemInDarkTheme()
             SideEffect {
@@ -43,29 +39,25 @@ class MainActivity : AppCompatActivity() {
                 )
             }
             GuitarLearnerTheme(darkTheme = darkTheme) {
-                Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-                    Column(Modifier.padding(padding)) {
-                        Text(stringResource(R.string.app_name))
-                        ThemeMode.entries.forEach { mode ->
-                            TextButton(onClick = { changeThemeMode(mode) }) {
-                                Text(stringResource(mode.label))
-                            }
-                        }
-                        TextButton(onClick = {
-                            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ko"))
-                        }) { Text(stringResource(R.string.language_korean)) }
-                        TextButton(onClick = {
-                            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en"))
-                        }) { Text(stringResource(R.string.language_english)) }
-                    }
-                }
+                DesignFoundationApp(
+                    themeMode = themeMode,
+                    languageTag = languageTag,
+                    onThemeChange = { mode ->
+                        preferences.edit { putString("theme_mode", mode.name) }
+                        themeMode = mode
+                        AppCompatDelegate.setDefaultNightMode(mode.nightMode)
+                    },
+                    onLanguageChange = { tag ->
+                        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
+                        languageTag = tag
+                    },
+                )
             }
         }
     }
 
-    private fun changeThemeMode(mode: ThemeMode) {
-        preferences.edit().putString("theme_mode", mode.name).apply()
-        themeMode = mode
-        AppCompatDelegate.setDefaultNightMode(mode.nightMode)
+    override fun onResume() {
+        super.onResume()
+        languageTag = AppCompatDelegate.getApplicationLocales().get(0)?.language.orEmpty()
     }
 }
