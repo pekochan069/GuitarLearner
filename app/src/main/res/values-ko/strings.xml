@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">GuitarLearner</string>
+    <string name="theme_system">시스템</string>
+    <string name="theme_light">밝게</string>
+    <string name="theme_dark">어둡게</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_english">영어</string>
+</resources>
