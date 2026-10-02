@@ -1,0 +1,5 @@
+interface:
+  display_name: "Alignment and Engineering"
+  short_description: "Keep human intent intact during poteto-mode engineering"
+policy:
+  allow_implicit_invocation: true
