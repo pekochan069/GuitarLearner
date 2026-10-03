@@ -65,7 +65,6 @@ internal class MetronomeStorage(
             // A failed commit also mutates SharedPreferences memory; restore the accepted document.
             if (!commitSource(acceptedSource)) Log.w("MetronomeStorage", "Disk rollback failed; accepted preference memory restored")
         } catch (_: SecurityException) {
-            // Accepted state remains authoritative when storage access itself is unavailable.
         }
     }
 

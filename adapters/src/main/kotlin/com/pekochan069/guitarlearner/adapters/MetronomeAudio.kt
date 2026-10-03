@@ -99,7 +99,6 @@ internal class MetronomeAudio(
                 track?.pause()
                 track?.flush()
             } catch (_: IllegalStateException) {
-                // Preparation can be cancelled before AudioTrack acquires its native resources.
             }
         }
     }

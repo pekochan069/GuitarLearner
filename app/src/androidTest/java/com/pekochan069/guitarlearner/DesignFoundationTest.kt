@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.pekochan069.guitarlearner.ui.R as UiR
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -72,7 +73,7 @@ class DesignFoundationTest {
 
         compose.activityRule.scenario.recreate()
         compose.waitForIdle()
-        compose.onNodeWithText("매일 편안하게").assertExists()
+        compose.onNodeWithText(compose.activity.getString(UiR.string.gallery_title)).assertExists()
         compose.onNodeWithTag("gallery_selection").performScrollTo().assertIsOff()
         compose.onNodeWithTag("page_Tuner").performClick()
         compose.onNodeWithTag("tuner_status").assertTextEquals("높음")
