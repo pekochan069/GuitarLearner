@@ -161,6 +161,7 @@ class AndroidMetronomeHost(
     }
 
     fun onServiceCommand(service: Service, scope: CoroutineScope, intent: Intent?, startId: Int) {
+        run?.takeIf { it.service === service }?.startId = startId
         val id = intent?.getLongExtra(EXTRA_RUN_ID, -1) ?: -1
         when (intent?.action) {
             ACTION_START -> if (run == null) begin(service, scope, startId, id)
@@ -219,7 +220,7 @@ class AndroidMetronomeHost(
     private inner class PlaybackRun(
         val service: Service,
         private val scope: CoroutineScope,
-        private val startId: Int,
+        var startId: Int,
         private val id: Long,
     ) {
         private val manager = application.getSystemService(AudioManager::class.java)
