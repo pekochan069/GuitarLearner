@@ -25,6 +25,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.abs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -66,6 +67,7 @@ class MetronomeTimingRecordingTest {
             runBlocking {
                 val host = (context.applicationContext as GuitarLearnerApplication).graph.metronomeHost
                 val previous = host.current.value.selected
+                var primaryFailure: Throwable? = null
                 try {
                     host.checked(MetronomeCommand.Stop)
                     host.checked(MetronomeCommand.SetTempo(bpm))
@@ -99,6 +101,10 @@ class MetronomeTimingRecordingTest {
                         val durationComplete = CompletableDeferred<Unit>()
                         val routes = JSONArray()
                         val timestamps = JSONArray()
+                        val continuityFailures = linkedSetOf<String>()
+                        val inputBufferFrames = recorder.bufferSizeInFrames
+                        val bufferNanos = inputBufferFrames * 1_000_000_000L / sampleRate
+                        var previousReadNanos = 0L
                         var completed = false
                         val metadata = JSONObject()
                             .put("bpm", bpm).put("duration_seconds", duration).put("route_label", route)
@@ -107,6 +113,7 @@ class MetronomeTimingRecordingTest {
                             .put("manufacturer", Build.MANUFACTURER).put("model", Build.MODEL)
                             .put("sdk", Build.VERSION.SDK_INT).put("os_release", Build.VERSION.RELEASE)
                             .put("capture_clock_independently_calibrated", false)
+                            .put("input_buffer_frames", inputBufferFrames)
                         var lastRoute = ""
                         recorder.startRecording()
                         val capture = async(Dispatchers.IO) {
@@ -118,7 +125,12 @@ class MetronomeTimingRecordingTest {
                                     while (frames.get() < captureEnd.get()) {
                                         val requested = minOf(samples.size.toLong(), captureEnd.get() - frames.get()).toInt()
                                         val count = recorder.read(samples, 0, requested, AudioRecord.READ_BLOCKING)
+                                        val readNanos = System.nanoTime()
                                         check(count > 0) { "AudioRecord read failed: $count" }
+                                        if (previousReadNanos != 0L && readNanos - previousReadNanos > bufferNanos) {
+                                            continuityFailures.add("Reader stall exceeded the native input buffer duration")
+                                        }
+                                        previousReadNanos = readNanos
                                         bytes.clear()
                                         repeat(count) { index -> bytes.putShort(samples[index]) }
                                         output.write(bytes.array(), 0, count * 2)
@@ -144,10 +156,29 @@ class MetronomeTimingRecordingTest {
                                         }
                                         if (startFrame != Long.MAX_VALUE && captured >= startFrame + duration * sampleRate.toLong()) durationComplete.complete(Unit)
                                         val timestamp = AudioTimestamp()
-                                        if (recorder.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC) == AudioRecord.SUCCESS &&
-                                            (timestamps.length() == 0 || captured >= captureEnd.get())
-                                        ) {
-                                            timestamps.put(JSONObject().put("captured_frame", captured).put("frame_position", timestamp.framePosition).put("monotonic_nanos", timestamp.nanoTime))
+                                        val timestampStatus = recorder.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC)
+                                        val observedNanos = System.nanoTime()
+                                        if (timestampStatus == AudioRecord.SUCCESS) {
+                                            if (timestamp.framePosition < 0 || timestamp.nanoTime <= 0 ||
+                                                observedNanos - timestamp.nanoTime !in 0..bufferNanos
+                                            ) continuityFailures.add("Invalid or stale input timestamp")
+                                            if (timestamps.length() > 0) {
+                                                val first = timestamps.getJSONObject(0)
+                                                val last = timestamps.getJSONObject(timestamps.length() - 1)
+                                                if (timestamp.framePosition <= last.getLong("frame_position") || timestamp.nanoTime <= last.getLong("monotonic_nanos")) {
+                                                    continuityFailures.add("Input timestamp did not advance")
+                                                }
+                                                val deliveredAdvance = captured - first.getLong("captured_frame")
+                                                val producerAdvance = timestamp.framePosition - first.getLong("frame_position")
+                                                val elapsedFrames = (timestamp.nanoTime - first.getLong("monotonic_nanos")) * sampleRate / 1_000_000_000.0
+                                                if (abs(producerAdvance - deliveredAdvance) > inputBufferFrames) continuityFailures.add("Input producer/read backlog changed beyond buffer capacity")
+                                                if (abs(producerAdvance - elapsedFrames) > inputBufferFrames) continuityFailures.add("Input timestamp time/frame continuity changed beyond buffer capacity")
+                                            }
+                                            timestamps.put(JSONObject().put("captured_frame", captured).put("frame_position", timestamp.framePosition)
+                                                .put("monotonic_nanos", timestamp.nanoTime).put("read_completed_monotonic_nanos", readNanos)
+                                                .put("timestamp_observed_monotonic_nanos", observedNanos))
+                                        } else if (timestamps.length() > 0 || captured >= sampleRate) {
+                                            continuityFailures.add("Input timestamp unavailable during capture: $timestampStatus")
                                         }
                                     }
                                 } finally {
@@ -179,7 +210,11 @@ class MetronomeTimingRecordingTest {
                                     if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop()
                                 } finally {
                                     capture.cancelAndJoin()
-                                    metadata.put("capture_valid", completed).put("route_verified", completed && routes.length() > 0)
+                                    val continuityVerified = continuityFailures.isEmpty() && timestamps.length() >= 2 &&
+                                        timestamps.getJSONObject(0).getLong("captured_frame") <= sampleRate &&
+                                        timestamps.getJSONObject(timestamps.length() - 1).getLong("captured_frame") == frames.get()
+                                    metadata.put("capture_valid", completed && continuityVerified).put("route_verified", completed && routes.length() > 0)
+                                        .put("capture_continuity_verified", continuityVerified).put("capture_continuity_failures", JSONArray(continuityFailures.toList()))
                                         .put("captured_frames", frames.get()).put("playback_start_capture_frame", playbackStart.get())
                                         .put("recorded_seconds", frames.get().toDouble() / sampleRate)
                                         .put("route_observations", routes).put("capture_timestamps", timestamps)
@@ -189,6 +224,7 @@ class MetronomeTimingRecordingTest {
                                         metadata.put("capture_timestamp_elapsed_seconds", (last.getLong("monotonic_nanos") - first.getLong("monotonic_nanos")) / 1e9)
                                     }
                                     File(context.filesDir, filename.removeSuffix(".wav") + ".json").writeText(metadata.toString(2))
+                                    if (completed) check(continuityVerified) { "Input continuity is unverified: $continuityFailures" }
                                 }
                             }
                         }
@@ -196,11 +232,24 @@ class MetronomeTimingRecordingTest {
                     } finally {
                         recorder.release()
                     }
+                } catch (failure: Throwable) {
+                    primaryFailure = failure
+                    throw failure
                 } finally {
                     withContext(NonCancellable) {
-                        host.checked(MetronomeCommand.Stop)
-                        host.checked(MetronomeCommand.SetPattern(previous.denominator, previous.beats))
-                        host.checked(MetronomeCommand.SetTempo(previous.bpm))
+                        val cleanupFailures = mutableListOf<Throwable>()
+                        for (command in listOf(MetronomeCommand.Stop, MetronomeCommand.SetPattern(previous.denominator, previous.beats), MetronomeCommand.SetTempo(previous.bpm))) {
+                            try {
+                                host.checked(command)
+                            } catch (failure: Throwable) {
+                                cleanupFailures.add(failure)
+                            }
+                        }
+                        if (cleanupFailures.isNotEmpty()) {
+                            val failure = primaryFailure ?: IllegalStateException("Metronome recording cleanup failed")
+                            cleanupFailures.forEach(failure::addSuppressed)
+                            if (primaryFailure == null) throw failure
+                        }
                     }
                 }
             }

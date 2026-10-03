@@ -108,7 +108,8 @@ export function analyze(path, bpm, minimumSeconds = 300, thresholdRatio = 0.15, 
   };
   const metadataPath = path.slice(0, path.length - extname(path).length) + ".json";
   const metadata = existsSync(metadataPath) ? JSON.parse(readFileSync(metadataPath, "utf8")) : null;
-  if (metadata) checks.capture_metadata_valid = Boolean(metadata.capture_valid && metadata.route_verified && metadata.bpm === bpm);
+  checks.capture_metadata_valid = Boolean(metadata?.capture_valid && metadata.route_verified && metadata.bpm === bpm);
+  checks.capture_continuity_verified = metadata?.capture_continuity_verified === true;
   return {
     wav: path,
     sample_rate_hz: sampleRate,
@@ -132,8 +133,11 @@ export function analyze(path, bpm, minimumSeconds = 300, thresholdRatio = 0.15, 
     checks,
     pass: Object.values(checks).every(Boolean),
     acceptance_duration_met: observed >= 300,
+    hardware_acceptance_pass: observed >= 300 && Object.values(checks).every(Boolean),
     capture_metadata: metadata,
     capture_route_verified: Boolean(metadata?.route_verified),
+    capture_continuity_verified: metadata?.capture_continuity_verified === true,
+    capture_continuity_limits: "Periodic input timestamps, delivered frames, read cadence, and buffer bounds detect some capture overruns. Small drops or vendor timestamp behavior may evade these checks; this is not proof of a lossless input pipeline.",
     absolute_clock_accuracy: "unverified; capture and output may share the phone clock",
     start_output_latency: "unverified; requires a synchronized independent reference",
     screen_sound_offset: "unverified; requires synchronized external video",
