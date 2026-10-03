@@ -124,8 +124,7 @@ class FoundationPresenter(
             }
         }
 
-        fun setRunning(value: Boolean) {
-            // Stop must not wait behind a checked preset/settings disk write.
+        fun setPlaybackImmediately(value: Boolean) {
             scope.launch {
                 metronome.execute(if (value) MetronomeCommand.Start else MetronomeCommand.Stop).fold(
                     ifLeft = { metronomeNotice = it.toNotice() },
@@ -178,7 +177,7 @@ class FoundationPresenter(
                     is FoundationEvent.AdjustBpm -> execute {
                         MetronomeCommand.SetTempo((metronome.current.value.selected.bpm + event.delta).coerceIn(40, 240))
                     }
-                    is FoundationEvent.SetRunning -> setRunning(event.value)
+                    is FoundationEvent.SetRunning -> setPlaybackImmediately(event.value)
                     is FoundationEvent.SetBeatCount -> setPattern { it.withBeatCount(event.value) }
                     is FoundationEvent.AdjustBeatCount -> setPattern { it.withBeatCount(it.numerator + event.delta) }
                     is FoundationEvent.SetBeatUnit -> setPattern { it.copy(denominator = event.value.toDomain()) }
