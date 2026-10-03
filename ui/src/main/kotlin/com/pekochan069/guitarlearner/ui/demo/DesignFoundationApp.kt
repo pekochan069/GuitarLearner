@@ -194,7 +194,11 @@ fun DesignFoundationApp(
                         shape = MaterialTheme.shapes.medium,
                     ) {
                         Text(
-                            stringResource(R.string.demo_notice),
+                            stringResource(when (page) {
+                                Page.Tuner -> R.string.tuner_demo_notice
+                                Page.Metronome -> R.string.metronome_playback_notice
+                                Page.Gallery -> R.string.gallery_demo_notice
+                            }),
                             Modifier.padding(16.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -206,10 +210,8 @@ fun DesignFoundationApp(
                             onReadingChange = { state.eventSink(FoundationEvent.SetReading(it)) },
                         )
                         Page.Metronome -> MetronomeSample(
-                            bpm = state.bpm,
-                            running = state.running,
-                            onBpmChange = { state.eventSink(FoundationEvent.SetBpm(it)) },
-                            onRunningChange = { state.eventSink(FoundationEvent.SetRunning(it)) },
+                            state = state.metronome,
+                            eventSink = state.eventSink,
                         )
                         Page.Gallery -> ComponentGallery(
                             selected = state.gallerySelected,

@@ -2,7 +2,9 @@ package com.pekochan069.guitarlearner
 
 import android.app.Application
 import com.pekochan069.guitarlearner.adapters.AndroidAppearanceHost
+import com.pekochan069.guitarlearner.adapters.AndroidMetronomeHost
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
+import com.pekochan069.guitarlearner.domain.Metronome
 import com.pekochan069.guitarlearner.presentation.logic.FoundationPresenter
 import com.pekochan069.guitarlearner.ui.FoundationUiFactory
 import com.slack.circuit.foundation.Circuit
@@ -20,6 +22,7 @@ private abstract class AppScope
 @DependencyGraph(AppScope::class)
 interface AppGraph {
     val appearanceHost: AndroidAppearanceHost
+    val metronomeHost: AndroidMetronomeHost
     val circuit: Circuit
 
     @Provides
@@ -31,8 +34,18 @@ interface AppGraph {
     fun provideSettings(host: AndroidAppearanceHost): AppearanceSettings = host
 
     @Provides
-    fun providePresenterFactory(settings: AppearanceSettings): FoundationPresenter.Factory =
-        FoundationPresenter.Factory(settings)
+    @SingleIn(AppScope::class)
+    fun provideMetronome(application: Application): AndroidMetronomeHost = AndroidMetronomeHost(
+        application, MetronomePlaybackService::class.java, MainActivity::class.java,
+        application.getSharedPreferences("metronome", Application.MODE_PRIVATE),
+    )
+
+    @Provides
+    fun provideMetronomeCapability(host: AndroidMetronomeHost): Metronome = host
+
+    @Provides
+    fun providePresenterFactory(settings: AppearanceSettings, metronome: Metronome): FoundationPresenter.Factory =
+        FoundationPresenter.Factory(settings, metronome)
 
     @Provides
     @SingleIn(AppScope::class)
