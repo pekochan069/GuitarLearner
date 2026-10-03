@@ -136,7 +136,6 @@ internal class MetronomeAudio(
             return
         }
         val capacity = audio.bufferSizeInFrames
-        if (Build.VERSION.SDK_INT >= 31) audio.setStartThresholdInFrames(min(capacity, chunkFrames * 2))
         val startThreshold = if (Build.VERSION.SDK_INT >= 31) audio.startThresholdInFrames else capacity
         val sequencer = MetronomeSequencer(config, sampleRate)
         val renderer = MetronomePcm(sequencer, sampleRate)
