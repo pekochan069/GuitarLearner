@@ -144,7 +144,8 @@ internal class MetronomeAudio(
         val writeHorizon = max(chunkFrames * 2, sampleRate / 25)
         Log.d(TAG, "Preparing sampleRate=$sampleRate chunk=$chunkFrames buffer=$capacity horizon=$writeHorizon start=$startThreshold")
 
-        fun refreshRoute() {
+        fun refreshRoute() = synchronized(trackGate) {
+            if (stopped || track !== audio) return@synchronized
             val route = audio.routedDevice
             if (lastRoute?.id != route?.id) {
                 clock.invalidate()
