@@ -4,7 +4,11 @@ import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.SharedPreferences
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.lifecycle.Lifecycle
 import arrow.core.Either
 import com.pekochan069.guitarlearner.adapters.AndroidMetronomeHost
 import com.pekochan069.guitarlearner.domain.BeatAccent
@@ -14,12 +18,14 @@ import com.pekochan069.guitarlearner.domain.MetronomeConfig
 import com.pekochan069.guitarlearner.domain.MetronomeFailure
 import com.pekochan069.guitarlearner.domain.MetronomePreset
 import com.pekochan069.guitarlearner.domain.PlaybackState
+import com.pekochan069.guitarlearner.domain.StopReason
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -110,6 +116,78 @@ class MetronomePlaybackTest {
         assertEquals(null, host.currentAudioDiagnostics())
     }
 
+    @Test
+    fun losingFocusStopsAndAbandoningTheInterruptionDoesNotResume(): Unit = runBlocking {
+        val host = (compose.activity.application as GuitarLearnerApplication).graph.metronomeHost
+        val original = host.current.value.selected
+        val manager = compose.activity.getSystemService(AudioManager::class.java)
+        val interruption = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+            .setOnAudioFocusChangeListener { }.build()
+        try {
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.Stop))
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetTempo(40)))
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.Start))
+            assertEquals(0, expectPlaying(host).beatIndex)
+            compose.runOnUiThread {
+                assertEquals(AudioManager.AUDIOFOCUS_REQUEST_GRANTED, manager.requestAudioFocus(interruption))
+            }
+            withTimeout(5_000) {
+                host.current.first { it.playback == PlaybackState.Stopped(StopReason.FocusLoss) }
+            }
+            assertEquals(null, host.currentAudioDiagnostics())
+            manager.abandonAudioFocusRequest(interruption)
+            delay(750)
+            assertEquals(PlaybackState.Stopped(StopReason.FocusLoss), host.current.value.playback)
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.Start))
+            assertEquals(0, expectPlaying(host).beatIndex)
+        } finally {
+            manager.abandonAudioFocusRequest(interruption)
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.Stop))
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetTempo(original.bpm)))
+        }
+    }
+
+    @Test
+    fun playbackAdvancesInBackgroundAndSurvivesActivityRecreation(): Unit = runBlocking {
+        val host = (compose.activity.application as GuitarLearnerApplication).graph.metronomeHost
+        val original = host.current.value.selected
+        val scenario = compose.activityRule.scenario
+        try {
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.Stop))
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetTempo(40)))
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetPattern(BeatUnit.Quarter,
+                List(8) { BeatAccent.Mute })))
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.Start))
+            assertEquals(0, expectPlaying(host).beatIndex)
+            scenario.moveToState(Lifecycle.State.CREATED)
+            withTimeout(5_000) { host.current.first { (it.playback as? PlaybackState.Playing)?.beatIndex == 1 } }
+            assertTrue(host.currentAudioDiagnostics() != null)
+            scenario.moveToState(Lifecycle.State.RESUMED)
+            scenario.recreate()
+            assertSame(host, (compose.activity.application as GuitarLearnerApplication).graph.metronomeHost)
+            val afterRecreation = host.current.value.playback
+            assertTrue("Playback changed during recreation: $afterRecreation", afterRecreation is PlaybackState.Playing)
+            assertTrue((afterRecreation as PlaybackState.Playing).beatIndex != 0)
+            withTimeout(5_000) {
+                host.current.first { (it.playback as? PlaybackState.Playing)?.beatIndex == afterRecreation.beatIndex + 1 }
+            }
+        } finally {
+            scenario.moveToState(Lifecycle.State.RESUMED)
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.Stop))
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetPattern(original.denominator, original.beats)))
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetTempo(original.bpm)))
+        }
+    }
+
+    private suspend fun expectPlaying(host: AndroidMetronomeHost): PlaybackState.Playing {
+        val result = withTimeout(10_000) {
+            host.current.first { it.playback is PlaybackState.Playing || it.playback is PlaybackState.Failed }
+        }
+        assertTrue("Expected playback, received ${result.playback}", result.playback is PlaybackState.Playing)
+        return result.playback as PlaybackState.Playing
+    }
 }
 
 private class FailingPreferenceEditor(private val delegate: SharedPreferences) {
