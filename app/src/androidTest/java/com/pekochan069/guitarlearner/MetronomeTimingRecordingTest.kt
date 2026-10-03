@@ -56,7 +56,7 @@ class MetronomeTimingRecordingTest {
         val bpm = intArgument(args, "bpm", 120)
         val duration = intArgument(args, "duration_seconds", 15)
         val route = args.getString("route") ?: "speaker"
-        require(bpm in 40..240 && duration in 1..3600)
+        require(bpm in 40..240 && duration in 1..27) { "BPM must be 40-240; playback duration must be 1-27 seconds within the 30-second capture limit" }
         require(route == "speaker" || route == "buds2")
         val filename = args.getString("filename") ?: "metronome-$route-$bpm-${System.currentTimeMillis()}.wav"
         require(filename.matches(Regex("[A-Za-z0-9._-]+\\.wav")))
@@ -95,7 +95,8 @@ class MetronomeTimingRecordingTest {
 
                         val frames = AtomicLong(0)
                         val playbackStart = AtomicLong(Long.MAX_VALUE)
-                        val captureEnd = AtomicLong(Long.MAX_VALUE)
+                        val maximumCaptureFrames = 30L * sampleRate
+                        val captureEnd = AtomicLong(maximumCaptureFrames)
                         val validateOutput = AtomicBoolean(false)
                         val warmupComplete = CompletableDeferred<Unit>()
                         val durationComplete = CompletableDeferred<Unit>()
@@ -114,6 +115,7 @@ class MetronomeTimingRecordingTest {
                             .put("sdk", Build.VERSION.SDK_INT).put("os_release", Build.VERSION.RELEASE)
                             .put("capture_clock_independently_calibrated", false)
                             .put("input_buffer_frames", inputBufferFrames)
+                            .put("maximum_recorded_seconds", 30)
                         var lastRoute = ""
                         recorder.startRecording()
                         val capture = async(Dispatchers.IO) {
@@ -182,7 +184,11 @@ class MetronomeTimingRecordingTest {
                                         }
                                     }
                                 } finally {
-                                    writeWavHeader(output, sampleRate, frames.get().toInt() * 2)
+                                    try {
+                                        recorder.stopIfRecording()
+                                    } finally {
+                                        writeWavHeader(output, sampleRate, frames.get().toInt() * 2)
+                                    }
                                 }
                             }
                         }
@@ -196,7 +202,9 @@ class MetronomeTimingRecordingTest {
                             }
                             check(routeMatches(route, host.currentAudioDiagnostics()?.outputType)) { "Playback route does not match the requested route" }
                             playbackStart.set(frames.get())
-                            captureEnd.set(playbackStart.get() + (duration + 1) * sampleRate.toLong())
+                            val requestedEnd = playbackStart.get() + (duration + 1) * sampleRate.toLong()
+                            check(requestedEnd <= maximumCaptureFrames) { "Startup left insufficient time for playback and tail within the 30-second capture limit" }
+                            captureEnd.set(requestedEnd)
                             validateOutput.set(true)
                             withTimeout((duration + 15) * 1000L) { durationComplete.await() }
                             validateOutput.set(false)
@@ -207,7 +215,7 @@ class MetronomeTimingRecordingTest {
                             withContext(NonCancellable) {
                                 validateOutput.set(false)
                                 try {
-                                    if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop()
+                                    recorder.stopIfRecording()
                                 } finally {
                                     capture.cancelAndJoin()
                                     val continuityVerified = continuityFailures.isEmpty() && timestamps.length() >= 2 &&
@@ -259,6 +267,10 @@ class MetronomeTimingRecordingTest {
 
 private suspend fun AndroidMetronomeHost.checked(command: MetronomeCommand) {
     execute(command).fold({ failure -> error("$command failed: $failure") }, {})
+}
+
+private fun AudioRecord.stopIfRecording() = synchronized(this) {
+    if (recordingState == AudioRecord.RECORDSTATE_RECORDING) stop()
 }
 
 private fun intArgument(args: Bundle, name: String, default: Int): Int =
