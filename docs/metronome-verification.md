@@ -1,6 +1,6 @@
 # Metronome verification
 
-Verified on 2026-10-04 against production commit `c6b4024`.
+Baseline verified on 2026-10-04 against production commit `c6b4024`. The CI playback correction below was verified against `dc317a6` on the same date.
 
 ## Automated checks
 
@@ -9,6 +9,18 @@ The clean checkout with committed Gradle 9.5.0, AGP 9.3.3 and lint 32.3.3 passed
 The boundary guard rejected all three forbidden dependency fixtures and restored its input. The Node acoustic analyzer self-check passed clean, jittered, missing, extra, silent, short, invalid-capture and unverified-continuity fixtures.
 
 Galaxy S26 Ultra instrumentation passed 11 functional tests. The opt-in recording test was skipped in the normal suite. Checks include actual JSON persistence and failed-write retention, rapid Start/Stop, media notification Stop, muted first positions, audio focus loss without automatic restart, background playback, activity recreation, and service removal after a stale Stop command.
+
+## CI playback correction
+
+The API 35 Google APIs x86_64 emulator reproduced `AudioUnavailable`. Native diagnostics showed that the forced 480-frame startup queue drained completely within a 5.9 ms loop interval. AudioFlinger reported 1,088-frame mixer blocks at 48,000 Hz with no FastMixer. The engine now retains AudioTrack's native startup threshold, which was 4,360 frames on this emulator and 5,760 frames on the phone. The native buffer allocation, steady 40 ms write horizon, and fail-stop policy are unchanged. Cancellation propagates before audio failures are reported.
+
+The CI diagnostic command now executes in one shell so the Gradle exit status survives logcat collection. Previously, emulator-runner executed each script line in a separate shell, and `exit "$status"` failed even when the tests passed. CI also runs the 11 domain unit tests explicitly.
+
+On `dc317a6`, the clean committed-toolchain checkout and the user's tooling both passed module boundaries, product lint, all 62 unit tests, and both debug APK builds. After the startup correction, six playback tests passed in six consecutive local emulator runs, with no logged underrun. Galaxy S26 Ultra passed all 11 functional tests again, with the opt-in microphone test skipped. These runs do not establish long-term audio stability or hardware timing.
+
+Both [push CI](https://github.com/pekochan069/GuitarLearner/actions/runs/37135562881) and [PR CI](https://github.com/pekochan069/GuitarLearner/actions/runs/37135566466) passed on `dc317a6`. Each emulator report contains 11 functional passes, one acoustic skip, and no logged underrun. One earlier failure occurred after playback had started; the original log does not establish its mechanism. The passing runs do not prove that all steady-playback scheduling stalls are impossible.
+
+The user requested that the acoustic refresh be skipped. No new acoustic timing result is accepted for `dc317a6`. Playback and recording processes were stopped, media volume was restored to 3/15, and microphone permission was revoked. The short-capture results below apply only to `c6b4024`.
 
 ## Short acoustic captures
 
