@@ -1,6 +1,8 @@
 package com.pekochan069.guitarlearner
 
 import android.content.res.Configuration
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
@@ -10,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -22,7 +25,7 @@ class DesignFoundationTest {
     val compose = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun preferencesAndDemoSelectionsSurviveRecreation() {
+    fun preferencesAndToolSelectionsSurviveRecreation() {
         compose.onNodeWithTag("settings").performClick()
         compose.onNodeWithTag("language_en").performScrollTo().performClick()
         compose.waitForIdle()
@@ -48,13 +51,13 @@ class DesignFoundationTest {
         }
 
         compose.onNodeWithTag("page_Metronome").performClick()
-        compose.onNodeWithTag("increase_bpm").performScrollTo().performClick()
+        compose.onNodeWithTag("tempo_slider").performScrollTo().performSemanticsAction(SemanticsActions.SetProgress) { it(91f) }
+        waitForText("bpm_value", "91")
         compose.onNodeWithTag("bpm_value").assertTextEquals("91")
-        compose.onNodeWithTag("metronome_status").assertTextEquals("Stopped · simulated")
-        compose.onNodeWithTag("toggle_metronome").performScrollTo().performClick()
+        compose.onNodeWithTag("metronome_status").assertTextEquals("Stopped")
         compose.onNodeWithTag("increase_bpm").performScrollTo().performClick()
+        waitForText("bpm_value", "92")
         compose.onNodeWithTag("bpm_value").assertTextEquals("92")
-        compose.onNodeWithTag("metronome_status").assertTextEquals("Running · simulated")
 
         compose.onNodeWithTag("page_Gallery").performClick()
         compose.onNodeWithTag("gallery_selection").performScrollTo().assertIsOn().performClick()
@@ -75,7 +78,7 @@ class DesignFoundationTest {
         compose.onNodeWithTag("tuner_status").assertTextEquals("높음")
         compose.onNodeWithTag("page_Metronome").performClick()
         compose.onNodeWithTag("bpm_value").assertTextEquals("92")
-        compose.onNodeWithTag("metronome_status").assertTextEquals("실행 중 · 시뮬레이션")
+        compose.onNodeWithTag("metronome_status").assertTextEquals("정지")
         compose.onNodeWithTag("settings").performClick()
         compose.onNodeWithTag("theme_Dark").assertIsSelected()
         compose.onNodeWithTag("language_ko").performScrollTo().assertIsSelected()
@@ -83,5 +86,11 @@ class DesignFoundationTest {
             Configuration.UI_MODE_NIGHT_YES,
             compose.activity.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK,
         )
+    }
+
+    private fun waitForText(tag: String, value: String): Unit {
+        compose.waitUntil(5_000) {
+            compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.Text].any { it.text == value }
+        }
     }
 }

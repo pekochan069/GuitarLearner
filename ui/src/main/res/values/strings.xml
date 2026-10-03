@@ -20,7 +20,9 @@
     <string name="metronome_subtitle">A comfortable tempo, right at your fingertips.</string>
     <string name="gallery_title">Made for the everyday</string>
     <string name="gallery_subtitle">Explore the colors, type, and controls of GuitarLearner.</string>
-    <string name="demo_notice">Interactive design demo. No microphone, audio, or timed playback.</string>
+    <string name="tuner_demo_notice">Interactive tuner demo. Sample readings only; the microphone is not used.</string>
+    <string name="gallery_demo_notice">Explore the design components and their example states.</string>
+    <string name="metronome_playback_notice">Start to hear your pattern. Playback continues in the background and when the screen locks.</string>
     <string name="tuner_target">Sample target · A2</string>
     <string name="note_placeholder" translatable="false">--</string>
     <string name="note_a2" translatable="false">A2</string>
@@ -54,16 +56,71 @@
         <item quantity="one">%1$d beat per minute</item>
         <item quantity="other">%1$d beats per minute</item>
     </plurals>
-    <string name="meter_sample">4/4 · quarter notes</string>
-    <string name="state_running">Running · simulated</string>
-    <string name="state_stopped">Stopped · simulated</string>
+    <string name="state_running">Playing</string>
+    <string name="state_stopped">Stopped</string>
+    <string name="state_preparing">Preparing playback…</string>
+    <string name="state_playback_failed">Playback unavailable</string>
+    <string name="state_focus_interrupted">Stopped by an audio interruption</string>
+    <string name="state_output_disconnected">Stopped because headphones disconnected</string>
+    <string name="state_service_ended">Playback ended. Start again to continue.</string>
     <string name="set_tempo">Set your tempo</string>
     <string name="decrease_tempo">Decrease tempo by 1 BPM</string>
     <string name="increase_tempo">Increase tempo by 1 BPM</string>
     <string name="tempo_range">40–240 BPM. Adjust the tempo while stopped or running.</string>
-    <string name="start_demo">Start demo</string>
-    <string name="stop_demo">Stop demo</string>
-    <string name="metronome_simulation">The beat markers stay still. This demo does not play sound or keep time.</string>
+    <string name="start_metronome">Start</string>
+    <string name="stop_metronome">Stop</string>
+    <string name="tempo_note">%1$s = %2$d</string>
+    <string name="tempo_note_description">%1$s, %2$s</string>
+    <string name="note_half" translatable="false">𝅗𝅥</string>
+    <string name="note_quarter" translatable="false">♩</string>
+    <string name="note_eighth" translatable="false">♪</string>
+    <string name="note_sixteenth" translatable="false">𝅘𝅥𝅯</string>
+    <string name="metronome_meter">%1$d/%2$d</string>
+    <string name="time_signature">Time signature</string>
+    <plurals name="beats_per_bar">
+        <item quantity="one">%1$d beat per bar</item>
+        <item quantity="other">%1$d beats per bar</item>
+    </plurals>
+    <string name="increase_beats">Add one beat to the bar</string>
+    <string name="decrease_beats">Remove one beat from the bar</string>
+    <string name="beat_half">Half note</string>
+    <string name="beat_quarter">Quarter note</string>
+    <string name="beat_eighth">Eighth note</string>
+    <string name="beat_sixteenth">Sixteenth note</string>
+    <string name="beat_unit_description">Each click counts one %1$s. The BPM counts these notes.</string>
+    <string name="customize_accents">Beat accents</string>
+    <string name="accent_description">Tap a beat to cycle through accent, normal, and mute. Muted beats keep their place in the pattern.</string>
+    <string name="beat_accent">Accent</string>
+    <string name="beat_normal">Normal</string>
+    <string name="beat_mute">Mute</string>
+    <string name="beat_edit_description">Beat %1$d, %2$s. Tap to change.</string>
+    <string name="current_beat_description">Beat %1$d of %2$d, %3$s</string>
+    <string name="metronome_pending">Change waiting. Already prepared beats continue; new settings apply at the next available beat or bar.</string>
+    <string name="metronome_active_config">Playing now: %1$d/%2$d, %3$d BPM</string>
+    <string name="presets">Presets</string>
+    <string name="preset_name">Preset name</string>
+    <string name="save_preset">Save current settings</string>
+    <string name="preset_saving">Saving…</string>
+    <string name="presets_empty">Save a tempo and pattern to use them again.</string>
+    <string name="preset_configuration">%1$d/%2$d · %3$d BPM</string>
+    <string name="load_preset">Load</string>
+    <string name="delete_preset">Delete</string>
+    <string name="load_preset_description">Load preset %1$s</string>
+    <string name="delete_preset_description">Delete preset %1$s</string>
+    <string name="overwrite_preset_title">Replace this preset?</string>
+    <string name="overwrite_preset_description">%1$s already exists. Replace it with the current tempo and pattern?</string>
+    <string name="overwrite_preset">Replace</string>
+    <string name="cancel_action">Cancel</string>
+    <string name="dismiss_notice">Dismiss</string>
+    <string name="metronome_invalid_configuration">Use 40–240 BPM and 1–16 beats per bar.</string>
+    <string name="preset_invalid_name">Enter a valid name for this preset.</string>
+    <string name="preset_exists">This preset name already exists. Confirm before replacing it.</string>
+    <string name="preset_missing">This preset is no longer available.</string>
+    <string name="metronome_read_failed">Could not read the saved metronome settings or presets.</string>
+    <string name="metronome_save_failed">Could not save your changes. Please try again.</string>
+    <string name="metronome_focus_denied">Another app is using audio. When it finishes, tap Start again.</string>
+    <string name="metronome_service_unavailable">Could not start background playback. Please try again.</string>
+    <string name="metronome_audio_unavailable">Could not play the clicks. Check your audio output, then tap Start again.</string>
     <string name="controls">Everyday controls</string>
     <string name="selected_control">Select this example</string>
     <string name="switch_on">Example switched on</string>
