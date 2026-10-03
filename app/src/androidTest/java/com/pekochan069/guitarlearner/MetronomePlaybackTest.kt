@@ -1,13 +1,20 @@
 package com.pekochan069.guitarlearner
 
+import android.app.ActivityManager
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
+import android.content.ComponentName
+import android.content.Intent
 import android.content.SharedPreferences
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.os.Process
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.Lifecycle
 import arrow.core.Either
 import com.pekochan069.guitarlearner.adapters.AndroidMetronomeHost
@@ -182,6 +189,60 @@ class MetronomePlaybackTest {
             assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetPattern(original.denominator, original.beats)))
             assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetTempo(original.bpm)))
         }
+    }
+
+    @Test
+    fun staleStopLeavesPlaybackRunningAndTheUiStopRemovesTheStartedService(): Unit = runBlocking {
+        val application = compose.activity.application as GuitarLearnerApplication
+        val host = application.graph.metronomeHost
+        val original = host.current.value.selected
+        val serviceIntent = Intent(application, MetronomePlaybackService::class.java)
+        try {
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.Stop))
+            withTimeout(5_000) { while (runningOwnMetronomeService(application) != null) delay(10) }
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetTempo(40)))
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetPattern(BeatUnit.Quarter,
+                List(8) { BeatAccent.Mute })))
+            compose.onNodeWithTag("page_Metronome").performClick()
+            compose.onNodeWithTag("toggle_metronome").performScrollTo().performClick()
+            expectPlaying(host)
+            val started = requireNotNull(runningOwnMetronomeService(application))
+            assertTrue(started.started)
+            assertTrue(started.foreground)
+
+            application.startService(Intent(serviceIntent)
+                .setAction("com.pekochan069.guitarlearner.metronome.STOP").putExtra("run_id", -1L))
+            withTimeout(5_000) {
+                while ((runningOwnMetronomeService(application)?.lastActivityTime ?: 0L) <= started.lastActivityTime) delay(10)
+            }
+            val afterStaleStop = requireNotNull(runningOwnMetronomeService(application))
+            assertEquals(started.activeSince, afterStaleStop.activeSince)
+            assertTrue(afterStaleStop.started)
+            val continuing = expectPlaying(host)
+            withTimeout(5_000) {
+                host.current.first {
+                    val playback = it.playback
+                    playback is PlaybackState.Playing && playback.beatIndex != continuing.beatIndex
+                }
+            }
+
+            compose.onNodeWithTag("toggle_metronome").performScrollTo().performClick()
+            withTimeout(5_000) { host.current.first { it.playback == PlaybackState.Stopped(StopReason.User) } }
+            withTimeout(5_000) { while (runningOwnMetronomeService(application) != null) delay(10) }
+            assertEquals(null, host.currentAudioDiagnostics())
+        } finally {
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.Stop))
+            application.stopService(serviceIntent)
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetPattern(original.denominator, original.beats)))
+            assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetTempo(original.bpm)))
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun runningOwnMetronomeService(application: Application): ActivityManager.RunningServiceInfo? {
+        val component = ComponentName(application, MetronomePlaybackService::class.java)
+        return application.getSystemService(ActivityManager::class.java).getRunningServices(Int.MAX_VALUE)
+            .firstOrNull { it.service == component && it.pid == Process.myPid() }
     }
 
     private suspend fun expectPlaying(host: AndroidMetronomeHost): PlaybackState.Playing {
