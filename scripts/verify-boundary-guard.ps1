@@ -22,3 +22,4 @@ try {
 } finally {
     [IO.File]::WriteAllText($taskBuildFile, $taskOriginal, $taskEncoding)
 }
+exit 0
