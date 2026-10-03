@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.metro)
 }
 
 android {
@@ -33,23 +34,36 @@ android {
     buildFeatures {
         compose = true
     }
+    lint {
+        abortOnError = true
+        warningsAsErrors = true
+        informational += setOf("AndroidGradlePluginVersion", "GradleDependency", "NewerVersionAvailable")
+    }
 }
 
+kotlin.compilerOptions.allWarningsAsErrors.set(true)
+
 dependencies {
+    implementation(project(":domain"))
+    implementation(project(":presentation:contract"))
+    implementation(project(":presentation:logic"))
+    implementation(project(":ui"))
+    implementation(project(":adapters"))
+    implementation(libs.arrow.core)
+    implementation(libs.circuit.foundation)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.compose.material3)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.kotlinx.coroutines.core)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    debugImplementation(libs.androidx.compose.ui.tooling)
+    lintChecks(project(":architecture-lint"))
 }
