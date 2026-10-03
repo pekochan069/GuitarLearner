@@ -133,9 +133,15 @@ class FoundationPresentationTest {
             context.getString(com.pekochan069.guitarlearner.ui.R.string.current_beat_description, 3, 4,
                 context.getString(com.pekochan069.guitarlearner.ui.R.string.beat_normal)),
         ).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
+        compose.onNodeWithTag("current_beat").assertTextEquals(
+            context.getString(com.pekochan069.guitarlearner.ui.R.string.current_beat_number, 3, 4),
+        ).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
         compose.onNodeWithTag("metronome_pending").assertExists()
         metronome.snapshot.value = metronome.snapshot.value.copy(playback = PlaybackState.Playing(audible.copy(bpm = 140), 3))
         compose.onNodeWithTag("metronome_pending").assertDoesNotExist()
+        compose.onNodeWithTag("current_beat").assertTextEquals(
+            context.getString(com.pekochan069.guitarlearner.ui.R.string.current_beat_number, 4, 4),
+        )
     }
 
     @Test

@@ -82,6 +82,8 @@
     <string name="beat_mute">무음</string>
     <string name="beat_edit_description">%1$d박, %2$s. 누르면 변경합니다.</string>
     <string name="current_beat_description">%2$d박 중 %1$d박, %3$s</string>
+    <string name="current_beat_number">현재 %1$d / %2$d박</string>
+    <string name="current_beat_ready">시작 대기</string>
     <string name="metronome_pending">변경 대기 중. 이미 준비된 박은 재생하고, 적용 가능한 다음 박이나 마디에서 바뀝니다.</string>
     <string name="metronome_active_config">현재 재생: %1$d/%2$d, %3$d BPM</string>
     <string name="presets">프리셋</string>

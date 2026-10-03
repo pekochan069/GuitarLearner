@@ -8,6 +8,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import arrow.core.raise.either
+import arrow.core.raise.ensure
 import com.pekochan069.guitarlearner.domain.AppearanceChange
 import com.pekochan069.guitarlearner.domain.AppearanceFailure
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
@@ -104,6 +106,24 @@ class FoundationPresenter(
             }
         }
 
+        fun setAccent(index: Int, transform: (BeatAccent) -> BeatAccent) {
+            scope.launch {
+                commands.withLock {
+                    either<MetronomeFailure, Unit> {
+                        val config = metronome.current.value.selected
+                        ensure(index in config.beats.indices) { MetronomeFailure.InvalidConfiguration }
+                        val beats = config.beats.mapIndexed { position, accent ->
+                            if (position == index) transform(accent) else accent
+                        }
+                        metronome.execute(MetronomeCommand.SetPattern(config.denominator, beats)).bind()
+                    }.fold(
+                        ifLeft = { metronomeNotice = it.toNotice() },
+                        ifRight = { metronomeNotice = null },
+                    )
+                }
+            }
+        }
+
         fun setRunning(value: Boolean) {
             // Stop must not wait behind a checked preset/settings disk write.
             scope.launch {
@@ -162,16 +182,9 @@ class FoundationPresenter(
                     is FoundationEvent.SetBeatCount -> setPattern { it.withBeatCount(event.value) }
                     is FoundationEvent.AdjustBeatCount -> setPattern { it.withBeatCount(it.numerator + event.delta) }
                     is FoundationEvent.SetBeatUnit -> setPattern { it.copy(denominator = event.value.toDomain()) }
-                    is FoundationEvent.SetBeatAccent -> {
-                        if (event.index !in metronome.current.value.selected.beats.indices) {
-                            metronomeNotice = MetronomeNotice.InvalidConfiguration
-                        } else {
-                            setPattern { config ->
-                                config.copy(beats = config.beats.mapIndexed { index, accent ->
-                                    if (index == event.index) event.value.toDomain() else accent
-                                })
-                            }
-                        }
+                    is FoundationEvent.SetBeatAccent -> setAccent(event.index) { event.value.toDomain() }
+                    is FoundationEvent.CycleBeatAccent -> setAccent(event.index) {
+                        BeatAccent.entries[(it.ordinal + 1) % BeatAccent.entries.size]
                     }
                     is FoundationEvent.SetPresetName -> presetName = event.value
                     FoundationEvent.SavePreset -> {

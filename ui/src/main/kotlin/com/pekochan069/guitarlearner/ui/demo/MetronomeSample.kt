@@ -234,10 +234,7 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
         config.beats.forEachIndexed { index, accent ->
             val description = stringResource(R.string.beat_edit_description, index + 1, stringResource(accent.label))
             FilledTonalButton(
-                onClick = {
-                    val next = BeatAccentUi.entries[(accent.ordinal + 1) % BeatAccentUi.entries.size]
-                    eventSink(FoundationEvent.SetBeatAccent(index, next))
-                },
+                onClick = { eventSink(FoundationEvent.CycleBeatAccent(index)) },
                 modifier = Modifier.heightIn(min = 56.dp).testTag("beat_accent_" + (index + 1)).semantics { contentDescription = description },
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -341,4 +338,12 @@ private fun BeatIndicators(config: MetronomeConfigUi, beatIndex: Int?): Unit {
             }
         }
     }
+    Text(
+        if (beatIndex == null) stringResource(R.string.current_beat_ready)
+        else stringResource(R.string.current_beat_number, beatIndex + 1, config.numerator),
+        Modifier.testTag("current_beat"),
+        style = MaterialTheme.typography.labelLarge,
+        minLines = 1,
+        maxLines = 1,
+    )
 }

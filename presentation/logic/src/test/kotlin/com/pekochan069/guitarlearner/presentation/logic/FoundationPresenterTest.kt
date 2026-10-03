@@ -159,6 +159,47 @@ class FoundationPresenterTest {
     }
 
     @Test
+    fun burstAccentCyclesUseTheCommittedAccentAfterThePendingWrite(): Unit = runTest {
+        val metronome = ControlledMetronome()
+        metronome.result = CompletableDeferred()
+        FoundationPresenter(ControlledAppearance(), metronome).test {
+            var state = awaitItem()
+            state.eventSink(FoundationEvent.CycleBeatAccent(0))
+            state.eventSink(FoundationEvent.CycleBeatAccent(0))
+            runCurrent()
+            assertEquals(1, metronome.requests.size)
+            assertEquals(BeatAccent.Normal, (metronome.requests.single() as MetronomeCommand.SetPattern).beats.first())
+            assertEquals(BeatAccent.Accent, metronome.snapshot.value.selected.beats.first())
+            metronome.result!!.complete(Either.Right(Unit))
+            do {
+                state = awaitItem()
+            } while (state.metronome.config.beats.first() != BeatAccentUi.Mute)
+            assertEquals(2, metronome.requests.size)
+            assertEquals(BeatAccent.Mute, (metronome.requests.last() as MetronomeCommand.SetPattern).beats.first())
+        }
+    }
+
+    @Test
+    fun queuedResizeRejectsAccentEditsForRemovedBeatsWithoutAnotherWrite(): Unit = runTest {
+        val metronome = ControlledMetronome()
+        metronome.result = CompletableDeferred()
+        FoundationPresenter(ControlledAppearance(), metronome).test {
+            var state = awaitItem()
+            state.eventSink(FoundationEvent.SetBeatCount(1))
+            state.eventSink(FoundationEvent.CycleBeatAccent(3))
+            state.eventSink(FoundationEvent.SetBeatAccent(3, BeatAccentUi.Mute))
+            runCurrent()
+            assertEquals(1, metronome.requests.size)
+            metronome.result!!.complete(Either.Right(Unit))
+            do {
+                state = awaitItem()
+            } while (state.metronome.notice != MetronomeNotice.InvalidConfiguration)
+            assertEquals(listOf(BeatAccentUi.Accent), state.metronome.config.beats)
+            assertEquals(listOf(MetronomeCommand.SetPattern(BeatUnit.Quarter, listOf(BeatAccent.Accent))), metronome.requests)
+        }
+    }
+
+    @Test
     fun startDoesNotInventRunningAndTypedFailureRemainsRecoverable(): Unit = runTest {
         val metronome = ControlledMetronome()
         metronome.result = CompletableDeferred()

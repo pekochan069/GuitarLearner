@@ -45,6 +45,7 @@ sealed interface FoundationEvent : CircuitUiEvent {
     data class AdjustBeatCount(val delta: Int) : FoundationEvent
     data class SetBeatUnit(val value: BeatUnitUi) : FoundationEvent
     data class SetBeatAccent(val index: Int, val value: BeatAccentUi) : FoundationEvent
+    data class CycleBeatAccent(val index: Int) : FoundationEvent
     data class SetPresetName(val value: String) : FoundationEvent
     data object SavePreset : FoundationEvent
     data object ConfirmPresetOverwrite : FoundationEvent

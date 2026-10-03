@@ -95,6 +95,8 @@
     <string name="beat_mute">Mute</string>
     <string name="beat_edit_description">Beat %1$d, %2$s. Tap to change.</string>
     <string name="current_beat_description">Beat %1$d of %2$d, %3$s</string>
+    <string name="current_beat_number">Beat %1$d / %2$d</string>
+    <string name="current_beat_ready">Ready to start</string>
     <string name="metronome_pending">Change waiting. Already prepared beats continue; new settings apply at the next available beat or bar.</string>
     <string name="metronome_active_config">Playing now: %1$d/%2$d, %3$d BPM</string>
     <string name="presets">Presets</string>
