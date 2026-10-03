@@ -163,7 +163,7 @@ class AndroidMetronomeHost(
     fun onServiceCommand(service: Service, scope: CoroutineScope, intent: Intent?, startId: Int) {
         val id = intent?.getLongExtra(EXTRA_RUN_ID, -1) ?: -1
         when (intent?.action) {
-            ACTION_START -> if (id == requestedRunId && run == null) begin(service, scope, startId, id)
+            ACTION_START -> if (run == null) begin(service, scope, startId, id)
             ACTION_STOP -> if (id == requestedRunId) stop(StopReason.User)
         }
         if (run == null) service.stopSelfResult(startId)
@@ -176,6 +176,14 @@ class AndroidMetronomeHost(
     private fun begin(service: Service, scope: CoroutineScope, startId: Int, id: Long) {
         try {
             val session = PlaybackRun(service, scope, startId, id)
+            if (id != requestedRunId) {
+                try {
+                    session.prepareForeground()
+                } finally {
+                    session.close()
+                }
+                return
+            }
             run = session
             session.prepare()
             if (requestedRunId == id) session.audio.start(scope)
@@ -260,7 +268,7 @@ class AndroidMetronomeHost(
             if (mode != AudioManager.MODE_NORMAL && requestedRunId == id) stop(StopReason.FocusLoss)
         } else null
 
-        fun prepare() {
+        fun prepareForeground() {
             notifications.createNotificationChannel(NotificationChannel(CHANNEL, application.getString(R.string.metronome_notification_channel), NotificationManager.IMPORTANCE_LOW))
             media.setCallback(object : MediaSession.Callback() {
                 override fun onStop() { if (requestedRunId == id) stop(StopReason.User) }
@@ -271,6 +279,10 @@ class AndroidMetronomeHost(
                 .setState(NativePlaybackState.STATE_CONNECTING, NativePlaybackState.PLAYBACK_POSITION_UNKNOWN, 0f).build())
             service.startForeground(NOTIFICATION, notification(snapshot.value.selected, preparing = true))
             foreground = true
+        }
+
+        fun prepare() {
+            prepareForeground()
             if (manager.mode != AudioManager.MODE_NORMAL || manager.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
                 fail(id, MetronomeFailure.FocusDenied)
                 return

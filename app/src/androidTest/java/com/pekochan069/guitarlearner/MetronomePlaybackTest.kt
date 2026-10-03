@@ -94,6 +94,9 @@ class MetronomePlaybackTest {
             }
             delay(500)
             assertTrue(host.current.value.playback is PlaybackState.Stopped)
+            withTimeout(5_000) {
+                while (Thread.getAllStackTraces().keys.any { it.name == "MetronomeAudio" && it.isAlive }) delay(25)
+            }
             assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.Start))
             val result = withTimeout(10_000) { host.current.first { it.playback is PlaybackState.Playing || it.playback is PlaybackState.Failed } }
             assertTrue("Expected playback, received ${result.playback}", result.playback is PlaybackState.Playing)

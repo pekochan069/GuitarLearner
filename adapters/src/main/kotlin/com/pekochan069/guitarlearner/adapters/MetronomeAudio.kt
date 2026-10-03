@@ -68,7 +68,7 @@ internal class MetronomeAudio(
     fun start(scope: CoroutineScope) {
         val thread = HandlerThread("MetronomeAudio", Process.THREAD_PRIORITY_AUDIO).apply { start() }
         val dispatcher = Handler(thread.looper).asCoroutineDispatcher("MetronomeAudio")
-        job = scope.launch(dispatcher) {
+        val worker = scope.launch(dispatcher) {
             try {
                 play()
             } catch (_: IllegalArgumentException) {
@@ -83,9 +83,10 @@ internal class MetronomeAudio(
                     track?.release()
                     track = null
                 }
-                thread.quitSafely()
             }
         }
+        worker.invokeOnCompletion { thread.quitSafely() }
+        job = worker
     }
 
     fun stop() {
