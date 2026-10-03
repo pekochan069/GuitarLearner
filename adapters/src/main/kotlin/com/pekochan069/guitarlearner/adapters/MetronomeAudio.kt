@@ -72,12 +72,11 @@ internal class MetronomeAudio(
         val worker = scope.launch(dispatcher) {
             try {
                 play()
-            } catch (failure: CancellationException) {
-                throw failure
             } catch (failure: IllegalArgumentException) {
                 Log.e(TAG, "Invalid audio configuration", failure)
                 onFailure()
             } catch (failure: IllegalStateException) {
+                if (failure is CancellationException) throw failure
                 Log.e(TAG, "Audio state failed", failure)
                 onFailure()
             } catch (failure: UnsupportedOperationException) {
