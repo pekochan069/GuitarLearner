@@ -23,4 +23,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "GuitarLearner"
-include(":app")
+include(":app", ":domain", ":presentation:contract", ":presentation:logic", ":ui", ":adapters", ":architecture-lint")

@@ -1,31 +1,26 @@
 package com.pekochan069.guitarlearner
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.core.content.edit
-import androidx.core.os.LocaleListCompat
-import com.pekochan069.guitarlearner.ui.demo.DesignFoundationApp
+import com.pekochan069.guitarlearner.domain.AppearanceFailure
+import com.pekochan069.guitarlearner.presentation.contract.FoundationScreen
 import com.pekochan069.guitarlearner.ui.theme.GuitarLearnerTheme
+import com.slack.circuit.foundation.CircuitCompositionLocals
+import com.slack.circuit.foundation.CircuitContent
 
 class MainActivity : AppCompatActivity() {
-    private val preferences by lazy { getSharedPreferences("appearance", MODE_PRIVATE) }
-    private var themeMode by mutableStateOf(ThemeMode.System)
-    private var languageTag by mutableStateOf("")
+    private val graph: AppGraph get() = (application as GuitarLearnerApplication).graph
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        themeMode = ThemeMode.read(preferences)
-        AppCompatDelegate.setDefaultNightMode(themeMode.nightMode)
+    override fun onCreate(savedInstanceState: Bundle?): Unit {
+        graph.appearanceHost.prepareActivityTheme().fold(::reportAppearanceFailure, {})
         super.onCreate(savedInstanceState)
-        languageTag = AppCompatDelegate.getApplicationLocales().get(0)?.language.orEmpty()
+        graph.appearanceHost.refreshPlatformLanguage().fold(::reportAppearanceFailure, {})
         setContent {
             val darkTheme = isSystemInDarkTheme()
             SideEffect {
@@ -39,25 +34,19 @@ class MainActivity : AppCompatActivity() {
                 )
             }
             GuitarLearnerTheme(darkTheme = darkTheme) {
-                DesignFoundationApp(
-                    themeMode = themeMode,
-                    languageTag = languageTag,
-                    onThemeChange = { mode ->
-                        preferences.edit { putString("theme_mode", mode.name) }
-                        themeMode = mode
-                        AppCompatDelegate.setDefaultNightMode(mode.nightMode)
-                    },
-                    onLanguageChange = { tag ->
-                        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
-                        languageTag = tag
-                    },
-                )
+                CircuitCompositionLocals(graph.circuit) {
+                    CircuitContent(FoundationScreen)
+                }
             }
         }
     }
 
-    override fun onResume() {
+    override fun onResume(): Unit {
         super.onResume()
-        languageTag = AppCompatDelegate.getApplicationLocales().get(0)?.language.orEmpty()
+        graph.appearanceHost.refreshPlatformLanguage().fold(::reportAppearanceFailure, {})
+    }
+
+    private fun reportAppearanceFailure(failure: AppearanceFailure): Unit {
+        Log.e("Appearance", "Native appearance initialization failed: $failure")
     }
 }
