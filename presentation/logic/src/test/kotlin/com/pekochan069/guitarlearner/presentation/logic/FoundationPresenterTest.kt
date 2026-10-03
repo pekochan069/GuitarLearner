@@ -159,6 +159,30 @@ class FoundationPresenterTest {
     }
 
     @Test
+    fun stopReachesTheSharedOwnerWhileAConfigurationWriteIsPending(): Unit = runTest {
+        val metronome = ControlledMetronome()
+        metronome.snapshot.value = MetronomeSnapshot(playback = PlaybackState.Playing(MetronomeConfig(), 0))
+        metronome.result = CompletableDeferred()
+        FoundationPresenter(ControlledAppearance(), metronome).test {
+            var state = awaitItem()
+            assertTrue(state.running)
+            state.eventSink(FoundationEvent.SetBpm(91))
+            runCurrent()
+            assertEquals(listOf(MetronomeCommand.SetTempo(91)), metronome.requests)
+            state.eventSink(FoundationEvent.SetRunning(false))
+            state = awaitItem()
+            assertFalse(state.running)
+            assertEquals(90, state.bpm)
+            assertFalse(metronome.result!!.isCompleted)
+            assertEquals(listOf(MetronomeCommand.SetTempo(91), MetronomeCommand.Stop), metronome.requests)
+            metronome.result!!.complete(Either.Right(Unit))
+            state = awaitItem()
+            assertEquals(91, state.bpm)
+            assertFalse(state.running)
+        }
+    }
+
+    @Test
     fun burstAccentCyclesUseTheCommittedAccentAfterThePendingWrite(): Unit = runTest {
         val metronome = ControlledMetronome()
         metronome.result = CompletableDeferred()
@@ -300,9 +324,10 @@ private class ControlledMetronome : Metronome {
 
     override suspend fun execute(command: MetronomeCommand): Either<MetronomeFailure, Unit> {
         requests += command
-        val outcome = result?.await() ?: Either.Right(Unit)
+        val outcome = if (command == MetronomeCommand.Stop) Either.Right(Unit) else result?.await() ?: Either.Right(Unit)
         if (outcome is Either.Left) return outcome
         when (command) {
+            MetronomeCommand.Stop -> snapshot.value = snapshot.value.copy(playback = PlaybackState.Stopped(StopReason.User))
             is MetronomeCommand.SetTempo -> snapshot.value = snapshot.value.copy(selected = snapshot.value.selected.copy(bpm = command.bpm))
             is MetronomeCommand.SetPattern -> snapshot.value = snapshot.value.copy(selected = snapshot.value.selected.copy(denominator = command.denominator, beats = command.beats))
             else -> Unit
