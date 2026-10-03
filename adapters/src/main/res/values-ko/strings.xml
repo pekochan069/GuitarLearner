@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="metronome_notification_channel">메트로놈 재생</string>
+    <string name="metronome_notification_title">메트로놈</string>
+    <string name="metronome_notification_preparing">재생 준비 중…</string>
+    <string name="metronome_notification_configuration">%1$d BPM · %2$d/%3$d</string>
+    <string name="metronome_notification_stop">정지</string>
+</resources>
