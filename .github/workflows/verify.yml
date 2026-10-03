@@ -27,7 +27,7 @@ jobs:
       - name: Verify architecture, lint, unit tests, and assembly
         run: |
           chmod +x gradlew
-          ./gradlew verifyModuleBoundaries lint :architecture-lint:test :adapters:testDebugUnitTest :presentation:logic:testDebugUnitTest :app:assembleDebug --console=plain
+          ./gradlew verifyModuleBoundaries lint :architecture-lint:test :domain:test :adapters:testDebugUnitTest :presentation:logic:testDebugUnitTest :app:assembleDebug --console=plain
       - name: Prove forbidden module dependency fails
         shell: pwsh
         run: ./scripts/verify-boundary-guard.ps1
@@ -43,10 +43,10 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: |
-            status=0
-            ./gradlew :app:connectedDebugAndroidTest --console=plain || status=$?
-            adb logcat -d -v threadtime MetronomeAudio:D AudioTrack:W '*:S' > metronome-logcat.txt
+          script: >-
+            status=0;
+            ./gradlew :app:connectedDebugAndroidTest --console=plain || status=$?;
+            adb logcat -d -v threadtime MetronomeAudio:D AudioTrack:W '*:S' > metronome-logcat.txt;
             exit "$status"
       - name: Upload verification reports
         if: always()

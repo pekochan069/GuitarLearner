@@ -19,6 +19,7 @@ import com.pekochan069.guitarlearner.domain.MetronomeConfig
 import com.pekochan069.guitarlearner.domain.MetronomeSequencer
 import com.pekochan069.guitarlearner.domain.ScheduledBeat
 import java.util.concurrent.ConcurrentLinkedQueue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.android.asCoroutineDispatcher
@@ -71,13 +72,19 @@ internal class MetronomeAudio(
         val worker = scope.launch(dispatcher) {
             try {
                 play()
-            } catch (_: IllegalArgumentException) {
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: IllegalArgumentException) {
+                Log.e(TAG, "Invalid audio configuration", failure)
                 onFailure()
-            } catch (_: IllegalStateException) {
+            } catch (failure: IllegalStateException) {
+                Log.e(TAG, "Audio state failed", failure)
                 onFailure()
-            } catch (_: UnsupportedOperationException) {
+            } catch (failure: UnsupportedOperationException) {
+                Log.e(TAG, "Audio operation unsupported", failure)
                 onFailure()
-            } catch (_: SecurityException) {
+            } catch (failure: SecurityException) {
+                Log.e(TAG, "Audio access denied", failure)
                 onFailure()
             } finally {
                 synchronized(trackGate) {
@@ -108,7 +115,11 @@ internal class MetronomeAudio(
             ?.toIntOrNull()?.takeIf { it > 0 } ?: 48_000
         val chunkFrames = max(1, sampleRate / 200)
         val minimumBytes = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        if (minimumBytes <= 0) { onFailure(); return }
+        if (minimumBytes <= 0) {
+            Log.e(TAG, "Invalid minimum audio buffer result=$minimumBytes sampleRate=$sampleRate")
+            onFailure()
+            return
+        }
         val audio = AudioTrack.Builder()
             .setAudioAttributes(mediaAttributes())
             .setAudioFormat(AudioFormat.Builder().setSampleRate(sampleRate)
@@ -119,7 +130,11 @@ internal class MetronomeAudio(
             .build()
         synchronized(trackGate) { track = audio }
         coroutineContext.ensureActive()
-        if (audio.state != AudioTrack.STATE_INITIALIZED) { onFailure(); return }
+        if (audio.state != AudioTrack.STATE_INITIALIZED) {
+            Log.e(TAG, "AudioTrack not initialized state=${audio.state}")
+            onFailure()
+            return
+        }
         val capacity = audio.bufferSizeInFrames
         if (Build.VERSION.SDK_INT >= 31) audio.setStartThresholdInFrames(min(capacity, chunkFrames * 2))
         val startThreshold = if (Build.VERSION.SDK_INT >= 31) audio.startThresholdInFrames else capacity
@@ -135,6 +150,10 @@ internal class MetronomeAudio(
         var rawHead = 0L
         var headEpoch = 0L
         var lastProgressNs = System.nanoTime()
+        var lastLoopNs = lastProgressNs
+        var maxLoopGapNs = 0L
+        var maxHeadDelta = 0L
+        var lastWriteResult = 0
         var lastLogNs = 0L
         var nextDiagnosticsNs = 0L
         val clock = PresentedFrameClock(sampleRate)
@@ -167,14 +186,30 @@ internal class MetronomeAudio(
         while (true) {
             coroutineContext.ensureActive()
             val now = System.nanoTime()
+            val loopGapNs = now - lastLoopNs
+            lastLoopNs = now
+            maxLoopGapNs = max(maxLoopGapNs, loopGapNs)
+            val previousHead = headEpoch + rawHead
+            val previousQueuedFrames = writtenFrames - previousHead
             val currentRaw = audio.playbackHeadPosition.toLong() and 0xffff_ffffL
             if (currentRaw < rawHead && rawHead - currentRaw > 0x8000_0000L) headEpoch += 0x1_0000_0000L
             if (currentRaw != rawHead) lastProgressNs = now
             rawHead = currentRaw
             val head = headEpoch + currentRaw
-            if (started && now - lastProgressNs > 3_000_000_000L) { onFailure(); return }
+            val headDelta = head - previousHead
+            maxHeadDelta = max(maxHeadDelta, headDelta)
+            if (started && now - lastProgressNs > 3_000_000_000L) {
+                Log.e(TAG, "Playback stalled head=$head written=$writtenFrames queued=${writtenFrames - head} " +
+                    "loopGapNs=$loopGapNs maxLoopGapNs=$maxLoopGapNs lastWrite=$lastWriteResult")
+                onFailure()
+                return
+            }
             if (started && audio.underrunCount > underruns) {
-                Log.w(TAG, "Playback underrun count=${audio.underrunCount}")
+                Log.w(TAG, "Playback underrun count=${audio.underrunCount} " +
+                    "loopGapNs=$loopGapNs maxLoopGapNs=$maxLoopGapNs " +
+                    "previousHead=$previousHead head=$head headDelta=$headDelta maxHeadDelta=$maxHeadDelta " +
+                    "written=$writtenFrames previousQueued=$previousQueuedFrames queued=${writtenFrames - head} " +
+                    "pending=$pendingSize lastWrite=$lastWriteResult buffer=$capacity horizon=$writeHorizon start=$startThreshold")
                 onFailure()
                 return
             }
@@ -205,7 +240,13 @@ internal class MetronomeAudio(
             }
             if (pendingSize > 0) {
                 val written = audio.write(buffer, pendingOffset, pendingSize, AudioTrack.WRITE_NON_BLOCKING)
-                if (written < 0) { onFailure(); return }
+                lastWriteResult = written
+                if (written < 0) {
+                    Log.e(TAG, "AudioTrack write failed result=$written offset=$pendingOffset size=$pendingSize " +
+                        "head=$head written=$writtenFrames queued=${writtenFrames - head}")
+                    onFailure()
+                    return
+                }
                 writtenFrames += written
                 pendingOffset += written
                 pendingSize -= written
