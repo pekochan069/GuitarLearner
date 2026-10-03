@@ -75,6 +75,8 @@ internal class MetronomeAudio(
                 onFailure()
             } catch (_: IllegalStateException) {
                 onFailure()
+            } catch (_: UnsupportedOperationException) {
+                onFailure()
             } catch (_: SecurityException) {
                 onFailure()
             } finally {
