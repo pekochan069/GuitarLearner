@@ -247,17 +247,18 @@ internal fun clickSamples(sampleRate: Int, accented: Boolean): ShortArray {
 }
 
 internal class MetronomePcm(private val sequencer: MetronomeSequencer, sampleRate: Int) {
+    private val prerollFrames = sampleRate / 20L
     private val normal = clickSamples(sampleRate, false)
     private val accent = clickSamples(sampleRate, true)
     private var sounding: ShortArray? = null
     private var soundOffset = 0
-    private var frame = 0L
+    private var frame = -prerollFrames
 
     fun render(buffer: ShortArray, size: Int, onBeat: (ScheduledBeat) -> Unit) {
         for (index in 0 until size) {
             if (frame == sequencer.nextFrame) {
                 val beat = sequencer.nextBeat()
-                onBeat(beat)
+                onBeat(beat.copy(frame = beat.frame + prerollFrames))
                 sounding = when (beat.config.beats[beat.beatIndex]) {
                     BeatAccent.Accent -> accent
                     BeatAccent.Normal -> normal

@@ -12,27 +12,48 @@ import org.junit.Test
 
 class MetronomeAudioTest {
     @Test
-    fun pcmContainsDistinctAccentsAndAdvancesThroughSilenceAcrossChunks() {
+    fun pcmPrerollKeepsMarkersAndAccentsAlignedAcrossChunks() {
         val sequencer = MetronomeSequencer(MetronomeConfig(120, BeatUnit.Eighth,
             listOf(BeatAccent.Accent, BeatAccent.Normal, BeatAccent.Mute)), 48_000)
         val renderer = MetronomePcm(sequencer, 48_000)
-        val samples = ShortArray(72_000)
+        val samples = ShortArray(74_400)
         val chunk = ShortArray(240)
         val beats = mutableListOf<ScheduledBeat>()
         for (offset in samples.indices step chunk.size) {
             renderer.render(chunk, chunk.size, beats::add)
             chunk.copyInto(samples, offset)
         }
-        assertEquals(listOf(0L, 24_000L, 48_000L), beats.map { it.frame })
+        assertEquals(listOf(2_400L, 26_400L, 50_400L), beats.map { it.frame })
         assertEquals(listOf(0, 1, 2), beats.map { it.beatIndex })
-        assertTrue(samples.sliceArray(48_000 until 72_000).all { it == 0.toShort() })
-        val accented = samples.sliceArray(0 until 960)
-        val normal = samples.sliceArray(24_000 until 24_960)
+        assertTrue(samples.sliceArray(0 until 2_400).all { it == 0.toShort() })
+        assertTrue(samples.sliceArray(50_400 until 74_400).all { it == 0.toShort() })
+        val accented = samples.sliceArray(2_400 until 3_360)
+        val normal = samples.sliceArray(26_400 until 27_360)
+        assertTrue(accented.contentEquals(clickSamples(48_000, true)))
+        assertTrue(normal.contentEquals(clickSamples(48_000, false)))
         fun energy(values: ShortArray): Long = values.sumOf { it.toLong() * it }
         fun crossings(values: ShortArray): Int = (1 until values.size).count { values[it - 1] <= 0 && values[it] > 0 }
         assertTrue(energy(accented) > energy(normal) * 2)
         assertTrue(crossings(accented) > crossings(normal) * 1.8)
-        assertTrue(samples.sliceArray(960 until 24_000).all { it == 0.toShort() })
+        assertTrue(samples.sliceArray(3_360 until 26_400).all { it == 0.toShort() })
+    }
+
+    @Test
+    fun prerollDoesNotConsumeTheFirstBeatOrPendingTempo() {
+        val sequencer = MetronomeSequencer(MetronomeConfig(120), 48_000)
+        val renderer = MetronomePcm(sequencer, 48_000)
+        val beats = mutableListOf<ScheduledBeat>()
+        val silence = ShortArray(2_400)
+        renderer.render(silence, silence.size, beats::add)
+        assertTrue(silence.all { it == 0.toShort() })
+        assertTrue(beats.isEmpty())
+        assertEquals(0L, sequencer.nextFrame)
+
+        sequencer.setTempo(240)
+        renderer.render(ShortArray(12_001), 12_001, beats::add)
+        assertEquals(listOf(2_400L, 14_400L), beats.map { it.frame })
+        assertEquals(listOf(0, 1), beats.map { it.beatIndex })
+        assertEquals(listOf(240, 240), beats.map { it.config.bpm })
     }
 
     @Test
@@ -40,10 +61,10 @@ class MetronomeAudioTest {
         val sequencer = MetronomeSequencer(MetronomeConfig(120), 48_000)
         val renderer = MetronomePcm(sequencer, 48_000)
         val beats = mutableListOf<ScheduledBeat>()
-        renderer.render(ShortArray(23_990), 23_990, beats::add)
+        renderer.render(ShortArray(26_390), 26_390, beats::add)
         sequencer.setTempo(240)
         renderer.render(ShortArray(12_020), 12_020, beats::add)
-        assertEquals(listOf(0L, 24_000L, 36_000L), beats.map { it.frame })
+        assertEquals(listOf(2_400L, 26_400L, 38_400L), beats.map { it.frame })
         assertEquals(listOf(120, 240, 240), beats.map { it.config.bpm })
         assertEquals(listOf(0, 1, 2), beats.map { it.beatIndex })
     }
