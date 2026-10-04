@@ -7,12 +7,14 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.pekochan069.guitarlearner.ui.R as UiR
 import org.junit.Assert.assertEquals
@@ -59,6 +61,9 @@ class DesignFoundationTest {
         compose.onNodeWithTag("increase_bpm").performScrollTo().performClick()
         waitForText("bpm_value", "92")
         compose.onNodeWithTag("bpm_value").assertTextEquals("92")
+        compose.onNodeWithTag("open_presets").performScrollTo().performClick()
+        compose.onNodeWithTag("preset_name").performTextInput("연습 A")
+        compose.onNodeWithTag("close_presets").performScrollTo().performClick()
 
         compose.onNodeWithTag("page_Gallery").performClick()
         compose.onNodeWithTag("gallery_selection").performScrollTo().assertIsOn().performClick()
@@ -80,6 +85,11 @@ class DesignFoundationTest {
         compose.onNodeWithTag("page_Metronome").performClick()
         compose.onNodeWithTag("bpm_value").assertTextEquals("92")
         compose.onNodeWithTag("metronome_status").assertTextEquals("정지")
+        compose.onNodeWithTag("open_presets").performScrollTo().performClick()
+        compose.onNodeWithTag("preset_name").assertTextContains("연습 A")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("preset_name").assertTextContains("연습 A")
+        compose.onNodeWithTag("close_presets").performScrollTo().performClick()
         compose.onNodeWithTag("settings").performClick()
         compose.onNodeWithTag("theme_Dark").assertIsSelected()
         compose.onNodeWithTag("language_ko").performScrollTo().assertIsSelected()

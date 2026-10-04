@@ -127,6 +127,55 @@ class MetronomePlaybackTest {
     }
 
     @Test
+    fun signatureEditsRestartTheNativeOutputAtBeatZeroAndStoppedEditsStayStopped(): Unit = runBlocking {
+        val application = compose.activity.application as GuitarLearnerApplication
+        val host = application.graph.metronomeHost
+        val original = host.current.value.selected
+        val presetName = "Issue 7 native restart ${System.nanoTime()}"
+        val preset = MetronomeConfig(137, BeatUnit.Sixteenth,
+            listOf(BeatAccent.Mute, BeatAccent.Accent, BeatAccent.Normal, BeatAccent.Mute, BeatAccent.Normal))
+        try {
+            host.execute(MetronomeCommand.Stop).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetPattern(preset.denominator, preset.beats)).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetTempo(preset.bpm)).assertNativeSuccess()
+            assertTrue(host.current.value.playback is PlaybackState.Stopped)
+            assertEquals(null, host.currentAudioDiagnostics())
+            host.execute(MetronomeCommand.SavePreset(presetName, overwrite = true)).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetPattern(BeatUnit.Quarter, MetronomeConfig().beats)).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetTempo(40)).assertNativeSuccess()
+            host.execute(MetronomeCommand.Start).assertNativeSuccess()
+            assertEquals(0, expectPlaying(host).beatIndex)
+            val service = requireNotNull(runningOwnMetronomeService(application))
+
+            val seven = List(7) { BeatAccent.Mute }
+            for (unit in listOf(BeatUnit.Quarter, BeatUnit.Eighth)) {
+                withTimeout(5_000) { host.current.first { (it.playback as? PlaybackState.Playing)?.beatIndex == 1 } }
+                host.execute(MetronomeCommand.SetPattern(unit, seven)).assertNativeSuccess()
+                val expected = MetronomeConfig(40, unit, seven)
+                val restarted = withTimeout(5_000) {
+                    host.current.first { (it.playback as? PlaybackState.Playing)?.config == expected || it.playback is PlaybackState.Failed }
+                }.playback
+                assertEquals(PlaybackState.Playing(expected, 0), restarted)
+                assertEquals(service.activeSince, requireNotNull(runningOwnMetronomeService(application)).activeSince)
+            }
+            withTimeout(5_000) { host.current.first { (it.playback as? PlaybackState.Playing)?.beatIndex == 1 } }
+            host.execute(MetronomeCommand.LoadPreset(presetName)).assertNativeSuccess()
+            val loaded = withTimeout(5_000) {
+                host.current.first { (it.playback as? PlaybackState.Playing)?.config == preset || it.playback is PlaybackState.Failed }
+            }.playback
+            assertEquals(PlaybackState.Playing(preset, 0), loaded)
+            assertEquals(service.activeSince, requireNotNull(runningOwnMetronomeService(application)).activeSince)
+        } finally {
+            host.execute(MetronomeCommand.Stop).assertNativeSuccess()
+            if (host.current.value.presets.any { it.name == presetName }) {
+                host.execute(MetronomeCommand.DeletePreset(presetName)).assertNativeSuccess()
+            }
+            host.execute(MetronomeCommand.SetPattern(original.denominator, original.beats)).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetTempo(original.bpm)).assertNativeSuccess()
+        }
+    }
+
+    @Test
     fun losingFocusStopsAndAbandoningTheInterruptionDoesNotResume(): Unit = runBlocking {
         val host = (compose.activity.application as GuitarLearnerApplication).graph.metronomeHost
         val original = host.current.value.selected
@@ -252,6 +301,10 @@ class MetronomePlaybackTest {
         assertTrue("Expected playback, received ${result.playback}", result.playback is PlaybackState.Playing)
         return result.playback as PlaybackState.Playing
     }
+}
+
+private fun Either<MetronomeFailure, Unit>.assertNativeSuccess() {
+    assertEquals(Either.Right(Unit), this)
 }
 
 private class FailingPreferenceEditor(private val delegate: SharedPreferences) {

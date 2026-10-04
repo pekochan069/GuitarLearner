@@ -1,21 +1,30 @@
 package com.pekochan069.guitarlearner
 
 import android.content.Context
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import arrow.core.Either
@@ -23,6 +32,7 @@ import com.pekochan069.guitarlearner.domain.AppearanceChange
 import com.pekochan069.guitarlearner.domain.AppearanceFailure
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
 import com.pekochan069.guitarlearner.domain.AppearanceSnapshot
+import com.pekochan069.guitarlearner.domain.BeatAccent
 import com.pekochan069.guitarlearner.domain.LanguagePreference
 import com.pekochan069.guitarlearner.domain.Metronome
 import com.pekochan069.guitarlearner.domain.MetronomeCommand
@@ -45,6 +55,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -119,7 +130,9 @@ class FoundationPresentationTest {
     fun audibleBeatAndPendingSettingsRenderWithoutPerBeatLiveAnnouncements(): Unit {
         val metronome = FakeMetronome()
         val audible = MetronomeConfig(120)
-        metronome.snapshot.value = MetronomeSnapshot(selected = audible.copy(bpm = 140), playback = PlaybackState.Playing(audible, 2))
+        metronome.snapshot.value = MetronomeSnapshot(selected = audible.copy(bpm = 140,
+            beats = listOf(BeatAccent.Accent, BeatAccent.Normal, BeatAccent.Mute, BeatAccent.Normal)),
+            playback = PlaybackState.Playing(audible, 2))
         val circuit = testCircuit(FakeAppearance(), metronome)
         compose.setContent {
             GuitarLearnerTheme(false) {
@@ -129,18 +142,24 @@ class FoundationPresentationTest {
         compose.onNodeWithTag("page_Metronome").performClick()
         compose.onNodeWithTag("bpm_value").assertTextEquals("140")
         val context = ApplicationProvider.getApplicationContext<Context>()
-        compose.onNodeWithTag("beat_indicators").assertContentDescriptionEquals(
+        compose.onNodeWithTag("beat_accent_3").assertHasClickAction().assertContentDescriptionEquals(
+            context.getString(com.pekochan069.guitarlearner.ui.R.string.beat_edit_description, 3,
+                context.getString(com.pekochan069.guitarlearner.ui.R.string.beat_mute)),
+        ).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
+            context.getString(com.pekochan069.guitarlearner.ui.R.string.beat_current_pending,
+                context.getString(com.pekochan069.guitarlearner.ui.R.string.beat_normal))))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion)).performClick()
+        assertEquals(BeatAccent.Accent, metronome.snapshot.value.selected.beats[2])
+        compose.onNodeWithTag("current_beat").assertTextEquals(
             context.getString(com.pekochan069.guitarlearner.ui.R.string.current_beat_description, 3, 4,
                 context.getString(com.pekochan069.guitarlearner.ui.R.string.beat_normal)),
         ).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
-        compose.onNodeWithTag("current_beat").assertTextEquals(
-            context.getString(com.pekochan069.guitarlearner.ui.R.string.current_beat_number, 3, 4),
-        ).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
         compose.onNodeWithTag("metronome_pending").assertExists()
-        metronome.snapshot.value = metronome.snapshot.value.copy(playback = PlaybackState.Playing(audible.copy(bpm = 140), 3))
+        metronome.snapshot.value = metronome.snapshot.value.copy(playback = PlaybackState.Playing(metronome.snapshot.value.selected, 3))
         compose.onNodeWithTag("metronome_pending").assertDoesNotExist()
         compose.onNodeWithTag("current_beat").assertTextEquals(
-            context.getString(com.pekochan069.guitarlearner.ui.R.string.current_beat_number, 4, 4),
+            context.getString(com.pekochan069.guitarlearner.ui.R.string.current_beat_description, 4, 4,
+                context.getString(com.pekochan069.guitarlearner.ui.R.string.beat_normal)),
         )
     }
 
@@ -156,6 +175,8 @@ class FoundationPresentationTest {
             }
         }
         compose.onNodeWithTag("page_Metronome").performClick()
+        compose.onNodeWithTag("preset_name").assertDoesNotExist()
+        compose.onNodeWithTag("open_presets").performClick()
         compose.onNodeWithTag("preset_name").performScrollTo().performTextInput("Practice")
         compose.onNodeWithTag("save_preset").performScrollTo().performClick()
         compose.onNodeWithTag("cancel_preset_overwrite").performClick()
@@ -165,11 +186,151 @@ class FoundationPresentationTest {
         compose.onNodeWithTag("confirm_preset_overwrite").performClick().assertIsNotEnabled()
         metronome.presetResult!!.complete(Either.Left(MetronomeFailure.WriteFailed))
         compose.onNodeWithTag("confirm_preset_overwrite").assertExists()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        compose.onNodeWithTag("preset_overwrite_error").assertIsDisplayed().assertTextEquals(
+            context.getString(com.pekochan069.guitarlearner.ui.R.string.metronome_save_failed))
         compose.onNodeWithTag("cancel_preset_overwrite").performClick()
+        compose.onNodeWithTag("metronome_error").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("preset_name").assertTextContains("Practice")
         compose.onNodeWithTag("load_preset_Practice").performScrollTo().assertExists()
         assertEquals(140, metronome.snapshot.value.presets.single().config.bpm)
         assertEquals(listOf(MetronomeCommand.SavePreset("Practice", overwrite = true)), metronome.requests)
+    }
+
+    @Test
+    fun defaultPracticeControlsAreVisibleAndBeatsKeepIndividualTouchTargets(): Unit {
+        val circuit = testCircuit(FakeAppearance(), FakeMetronome())
+        compose.setContent {
+            GuitarLearnerTheme(false) {
+                CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+            }
+        }
+        compose.onNodeWithTag("page_Metronome").performClick()
+        val bottomBarTop = compose.onNodeWithTag("page_Metronome").getUnclippedBoundsInRoot().top
+        val minimumTouchSize = with(compose.density) { 48.dp.toPx() }
+        val buttons = listOf("decrease_bpm", "increase_bpm", "decrease_beats", "increase_beats",
+            "beat_unit_2", "beat_unit_4", "beat_unit_8", "beat_unit_16",
+            "beat_accent_1", "beat_accent_2", "beat_accent_3", "beat_accent_4", "toggle_metronome")
+        buttons.forEach { tag ->
+            val button = compose.onNodeWithTag(tag)
+            button.assertIsDisplayed().assertHasClickAction()
+            val touch = button.fetchSemanticsNode().touchBoundsInRoot
+            assertTrue("$tag touch width is ${touch.width}px", touch.width >= minimumTouchSize - 1f)
+            assertTrue("$tag touch height is ${touch.height}px", touch.height >= minimumTouchSize - 1f)
+            assertTrue("$tag extends below practice viewport", button.getUnclippedBoundsInRoot().bottom <= bottomBarTop)
+        }
+        val slider = compose.onNodeWithTag("tempo_slider").assertIsDisplayed()
+        val sliderTouch = slider.fetchSemanticsNode().touchBoundsInRoot
+        assertTrue("Slider touch height is ${sliderTouch.height}px", sliderTouch.height >= minimumTouchSize - 1f)
+        compose.onNodeWithTag("bpm_value").assertIsDisplayed()
+        val rowTop = compose.onNodeWithTag("beat_accent_1").getUnclippedBoundsInRoot().top
+        assertEquals(rowTop, compose.onNodeWithTag("beat_accent_4").getUnclippedBoundsInRoot().top)
+        compose.onNodeWithTag("preset_name").assertDoesNotExist()
+    }
+
+    @Test
+    fun beatsCycleThroughAllAccentsInThePracticeArea(): Unit {
+        val metronome = FakeMetronome()
+        val circuit = testCircuit(FakeAppearance(), metronome)
+        compose.setContent {
+            GuitarLearnerTheme(false) {
+                CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+            }
+        }
+        compose.onNodeWithTag("page_Metronome").performClick()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        for ((accent, label) in listOf(BeatAccent.Normal to com.pekochan069.guitarlearner.ui.R.string.beat_normal,
+            BeatAccent.Mute to com.pekochan069.guitarlearner.ui.R.string.beat_mute,
+            BeatAccent.Accent to com.pekochan069.guitarlearner.ui.R.string.beat_accent)) {
+            compose.onNodeWithTag("beat_accent_1").performClick().assertContentDescriptionEquals(
+                context.getString(com.pekochan069.guitarlearner.ui.R.string.beat_edit_description, 1, context.getString(label)))
+            assertEquals(accent, metronome.snapshot.value.selected.beats.first())
+        }
+        assertTrue(metronome.snapshot.value.playback is PlaybackState.Stopped)
+    }
+
+    @Test
+    fun sixteenBeatsWrapAndRemainInteractiveAtDoubleTextSize(): Unit {
+        val metronome = FakeMetronome()
+        metronome.snapshot.value = MetronomeSnapshot(selected = MetronomeConfig(240, beats = List(16) { BeatAccent.Normal }))
+        val circuit = testCircuit(FakeAppearance(), metronome)
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                GuitarLearnerTheme(true) {
+                    CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+                }
+            }
+        }
+        compose.onNodeWithTag("page_Metronome").performScrollTo().performClick()
+        val first = compose.onNodeWithTag("beat_accent_1").getUnclippedBoundsInRoot().top
+        val last = compose.onNodeWithTag("beat_accent_16").getUnclippedBoundsInRoot().top
+        assertTrue(last > first)
+        compose.onNodeWithTag("beat_accent_16").performScrollTo().assertIsDisplayed()
+            .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
+        compose.waitForIdle()
+        assertEquals(BeatAccent.Mute, metronome.snapshot.value.selected.beats.last())
+        compose.onNodeWithTag("toggle_metronome").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        compose.onNodeWithTag("open_presets").performScrollTo().performClick()
+        compose.onNodeWithTag("preset_name").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("close_presets").performScrollTo().assertHasClickAction()
+    }
+
+    @Test
+    fun presetsStayOnDemandAndSaveLoadOverwriteAndDeleteRemainAvailable(): Unit {
+        val metronome = FakeMetronome()
+        val circuit = testCircuit(FakeAppearance(), metronome)
+        compose.setContent {
+            GuitarLearnerTheme(false) {
+                CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+            }
+        }
+        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.onNodeWithTag("preset_name").assertDoesNotExist()
+        compose.onNodeWithTag("open_presets").performClick()
+        compose.onNodeWithTag("preset_name").performTextInput("Practice")
+        compose.onNodeWithTag("save_preset").performScrollTo().performClick()
+        compose.onNodeWithTag("load_preset_Practice").performScrollTo().assertHasClickAction()
+        compose.onNodeWithTag("close_presets").performScrollTo().performClick()
+        compose.onNodeWithTag("preset_name").assertDoesNotExist()
+        compose.onNodeWithTag("increase_bpm").performClick()
+        compose.onNodeWithTag("open_presets").performClick()
+        compose.onNodeWithTag("load_preset_Practice").performScrollTo().performClick()
+        compose.waitForIdle()
+        assertEquals(90, metronome.snapshot.value.selected.bpm)
+        compose.onNodeWithTag("preset_name").assertExists()
+        compose.onNodeWithTag("close_presets").performScrollTo().performClick()
+        compose.onNodeWithTag("increase_bpm").performClick()
+        compose.onNodeWithTag("open_presets").performClick()
+        compose.onNodeWithTag("save_preset").performScrollTo().performClick()
+        compose.onNodeWithTag("confirm_preset_overwrite").performClick()
+        compose.waitForIdle()
+        assertEquals(91, metronome.snapshot.value.presets.single().config.bpm)
+        compose.onNodeWithTag("delete_preset_Practice").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("load_preset_Practice").assertDoesNotExist()
+        compose.onNodeWithTag("preset_name").assertTextContains("Practice")
+        assertTrue(metronome.snapshot.value.presets.isEmpty())
+        assertFalse(metronome.requests.any { it == MetronomeCommand.Start })
+    }
+
+    @Test
+    fun openPresetSheetAndEnteredNameSurviveStateRestoration(): Unit {
+        val restore = StateRestorationTester(compose)
+        val circuit = testCircuit(FakeAppearance(), FakeMetronome())
+        restore.setContent {
+            GuitarLearnerTheme(false) {
+                CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+            }
+        }
+        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.onNodeWithTag("open_presets").performClick()
+        compose.onNodeWithTag("preset_name").performTextInput("다음 연습")
+        restore.emulateSavedInstanceStateRestore()
+        compose.onNodeWithTag("preset_name").assertTextContains("다음 연습")
+        compose.onNodeWithTag("close_presets").performClick()
+        compose.onNodeWithTag("preset_name").assertDoesNotExist()
+        compose.onNodeWithTag("open_presets").performClick()
+        compose.onNodeWithTag("preset_name").assertTextContains("다음 연습")
     }
 }
 
@@ -195,13 +356,18 @@ private class FakeMetronome : Metronome {
 
     override suspend fun execute(command: MetronomeCommand): Either<MetronomeFailure, Unit> {
         requests += command
+        if (command is MetronomeCommand.SavePreset || command is MetronomeCommand.LoadPreset || command is MetronomeCommand.DeletePreset) {
+            presetResult?.await()?.let { if (it.isLeft()) return it }
+        }
         when (command) {
             MetronomeCommand.Start -> snapshot.value = snapshot.value.copy(playback = PlaybackState.Playing(snapshot.value.selected, 0))
             MetronomeCommand.Stop -> snapshot.value = snapshot.value.copy(playback = PlaybackState.Stopped(StopReason.User))
             is MetronomeCommand.SetTempo -> snapshot.value = snapshot.value.copy(selected = snapshot.value.selected.copy(bpm = command.bpm))
             is MetronomeCommand.SetPattern -> snapshot.value = snapshot.value.copy(selected = snapshot.value.selected.copy(denominator = command.denominator, beats = command.beats))
-            is MetronomeCommand.SavePreset -> presetResult?.let { return it.await() }
-            is MetronomeCommand.LoadPreset, is MetronomeCommand.DeletePreset -> Unit
+            is MetronomeCommand.SavePreset -> snapshot.value = snapshot.value.copy(presets =
+                snapshot.value.presets.filterNot { it.name == command.name } + MetronomePreset(command.name, snapshot.value.selected))
+            is MetronomeCommand.LoadPreset -> snapshot.value = snapshot.value.copy(selected = snapshot.value.presets.single { it.name == command.name }.config)
+            is MetronomeCommand.DeletePreset -> snapshot.value = snapshot.value.copy(presets = snapshot.value.presets.filterNot { it.name == command.name })
         }
         return Either.Right(Unit)
     }
