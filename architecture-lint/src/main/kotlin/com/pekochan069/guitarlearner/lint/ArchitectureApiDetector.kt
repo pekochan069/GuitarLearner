@@ -116,7 +116,7 @@ class ArchitectureApiDetector : Detector(), SourceCodeScanner {
     companion object {
         private val IO_PREFIXES = listOf("java.io.", "java.nio.file.", "java.nio.channels.", "java.net.", "kotlin.io.", "java.lang.reflect.")
         private val DI_PREFIXES = listOf("dev.zacsweers.metro.", "dagger.", "javax.inject.", "org.koin.", "com.google.dagger.")
-        private val NATIVE_PREFIXES = listOf("android.content.Context", "android.content.SharedPreferences", "android.app.Service", "android.media.", "android.hardware.", "android.database.", "androidx.appcompat.", "androidx.core.content.")
+        private val NATIVE_PREFIXES = listOf("android.content.Context", "android.content.SharedPreferences", "android.app.Service", "android.media.", "android.hardware.", "android.database.", "androidx.appcompat.", "androidx.core.content.", "androidx.lifecycle.ViewModel", "androidx.lifecycle.viewmodel.", "androidx.activity.ComponentActivity", "androidx.activity.result.")
         private val RENDERING_PREFIXES = listOf("androidx.compose.ui.", "androidx.compose.foundation.", "androidx.compose.material3.", "com.slack.circuit.foundation.")
         private val PRODUCT_IMPLEMENTATIONS = listOf("com.pekochan069.guitarlearner.domain.", "com.pekochan069.guitarlearner.presentation.logic.", "com.pekochan069.guitarlearner.adapters.")
         private val SCREEN_SERIALIZATION = setOf("android.os.Parcelable", "kotlinx.parcelize.Parcelize")

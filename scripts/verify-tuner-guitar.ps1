@@ -16,7 +16,7 @@ try {
     $resultsPath = 'domain/build/test-results/test/TEST-com.pekochan069.guitarlearner.domain.GuitarPitchDetectorTest.xml'
     if (Test-Path -LiteralPath $resultsPath) {
         [xml]$results = Get-Content -LiteralPath $resultsPath -Raw
-        Write-Output $results.testsuite.'system-out'
+        Write-Output $results.testsuite.'system-out'.InnerText
     }
     if ($testExit -ne 0) { throw "Recorded-guitar verification failed with exit $testExit" }
 } finally {
