@@ -53,6 +53,8 @@ The user then requested removal of the ordinary bottom Stopped label. Initial an
 
 During manual follow-up playback the emulator logged another underrun after a 58.172 ms worker gap exceeded the existing 40 ms queue horizon. The UI exposed the recoverable failure. Audio buffering and failure thresholds remain unchanged; the retained evidence does not establish scheduling robustness.
 
+PR CI run `37195554660` at the footer revision passed static validation but failed four presentation cases. Its emulator boot log shows a 320 × 640 dp display, smaller than the approved 360 × 800 dp compactness viewport. Three preset cases tapped the offscreen entry without scrolling; the fourth applied the no-scroll compactness assertion to that smaller display. Preset entry actions now scroll into view, and the CI emulator explicitly uses 360 × 800 px at its original 160 dpi, equivalent to 360 × 800 dp. All three preset journeys passed locally at the original 320 × 640 dp size. No application rendering, audio behavior, assertion threshold or test skip changed for this CI correction. Current remote check results are available on PR #16.
+
 Meaningful regression evidence includes:
 
 - The literal 90 BPM note-value test failed the old formula before the correction. Fractional carry is checked over 100,000 beats at 137 BPM for every note value; minimum and maximum tempos are covered.
