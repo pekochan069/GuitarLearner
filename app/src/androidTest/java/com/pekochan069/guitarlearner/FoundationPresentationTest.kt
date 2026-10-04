@@ -1,8 +1,11 @@
 package com.pekochan069.guitarlearner
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -22,9 +25,12 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import arrow.core.Either
@@ -54,6 +60,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -208,9 +215,8 @@ class FoundationPresentationTest {
         compose.onNodeWithTag("page_Metronome").performClick()
         val bottomBarTop = compose.onNodeWithTag("page_Metronome").getUnclippedBoundsInRoot().top
         val minimumTouchSize = with(compose.density) { 48.dp.toPx() }
-        val buttons = listOf("decrease_bpm", "increase_bpm", "decrease_beats", "increase_beats",
-            "beat_unit_2", "beat_unit_4", "beat_unit_8", "beat_unit_16",
-            "beat_accent_1", "beat_accent_2", "beat_accent_3", "beat_accent_4", "toggle_metronome")
+        val buttons = listOf("decrease_bpm", "increase_bpm", "beat_count", "beat_unit",
+            "beat_accent_1", "beat_accent_2", "beat_accent_3", "beat_accent_4", "toggle_metronome", "open_presets")
         buttons.forEach { tag ->
             val button = compose.onNodeWithTag(tag)
             button.assertIsDisplayed().assertHasClickAction()
@@ -250,6 +256,109 @@ class FoundationPresentationTest {
     }
 
     @Test
+    fun beatAccentCyclesKeepEveryDefaultPracticeControlInPlace(): Unit {
+        assertAccentCyclesKeepPracticeBounds(4, 1f)
+    }
+
+    @Test
+    fun beatAccentCyclesKeepWrappedControlsInPlaceAtDoubleTextSize(): Unit {
+        assertAccentCyclesKeepPracticeBounds(16, 2f)
+    }
+
+    @Test
+    fun pendingAccentEditsKeepRunningPracticeControlsInPlace(): Unit {
+        assertAccentCyclesKeepPracticeBounds(7, 1f, running = true)
+    }
+
+    private fun assertAccentCyclesKeepPracticeBounds(beatCount: Int, fontScale: Float, running: Boolean = false) {
+        val metronome = FakeMetronome()
+        val config = MetronomeConfig(beats = List(beatCount) { if (it == 0) BeatAccent.Accent else BeatAccent.Normal })
+        metronome.snapshot.value = MetronomeSnapshot(selected = config,
+            playback = if (running) PlaybackState.Playing(config, 0) else PlaybackState.Stopped())
+        val circuit = testCircuit(FakeAppearance(), metronome)
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val english = context.createConfigurationContext(Configuration(context.resources.configuration).apply {
+            setLocale(Locale.ENGLISH)
+        })
+        compose.setContent {
+            CompositionLocalProvider(LocalContext provides english,
+                LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
+                GuitarLearnerTheme(false) {
+                    CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+                }
+            }
+        }
+        compose.onNodeWithTag("page_Metronome").performClick()
+        val tags = (1..beatCount).map { "beat_accent_$it" } + listOf("toggle_metronome", "open_presets")
+        val bounds = tags.associateWith { compose.onNodeWithTag(it).getUnclippedBoundsInRoot() }
+        if (beatCount > 4) {
+            assertTrue(bounds.getValue("beat_accent_$beatCount").top > bounds.getValue("beat_accent_1").top)
+        }
+        for (beat in listOf(1, beatCount / 2 + 1, beatCount)) {
+            repeat(6) { cycle ->
+                compose.onNodeWithTag("beat_accent_$beat").performSemanticsAction(SemanticsActions.OnClick) { it() }
+                compose.waitForIdle()
+                if (running && cycle % 3 == 0) compose.onNodeWithTag("metronome_pending").assertExists()
+                tags.forEach { tag ->
+                    assertEquals("$tag moved or resized after beat $beat accent cycle $cycle", bounds.getValue(tag),
+                        compose.onNodeWithTag(tag).getUnclippedBoundsInRoot())
+                }
+            }
+        }
+        assertEquals(running, metronome.snapshot.value.playback is PlaybackState.Playing)
+    }
+
+    @Test
+    fun everyMeterUsesEqualBeatCellsAndFixedColumns(): Unit {
+        assertMetersKeepEqualGridGeometry(1f)
+    }
+
+    @Test
+    fun everyMeterKeepsEqualCellsAndFixedColumnsAtDoubleTextSize(): Unit {
+        assertMetersKeepEqualGridGeometry(2f)
+    }
+
+    private fun assertMetersKeepEqualGridGeometry(fontScale: Float) {
+        val metronome = FakeMetronome()
+        val circuit = testCircuit(FakeAppearance(), metronome)
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
+                GuitarLearnerTheme(false) {
+                    CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+                }
+            }
+        }
+        compose.onNodeWithTag("page_Metronome").performClick()
+        val expectedColumns = listOf(1, 2, 3, 4, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4, 3, 4)
+        val tolerance = with(compose.density) { 1f.toDp().value.toDouble() }
+        expectedColumns.forEachIndexed { index, columns ->
+            val count = index + 1
+            compose.onNodeWithTag("beat_count").performScrollTo().performClick()
+            compose.onNodeWithTag("beat_count_option_$count").performScrollTo().performClick()
+            assertEquals(count, metronome.snapshot.value.selected.numerator)
+            val countField = compose.onNodeWithTag("beat_count").getUnclippedBoundsInRoot()
+            val unitField = compose.onNodeWithTag("beat_unit").getUnclippedBoundsInRoot()
+            assertEquals("Meter selectors have different widths", countField.width.value.toDouble(), unitField.width.value.toDouble(), tolerance)
+            val cells = (1..count).map { compose.onNodeWithTag("beat_accent_$it").getUnclippedBoundsInRoot() }
+            val rows = (count + columns - 1) / columns
+            val firstRow = compose.onNodeWithTag("beat_row_1").getUnclippedBoundsInRoot()
+            cells.forEachIndexed { cellIndex, cell ->
+                assertEquals("$count beats: cell ${cellIndex + 1} width", cells.first().width.value.toDouble(), cell.width.value.toDouble(), tolerance)
+                assertEquals("$count beats: cell ${cellIndex + 1} height", cells.first().height.value.toDouble(), cell.height.value.toDouble(), tolerance)
+                val row = compose.onNodeWithTag("beat_row_${cellIndex / columns + 1}").getUnclippedBoundsInRoot()
+                assertEquals("$count beats: cell ${cellIndex + 1} row", row.top, cell.top)
+                assertEquals("$count beats: cell ${cellIndex + 1} column", cells[cellIndex % columns].left, cell.left)
+            }
+            for (row in 1..rows) {
+                val rect = compose.onNodeWithTag("beat_row_$row").getUnclippedBoundsInRoot()
+                assertEquals("$count beats: partial row must reserve every column", firstRow.width.value.toDouble(), rect.width.value.toDouble(), tolerance)
+                assertEquals("$count beats: row heights", firstRow.height.value.toDouble(), rect.height.value.toDouble(), tolerance)
+            }
+            compose.onNodeWithTag("beat_row_${rows + 1}").assertDoesNotExist()
+        }
+    }
+
+    @Test
     fun tempoKeepsItsQuarterNoteReferenceWhenTheMeterChanges(): Unit {
         val metronome = FakeMetronome()
         val circuit = testCircuit(FakeAppearance(), metronome)
@@ -264,7 +373,8 @@ class FoundationPresentationTest {
         val description = context.getString(com.pekochan069.guitarlearner.ui.R.string.tempo_note_description,
             context.getString(com.pekochan069.guitarlearner.ui.R.string.beat_quarter), tempo)
         for (unit in listOf(2, 4, 8, 16)) {
-            compose.onNodeWithTag("beat_unit_$unit").performClick().assertIsSelected()
+            compose.onNodeWithTag("beat_unit").performClick()
+            compose.onNodeWithTag("beat_unit_option_$unit").performClick()
             compose.onNodeWithTag("bpm_value").assertTextEquals("90").assertContentDescriptionEquals(description)
             compose.onNodeWithTag("tempo_slider").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, description))
             assertEquals(unit, metronome.snapshot.value.selected.denominator.denominator)
@@ -288,6 +398,7 @@ class FoundationPresentationTest {
         val first = compose.onNodeWithTag("beat_accent_1").getUnclippedBoundsInRoot().top
         val last = compose.onNodeWithTag("beat_accent_16").getUnclippedBoundsInRoot().top
         assertTrue(last > first)
+        compose.onNodeWithTag("beat_indicators").performScrollTo()
         compose.onNodeWithTag("beat_accent_16").performScrollTo().assertIsDisplayed()
             .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
         compose.waitForIdle()

@@ -1,14 +1,18 @@
 package com.pekochan069.guitarlearner.ui.demo
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -17,6 +21,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -24,9 +32,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
@@ -34,9 +39,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -47,8 +57,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.pekochan069.guitarlearner.presentation.contract.BeatAccentUi
 import com.pekochan069.guitarlearner.presentation.contract.BeatUnitUi
@@ -65,6 +77,13 @@ private val BeatUnitUi.label: Int get() = when (this) {
     BeatUnitUi.Quarter -> R.string.beat_quarter
     BeatUnitUi.Eighth -> R.string.beat_eighth
     BeatUnitUi.Sixteenth -> R.string.beat_sixteenth
+}
+
+private val BeatUnitUi.symbol: Int get() = when (this) {
+    BeatUnitUi.Half -> R.string.note_half
+    BeatUnitUi.Quarter -> R.string.note_quarter
+    BeatUnitUi.Eighth -> R.string.note_eighth
+    BeatUnitUi.Sixteenth -> R.string.note_sixteenth
 }
 
 private val BeatAccentUi.label: Int get() = when (this) {
@@ -106,8 +125,6 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
     val tempoLabel = stringResource(R.string.tempo)
     val tempoDescription = pluralStringResource(R.plurals.tempo_bpm, config.bpm, config.bpm)
     val tempoNoteDescription = stringResource(R.string.tempo_note_description, stringResource(R.string.beat_quarter), tempoDescription)
-    val beatCountDescription = pluralStringResource(R.plurals.beats_per_bar, config.numerator, config.numerator)
-    val beatUnitDescription = stringResource(config.denominator.label)
     val notice = state.notice ?: (playback as? MetronomePlaybackUi.Failed)?.notice
     val tempoInteraction = remember { MutableInteractionSource() }
 
@@ -116,8 +133,8 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = MaterialTheme.shapes.extraLarge,
     ) {
-        Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 FilledTonalIconButton(
@@ -154,38 +171,7 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
                     stateDescription = tempoNoteDescription
                 },
             )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                FilledTonalIconButton(
-                    onClick = { eventSink(FoundationEvent.AdjustBeatCount(-1)) },
-                    enabled = config.numerator > 1,
-                    modifier = Modifier.size(48.dp).testTag("decrease_beats"),
-                ) { Icon(painterResource(R.drawable.ic_remove), stringResource(R.string.decrease_beats)) }
-                Text(stringResource(R.string.metronome_meter, config.numerator, config.denominator.denominator),
-                    Modifier.weight(1f).testTag("beat_count").semantics {
-                        contentDescription = beatCountDescription
-                        stateDescription = beatUnitDescription
-                    },
-                    style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-                FilledTonalIconButton(
-                    onClick = { eventSink(FoundationEvent.AdjustBeatCount(1)) },
-                    enabled = config.numerator < 16,
-                    modifier = Modifier.size(48.dp).testTag("increase_beats"),
-                ) { Icon(painterResource(R.drawable.ic_add), stringResource(R.string.increase_beats)) }
-            }
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                BeatUnitUi.entries.forEachIndexed { index, unit ->
-                    val label = stringResource(unit.label)
-                    SegmentedButton(
-                        selected = config.denominator == unit,
-                        onClick = { eventSink(FoundationEvent.SetBeatUnit(unit)) },
-                        shape = SegmentedButtonDefaults.itemShape(index, BeatUnitUi.entries.size),
-                        modifier = Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp)
-                            .testTag("beat_unit_" + unit.denominator).semantics { contentDescription = label },
-                        icon = {},
-                    ) { Text(stringResource(R.string.tempo_value, unit.denominator)) }
-                }
-            }
+            TimeSignatureControls(state, eventSink)
             BeatControls(state, eventSink)
             Button(
                 onClick = { eventSink(FoundationEvent.SetRunning(!active)) },
@@ -198,6 +184,10 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
                 Text(stringResource(if (active) R.string.stop_metronome else R.string.start_metronome),
                     style = MaterialTheme.typography.titleLarge)
             }
+            FilledTonalButton(
+                onClick = { eventSink(FoundationEvent.SetPresetsOpen(true)) },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("open_presets"),
+            ) { Text(stringResource(R.string.presets)) }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(stringResource(status),
@@ -224,11 +214,6 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
             if (notice != null && !state.presetsOpen) MetronomeError(notice, state.notice != null, eventSink)
         }
     }
-    FilledTonalButton(
-        onClick = { eventSink(FoundationEvent.SetPresetsOpen(true)) },
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("open_presets"),
-    ) { Text(stringResource(R.string.presets)) }
-
     if (state.presetsOpen) {
         ModalBottomSheet(
             onDismissRequest = { eventSink(FoundationEvent.SetPresetsOpen(false)) },
@@ -282,6 +267,70 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeSignatureControls(state: MetronomeUiState, eventSink: (FoundationEvent) -> Unit) {
+    val config = state.config
+    var countOpen by remember { mutableStateOf(false) }
+    var unitOpen by remember { mutableStateOf(false) }
+    val fieldWidth = 144.dp * LocalDensity.current.fontScale
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        ExposedDropdownMenuBox(
+            expanded = countOpen,
+            onExpandedChange = { countOpen = it },
+            modifier = Modifier.width(fieldWidth).weight(1f),
+        ) {
+            OutlinedTextField(
+                value = stringResource(R.string.tempo_value, config.numerator),
+                onValueChange = {},
+                readOnly = true,
+                label = { Text(stringResource(R.string.beats_per_bar_label)) },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(countOpen) },
+                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                    .testTag("beat_count"),
+            )
+            ExposedDropdownMenu(expanded = countOpen, onDismissRequest = { countOpen = false },
+                matchAnchorWidth = false, modifier = Modifier.widthIn(min = fieldWidth)) {
+                (1..16).forEach { count ->
+                    DropdownMenuItem(
+                        text = { Text(pluralStringResource(R.plurals.beats_per_bar, count, count)) },
+                        onClick = { countOpen = false; eventSink(FoundationEvent.SetBeatCount(count)) },
+                        modifier = Modifier.testTag("beat_count_option_$count").semantics { selected = count == config.numerator },
+                    )
+                }
+            }
+        }
+        ExposedDropdownMenuBox(
+            expanded = unitOpen,
+            onExpandedChange = { unitOpen = it },
+            modifier = Modifier.width(fieldWidth).weight(1f),
+        ) {
+            val description = stringResource(config.denominator.label)
+            OutlinedTextField(
+                value = stringResource(R.string.note_value_display, stringResource(config.denominator.symbol), config.denominator.denominator),
+                onValueChange = {},
+                readOnly = true,
+                label = { Text(stringResource(R.string.note_value)) },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(unitOpen) },
+                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                    .testTag("beat_unit").semantics { contentDescription = description },
+            )
+            ExposedDropdownMenu(expanded = unitOpen, onDismissRequest = { unitOpen = false },
+                matchAnchorWidth = false, modifier = Modifier.widthIn(min = fieldWidth)) {
+                BeatUnitUi.entries.forEach { unit ->
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.note_value_option, stringResource(unit.symbol), unit.denominator,
+                            stringResource(unit.label))) },
+                        onClick = { unitOpen = false; eventSink(FoundationEvent.SetBeatUnit(unit)) },
+                        modifier = Modifier.testTag("beat_unit_option_${unit.denominator}").semantics { selected = unit == config.denominator },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun BeatControls(state: MetronomeUiState, eventSink: (FoundationEvent) -> Unit) {
@@ -289,37 +338,73 @@ private fun BeatControls(state: MetronomeUiState, eventSink: (FoundationEvent) -
     val sameSignature = playing?.config?.let {
         it.numerator == state.config.numerator && it.denominator == state.config.denominator
     } ?: false
-    FlowRow(Modifier.fillMaxWidth().testTag("beat_indicators"),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        state.config.beats.forEachIndexed { index, accent ->
-            val current = sameSignature && index == playing?.beatIndex
-            val applied = if (sameSignature) playing?.config?.beats?.get(index) else null
-            val description = stringResource(R.string.beat_edit_description, index + 1, stringResource(accent.label))
-            val appliedDescription = when {
-                applied == null -> null
-                current && applied != accent -> stringResource(R.string.beat_current_pending, stringResource(applied.label))
-                current -> stringResource(R.string.beat_current, stringResource(applied.label))
-                applied != accent -> stringResource(R.string.beat_applied_pending, stringResource(applied.label))
-                else -> null
-            }
-            FilledTonalButton(
-                onClick = { eventSink(FoundationEvent.CycleBeatAccent(index)) },
-                shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
-                contentPadding = ButtonDefaults.ExtraSmallContentPadding,
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = if (current) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
-                ),
-                modifier = Modifier.widthIn(min = 48.dp).heightIn(min = 56.dp)
-                    .testTag("beat_accent_" + (index + 1)).semantics {
-                        contentDescription = description
-                        if (appliedDescription != null) stateDescription = appliedDescription
-                    },
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.tempo_value, index + 1), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(accent.label), style = MaterialTheme.typography.labelMedium)
+    val numbers = (1..16).map { stringResource(R.string.tempo_value, it) }
+    val accents = BeatAccentUi.entries.map { stringResource(it.label) }
+    val numberStyle = MaterialTheme.typography.titleMedium
+    val accentStyle = MaterialTheme.typography.labelMedium
+    val textMeasurer = rememberTextMeasurer()
+    val contentSize = remember(numbers, accents, numberStyle, accentStyle, textMeasurer) {
+        val numberSizes = numbers.map { textMeasurer.measure(it, numberStyle).size }
+        val accentSizes = accents.map { textMeasurer.measure(it, accentStyle).size }
+        IntSize(maxOf(numberSizes.maxOf { it.width }, accentSizes.maxOf { it.width }),
+            numberSizes.maxOf { it.height } + accentSizes.maxOf { it.height })
+    }
+    val density = LocalDensity.current
+    val direction = LocalLayoutDirection.current
+    val padding = ButtonDefaults.ExtraSmallContentPadding
+    val minimumWidth = maxOf(48.dp, with(density) { contentSize.width.toDp() } +
+        padding.calculateLeftPadding(direction) + padding.calculateRightPadding(direction))
+    val height = maxOf(56.dp, with(density) { contentSize.height.toDp() } +
+        padding.calculateTopPadding() + padding.calculateBottomPadding())
+    val count = state.config.numerator
+    val columns = when {
+        count <= 4 -> count
+        count % 3 == 0 -> 3
+        else -> 4
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val width = maxOf(minimumWidth, (maxWidth - 8.dp * (columns - 1)) / columns)
+        Column(Modifier.horizontalScroll(rememberScrollState()).testTag("beat_indicators"),
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat((count + columns - 1) / columns) { row ->
+                Row(Modifier.testTag("beat_row_${row + 1}"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    repeat(columns) { column ->
+                        val index = row * columns + column
+                        val accent = state.config.beats.getOrNull(index)
+                        if (accent == null) {
+                            Spacer(Modifier.size(width, height))
+                        } else {
+                            val current = sameSignature && index == playing?.beatIndex
+                            val applied = if (sameSignature) playing?.config?.beats?.get(index) else null
+                            val description = stringResource(R.string.beat_edit_description, index + 1, stringResource(accent.label))
+                            val appliedDescription = when {
+                                applied == null -> null
+                                current && applied != accent -> stringResource(R.string.beat_current_pending, stringResource(applied.label))
+                                current -> stringResource(R.string.beat_current, stringResource(applied.label))
+                                applied != accent -> stringResource(R.string.beat_applied_pending, stringResource(applied.label))
+                                else -> null
+                            }
+                            FilledTonalButton(
+                                onClick = { eventSink(FoundationEvent.CycleBeatAccent(index)) },
+                                shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
+                                contentPadding = padding,
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = if (current) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
+                                ),
+                                modifier = Modifier.size(width, height)
+                                    .testTag("beat_accent_" + (index + 1)).semantics {
+                                        contentDescription = description
+                                        if (appliedDescription != null) stateDescription = appliedDescription
+                                    },
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(numbers[index], style = numberStyle)
+                                    Text(stringResource(accent.label), style = accentStyle)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

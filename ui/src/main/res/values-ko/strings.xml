@@ -62,6 +62,10 @@
     <string name="tempo_note_description">%1$s 기준, %2$s</string>
     <string name="metronome_meter">%1$d/%2$d</string>
     <string name="time_signature">박자표</string>
+    <string name="beats_per_bar_label">한 마디의 박 수</string>
+    <string name="note_value">음표 길이</string>
+    <string name="note_value_display">%1$s 1/%2$d</string>
+    <string name="note_value_option">%1$s 1/%2$d · %3$s</string>
     <plurals name="beats_per_bar">
         <item quantity="other">한 마디에 %1$d박</item>
     </plurals>
