@@ -123,10 +123,10 @@ class ChordPresentationUiTest {
         assertTrue(metronome.requests.isEmpty())
     }
 
-    @Test fun englishLightLargeTextKeepsErrorsOmissionsAndSaveRecoveryAccessible() { largeTextJourney(Locale.ENGLISH, false) }
-    @Test fun koreanDarkLargeTextKeepsErrorsOmissionsAndSaveRecoveryAccessible() { largeTextJourney(Locale.KOREAN, true) }
+    @Test fun englishLightLargeTextKeepsInputCorrectionAndOmissionsAccessible() { largeTextInputCorrectionJourney(Locale.ENGLISH, false) }
+    @Test fun koreanDarkLargeTextKeepsInputCorrectionAndOmissionsAccessible() { largeTextInputCorrectionJourney(Locale.KOREAN, true) }
 
-    private fun largeTextJourney(locale: Locale, dark: Boolean) {
+    private fun largeTextInputCorrectionJourney(locale: Locale, dark: Boolean) {
         runBlocking {
             val stops = listOf(StringStop.Muted, StringStop.Fretted(3), StringStop.Fretted(2), StringStop.Fretted(3), StringStop.Fretted(1), StringStop.Open)
             for (index in 0..5) assertEquals(Either.Right(Unit), host.execute(ChordCommand.SetStop(index, stops[index])))

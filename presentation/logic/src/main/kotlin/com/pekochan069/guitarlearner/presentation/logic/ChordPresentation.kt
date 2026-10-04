@@ -102,6 +102,7 @@ internal fun presentChords(chords: Chords): ChordPresentation {
         ChordDraft(context = ready.query.context, shape = shape, selected = ready.query.identity)
     }
     val lookupCandidate = lookupDraft?.let(ChordTheory::selectedCandidate)
+    val lookupStrings = lookupDraft?.strings().orEmpty()
     val state = ChordUiState(
         section = ChordSection.valueOf(section), tuningExpanded = tuningExpanded,
         preset = TuningPreset.entries.firstOrNull { it.tuning == draft.context.tuning }?.let { TuningPresetUi.valueOf(it.name) },
@@ -117,14 +118,14 @@ internal fun presentChords(chords: Chords): ChordPresentation {
                 ChordTheory.symbol(candidate), candidate.omitted.joinToString(", ") { it.symbol }, candidate.identity == draft.selected)
         },
         roots = PitchClass.entries.map { it.symbol }, root = root, quality = ChordQualityUi.valueOf(quality),
-        lookup = when (workspace.lookup) {
+        lookup = when (val lookup = workspace.lookup) {
             ChordLookup.Idle -> ChordLookupUi.Idle
             is ChordLookup.Searching -> ChordLookupUi.Searching
-            is ChordLookup.Ready -> if (ready?.shapes.isNullOrEmpty()) ChordLookupUi.NoShapes else ChordLookupUi.Ready
+            is ChordLookup.Ready -> if (lookup.shapes.isEmpty()) ChordLookupUi.NoShapes else ChordLookupUi.Ready
         },
         lookupSymbol = lookupCandidate?.let(ChordTheory::symbol) ?: query?.let { it.identity.root.symbol + it.identity.quality.symbol },
         lookupShapeSymbol = lookupCandidate?.let { ChordTheory.symbol(ChordTheory.shapeCandidate(it, query?.context?.capo ?: 0)) },
-        lookupStrings = lookupDraft?.strings().orEmpty(), lookupNotes = lookupDraft?.strings()?.mapNotNull { it.note }?.distinct()?.joinToString(" · ").orEmpty(),
+        lookupStrings = lookupStrings, lookupNotes = lookupStrings.mapNotNull { it.note }.distinct().joinToString(" · "),
         lookupOmitted = lookupCandidate?.omitted?.joinToString(", ") { it.symbol }.orEmpty(),
         representativeIndex = ready?.selectedIndex ?: 0, representativeCount = ready?.shapes?.size ?: 0,
         records = workspace.records.map { record ->
