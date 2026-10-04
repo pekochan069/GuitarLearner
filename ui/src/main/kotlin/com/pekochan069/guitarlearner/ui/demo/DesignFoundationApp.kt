@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -53,8 +54,8 @@ import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 
-private val FoundationDestination.title: Int get() = when (this) {
-    FoundationDestination.Home -> R.string.home_title
+private val FoundationDestination.title: Int? get() = when (this) {
+    FoundationDestination.Home -> null
     is FoundationDestination.Feature -> when (id) {
         FeatureId.Metronome -> R.string.metronome_title
     }
@@ -127,26 +128,24 @@ fun DesignFoundationApp(
                         .padding(if (metronome) 12.dp else 24.dp),
                     verticalArrangement = Arrangement.spacedBy(if (metronome) 12.dp else 24.dp),
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            stringResource(destination.title),
-                            Modifier.testTag("destination_title").semantics { heading() },
-                            style = if (metronome) MaterialTheme.typography.headlineMedium
-                                else MaterialTheme.typography.headlineLarge,
-                        )
-                        if (!metronome) {
+                    destination.title?.let { title ->
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
-                                stringResource(when (destination) {
-                                    FoundationDestination.Home -> R.string.home_description
-                                    is FoundationDestination.Sample -> when (destination.id) {
+                                stringResource(title),
+                                Modifier.testTag("destination_title").semantics { heading() },
+                                style = if (metronome) MaterialTheme.typography.headlineMedium
+                                    else MaterialTheme.typography.headlineLarge,
+                            )
+                            if (destination is FoundationDestination.Sample) {
+                                Text(
+                                    stringResource(when (destination.id) {
                                         DevelopmentSample.Tuner -> R.string.tuner_subtitle
                                         DevelopmentSample.Gallery -> R.string.gallery_subtitle
-                                    }
-                                    is FoundationDestination.Feature -> R.string.metronome_subtitle
-                                }),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                                    }),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                     if (!metronome) CompactMetronomeControl(state.metronome, state.eventSink)
@@ -311,26 +310,28 @@ private fun HomeCatalog(state: FoundationState) {
         Column(Modifier.fillMaxWidth().testTag("category_" + group.category.name),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeading(group.category.label)
-            group.features.forEach { feature ->
-                when (feature) {
-                    FeatureId.Metronome -> Card(
-                        onClick = { state.eventSink(FoundationEvent.OpenFeature(feature)) },
-                        modifier = Modifier.fillMaxWidth().testTag("feature_" + feature.name),
-                        shape = MaterialTheme.shapes.extraLarge,
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
-                    ) {
-                        Row(Modifier.fillMaxWidth().heightIn(min = 96.dp).padding(20.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Icon(painterResource(R.drawable.ic_tempo), null, Modifier.size(32.dp))
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(stringResource(R.string.metronome_title), style = MaterialTheme.typography.titleLarge)
-                                Text(stringResource(R.string.metronome_subtitle), style = MaterialTheme.typography.bodyMedium)
+            group.features.chunked(2).forEach { features ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    features.forEach { feature ->
+                        when (feature) {
+                            FeatureId.Metronome -> Card(
+                                onClick = { state.eventSink(FoundationEvent.OpenFeature(feature)) },
+                                modifier = Modifier.weight(1f).testTag("feature_" + feature.name),
+                                shape = MaterialTheme.shapes.extraLarge,
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
+                            ) {
+                                Row(Modifier.fillMaxWidth().padding(16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(painterResource(R.drawable.ic_tempo), null, Modifier.size(32.dp))
+                                    Text(stringResource(R.string.metronome_title), Modifier.weight(1f),
+                                        style = MaterialTheme.typography.titleLarge)
+                                }
                             }
-                            Icon(painterResource(R.drawable.ic_arrow_forward), null)
                         }
                     }
+                    if (features.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         }

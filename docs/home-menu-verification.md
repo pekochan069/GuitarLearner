@@ -4,13 +4,13 @@ Verified on 2026-10-04 against [issue #8](https://github.com/pekochan069/GuitarL
 
 ## Behavior
 
-Home lists usable features by category. Initially it shows Tools and Metronome; empty Training and Learning categories are hidden. Up and Back return features to Home after dismissing the current overlay. Shared settings remain in the top app bar. Tuner and component examples have a separate development entry enabled only by the debug app capability.
+Home lists usable features by category in two columns. Cards show a theme-tinted icon to the left of their title, with no Home introduction or card description. Initially it shows Tools and Metronome; empty Training and Learning categories are hidden. Up and Back return features to Home after dismissing the current overlay. Shared settings remain in the top app bar. Tuner and component examples have a separate development entry enabled only by the debug app capability.
 
 One persistent presenter owns typed destinations and an exclusive settings/presets/overwrite overlay. Stable saved identifiers normalize unavailable destinations to Home. Home keeps its scroll state outside destination content. The app handles platform Back and notification input; rendering still receives contract state and emits events. No dependencies or audio behavior changed.
 
 On other screens, the compact metronome displays the actual playing configuration rather than selected pending edits. Open does not start or reset playback. Stop waits for the reported playback state; a failed Stop retains the controller and exposes an error. Preparing, interrupted and failed states remain distinguishable, with access to the metronome even when no controller remains.
 
-## Automated evidence
+## Automated evidence for the navigation implementation
 
 Checks used the committed dependency stack in an isolated worktree. The original checkout's IDE, dependency and wrapper edits were preserved.
 
@@ -28,7 +28,7 @@ Independent review found a process-restoration defect that ordinary activity rec
 
 The final complete API 37 connected run passed: JUnit XML reports 48 cases, 47 passes, zero failures and one opt-in acoustic skip. Coverage includes production Home visibility, unavailable destination restoration, retained Home scroll, actual/pending playback, failed Stop, truthful preparation, late preset completion, overlay Back order, locale/theme/sample restoration, grid/preset behavior, native playback and actual notification PendingIntent task/activity/service/media-session reuse.
 
-## Installed UI and release evidence
+## Installed UI and release evidence for the navigation implementation
 
 The final release APK was signed locally with the debug key for installation; its application flags were not debuggable. Release settings had no development section. An explicit sample action and destination extra left Home unchanged. No build signing configuration changed.
 
@@ -38,18 +38,35 @@ System Back dismissed an overwrite confirmation, then the preset sheet, then the
 
 After inspection, the debug APK was reinstalled. Device size/density, 100% font, rotation and automatic rotation were restored, along with Korean/light appearance and the previously visible 100 BPM, 8/8 selection. Playback was stopped. Raw XML, logs, design/review reports and signed local release evidence remain in `%TEMP%/GuitarLearner-home-8-20261004-201742`.
 
-| Installed release view | Evidence |
+| Installed release view before the Home card revision | Evidence |
 | --- | --- |
-| Korean/light Home | ![Usable Tools catalog](screenshots/home-menu/home-ko-light.png) |
 | English/dark, playing at 200% text | ![Actual configuration and wrapped actions](screenshots/home-menu/playing-en-large.png) |
 | English/dark landscape, 200% text | ![Scrollable compact controller with reachable actions](screenshots/home-menu/playing-landscape-large.png) |
-| Korean/light Home, 200% text | ![Large localized Home card](screenshots/home-menu/home-ko-large.png) |
 | Korean/light settings landscape, 200% text | ![Language options reached by scrolling](screenshots/home-menu/settings-landscape-large.png) |
+
+## Follow-up Home card revision
+
+The user requested a fixed two-column grid, removal of the Home heading and introductory text, removal of the card description, and the title to the right of the supplied Material Design Icons metronome icon. Each category now uses two equally weighted slots; the sole current feature occupies the first slot. The title wraps within its slot without truncation. The compact metronome still spans the available width.
+
+The exact supplied SVG path is preserved in a 32 dp VectorDrawable with a 24-unit viewport and the existing theme tint. Its attribution and conversion notice remain in the source. The [upstream notice](https://github.com/Templarian/MaterialDesign/blob/master/LICENSE) and full Apache 2.0 text are bundled in `assets/licenses/material-design-icons.txt`; the debug APK was inspected to confirm that entry.
+
+After the final icon/title revision, UI and app lint, `verifyModuleBoundaries`, debug/test APK assembly and release assembly passed. Four focused API 37 `FoundationPresentationTest` journeys passed: production Home with 200% text and half-width card bounds, retained Home scroll/restoration, actual playback with failed Stop, and truthful preparation controls. The earlier complete navigation suite above is baseline evidence; it was not rerun for this rendering-only revision. Instrumentation ran explicitly on `emulator-5554`, without running tests on the connected phone.
+
+Installed debug inspection covered 360 × 800 dp in Korean and English with normal and 200% text, plus English at 800 × 360 dp with 200% text. All title text remained readable through wrapping. The final APK was also installed with `adb install -r` on the connected Samsung SM-S948N; its actual Home screen confirmed the removed text, two-column card width, supplied icon and title placement. Physical-device evidence is limited to installation, launch and Home appearance.
+
+Emulator size/density, 100% font, rotation and automatic rotation were restored. Korean/light appearance was restored; this revision inspection did not edit metronome controls or start playback. Build logs, focused instrumentation output and raw device captures remain in `%TEMP%/GuitarLearner-home-8-20261004-201742` under `home-icon-title-*`.
+
+| Final installed debug view | Evidence |
+| --- | --- |
+| Korean/light Home | ![Two-column Home with icon beside title](screenshots/home-menu/home-ko-light.png) |
+| Korean/light Home, 200% text | ![Wrapping Korean title beside icon](screenshots/home-menu/home-ko-large.png) |
+| English/light Home, 200% text | ![Wrapping English title beside icon](screenshots/home-menu/home-en-large.png) |
+| English/light landscape, 200% text | ![Two-column Home in landscape](screenshots/home-menu/home-en-landscape-large.png) |
 
 ## Review
 
 Three independent design lanes selected typed destinations in one presenter; the synthesis adopted an exclusive overlay state and app-owned platform input. Independent comment and correctness reviews plus parent review covered the diff. All lanes used the configured Codex model, with no model-family diversity.
 
-Model the Domain shaped destinations and overlays. Laziness Protocol kept one presenter and existing audio ownership. Separate Before Serializing Shared State kept implementation and device ownership distinct. Test Behavior and Prove It Works required real task, notification, release and UI journeys. Code and evidence form separate verifiable commits.
+Model the Domain shaped destinations and overlays. Laziness Protocol kept one presenter and existing audio ownership. Separate Before Serializing Shared State kept implementation and device ownership distinct. Test Behavior and Prove It Works required real task, notification, release and UI journeys. The initial code and evidence form separate verifiable commits.
 
-Physical-device behavior, pre-API-33 locale behavior and spoken TalkBack output remain unverified. Accessibility evidence covers labels, semantics, touch bounds and manual screen inspection. Acoustic recording is opt-in and skipped; this change makes no hardware timing claim.
+Physical-device playback/navigation beyond Home appearance, pre-API-33 locale behavior and spoken TalkBack output remain unverified. Accessibility evidence covers labels, semantics, touch bounds and manual screen inspection. Acoustic recording is opt-in and skipped; this change makes no hardware timing claim.

@@ -1,5 +1,9 @@
+<!-- SVG-to-VectorDrawable conversion with unchanged path data.
+     Metronome icon from Material Design Icons by Pictogrammers, Apache License 2.0.
+     License: https://github.com/Templarian/MaterialDesign/blob/master/LICENSE
+     Bundled notice: ui/src/main/assets/licenses/material-design-icons.txt -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp"
+    android:width="32dp" android:height="32dp"
     android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="#FF000000" android:pathData="M12,2L3,21h18zM12,7l6,12H6zM11,10h2v7h-2z" />
+    <path android:fillColor="#FF000000" android:pathData="m12 1.75l-3.43.92l-4.51 16.86c-.03.15-.06.31-.06.47c0 1.11.89 2 2 2h12c1.11 0 2-.89 2-2c0-.16-.03-.32-.06-.47l-1.36-5.11L17 16l.2 1h-3.79l2.84-2.84l-1.41-1.41L10.59 17H6.8l3.49-13h3.42l1.46 5.43l1.63-1.64l-1.37-5.12zM11.25 5v9.75l1.5-1.5V5zm8.54 2.8l-2.83 2.83l-.71-.71l-1.41 1.42l2.82 2.82l1.42-1.41l-.71-.71l2.83-2.83z" />
 </vector>

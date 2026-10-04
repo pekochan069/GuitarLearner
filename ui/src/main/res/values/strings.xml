@@ -1,7 +1,5 @@
 <resources>
     <string name="app_name">GuitarLearner</string>
-    <string name="home_title">Home</string>
-    <string name="home_description">Choose a tool for your practice.</string>
     <string name="category_tools">Tools</string>
     <string name="category_training">Training</string>
     <string name="category_learning">Learning</string>
@@ -23,7 +21,6 @@
     <string name="tuner_title">Tuner demo</string>
     <string name="tuner_subtitle">Sample pitch readings</string>
     <string name="metronome_title">Metronome</string>
-    <string name="metronome_subtitle">Tempo and beat settings</string>
     <string name="gallery_title">Component examples</string>
     <string name="gallery_subtitle">Buttons, typography, colors, and shapes</string>
     <string name="tuner_demo_notice">Sample readings only. The microphone is not used.</string>

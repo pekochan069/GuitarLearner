@@ -82,12 +82,19 @@ class FoundationPresentationTest {
         val metronome = FakeMetronome()
         val circuit = testCircuit(FakeAppearance(), metronome, developmentSamplesEnabled = false)
         compose.setContent {
-            GuitarLearnerTheme(false) {
-                CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                GuitarLearnerTheme(false) {
+                    CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+                }
             }
         }
+        compose.onNodeWithTag("destination_title").assertDoesNotExist()
         compose.onNodeWithTag("category_Tools").assertExists()
         compose.onNodeWithTag("feature_Metronome").assertHasClickAction().assertIsDisplayed()
+        val category = compose.onNodeWithTag("category_Tools").getUnclippedBoundsInRoot()
+        val tile = compose.onNodeWithTag("feature_Metronome").getUnclippedBoundsInRoot()
+        assertEquals((category.width.value - 12f) / 2, tile.width.value, 1f)
+        assertEquals(category.left.value, tile.left.value, 1f)
         compose.onNodeWithTag("category_Training").assertDoesNotExist()
         compose.onNodeWithTag("category_Learning").assertDoesNotExist()
         compose.onNodeWithTag("sample_Tuner").assertDoesNotExist()

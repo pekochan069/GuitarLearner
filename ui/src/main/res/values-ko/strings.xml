@@ -1,7 +1,5 @@
 <resources>
     <string name="app_name">GuitarLearner</string>
-    <string name="home_title">홈</string>
-    <string name="home_description">연습에 사용할 도구를 선택하세요.</string>
     <string name="category_tools">도구</string>
     <string name="category_training">훈련</string>
     <string name="category_learning">학습</string>
@@ -23,7 +21,6 @@
     <string name="tuner_title">튜너 데모</string>
     <string name="tuner_subtitle">음 높이 예시</string>
     <string name="metronome_title">메트로놈</string>
-    <string name="metronome_subtitle">빠르기와 박자 설정</string>
     <string name="gallery_title">컴포넌트 예시</string>
     <string name="gallery_subtitle">버튼, 글꼴, 색상, 모양</string>
     <string name="tuner_demo_notice">예시 상태만 표시합니다. 마이크는 사용하지 않습니다.</string>
