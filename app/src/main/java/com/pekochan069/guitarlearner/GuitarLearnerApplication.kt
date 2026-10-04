@@ -14,7 +14,14 @@ import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.createGraphFactory
 
 class GuitarLearnerApplication : Application() {
-    val graph: AppGraph by lazy { createGraphFactory<AppGraph.Factory>().create(this) }
+    private val defaultGraph: AppGraph by lazy {
+        createGraphFactory<AppGraph.Factory>().create(this, AndroidMetronomeHost(
+            this, MetronomePlaybackService::class.java, MainActivity::class.java,
+            getSharedPreferences("metronome", MODE_PRIVATE),
+        ))
+    }
+    internal var graphOverride: AppGraph? = null
+    val graph: AppGraph get() = graphOverride ?: defaultGraph
 }
 
 private abstract class AppScope
@@ -34,13 +41,6 @@ interface AppGraph {
     fun provideSettings(host: AndroidAppearanceHost): AppearanceSettings = host
 
     @Provides
-    @SingleIn(AppScope::class)
-    fun provideMetronome(application: Application): AndroidMetronomeHost = AndroidMetronomeHost(
-        application, MetronomePlaybackService::class.java, MainActivity::class.java,
-        application.getSharedPreferences("metronome", Application.MODE_PRIVATE),
-    )
-
-    @Provides
     fun provideMetronomeCapability(host: AndroidMetronomeHost): Metronome = host
 
     @Provides
@@ -56,6 +56,6 @@ interface AppGraph {
 
     @DependencyGraph.Factory
     fun interface Factory {
-        fun create(@Provides application: Application): AppGraph
+        fun create(@Provides application: Application, @Provides metronomeHost: AndroidMetronomeHost): AppGraph
     }
 }
