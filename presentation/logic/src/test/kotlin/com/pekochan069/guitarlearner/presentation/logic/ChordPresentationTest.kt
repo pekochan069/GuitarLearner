@@ -110,7 +110,7 @@ class ChordPresentationTest {
         }
     }
 
-    @Test fun copyingSelectedLookupAndAnOctaveCapoRetainTheInterpretationAndShapeMeaning() = runTest {
+    @Test fun copyingSelectedLookupAndCapoChangesRetainTheInterpretationAndShapeMeaning() = runTest {
         val port = ChordTestPort()
         val shape = ChordShape(listOf(StringStop.Muted, StringStop.Fretted(3), StringStop.Fretted(2),
             StringStop.Fretted(2), StringStop.Fretted(1), StringStop.Fretted(3)))
@@ -123,8 +123,13 @@ class ChordPresentationTest {
             state = stateWhere { it.chords.soundingSymbol == "Am7/C" }
             assertEquals(ChordSection.Edit, state.chords.section)
             assertEquals("Am7/C", state.chords.shapeSymbol)
-            state.chord(ChordEvent.SetCapo("12"))
-            state = stateWhere { it.chords.capo == 12 }
+            state.chord(ChordEvent.SetCapo("2"))
+            state = stateWhere { it.chords.capo == 2 }
+            assertEquals("Bm7/D", state.chords.soundingSymbol)
+            assertEquals("Am7/C", state.chords.shapeSymbol)
+            assertTrue(state.chords.candidates.any { it.selected && it.quality == ChordQualityUi.MinorSeventh })
+            state.chord(ChordEvent.SetCapo("0"))
+            state = stateWhere { it.chords.capo == 0 }
             assertEquals("Am7/C", state.chords.soundingSymbol)
             assertEquals("Am7/C", state.chords.shapeSymbol)
             assertTrue(state.chords.candidates.any { it.selected && it.quality == ChordQualityUi.MinorSeventh })
@@ -215,7 +220,8 @@ private class ChordTestPort : Chords {
         if (command == ChordCommand.SaveDraft) return pending?.await() ?: Either.Right(Unit)
         val draft = snapshot.value.draft
         when (command) {
-            is ChordCommand.SetCapo -> update(draft.copy(context = draft.context.copy(capo = command.capo)))
+            is ChordCommand.SetCapo -> update(draft.copy(context = draft.context.copy(capo = command.capo),
+                selected = draft.selected?.let { it.copy(root = it.root.transpose(command.capo - draft.context.capo)) }))
             is ChordCommand.SetStringPitch -> update(draft.copy(context = draft.context.copy(tuning = draft.context.tuning.withString(command.index, command.pitch))))
             is ChordCommand.SetTuning -> update(draft.copy(context = draft.context.copy(tuning = command.tuning)))
             is ChordCommand.SetStop -> update(draft.copy(shape = draft.shape.withString(command.index, command.stop)))

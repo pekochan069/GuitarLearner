@@ -246,6 +246,28 @@ class AndroidChordsHostTest {
         assertEquals(null, fixture.host(dispatcher).current.value.draft.selected)
     }
 
+    @Test fun fullCapoTransposesTheSelectedAlternativeAndRetainsItsShapeNameAcrossRestartAndReturn() = runTest {
+        val fixture = ChordFixture()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val host = fixture.host(dispatcher)
+        val stops = listOf(StringStop.Muted, StringStop.Fretted(3), StringStop.Fretted(2),
+            StringStop.Fretted(2), StringStop.Fretted(1), StringStop.Fretted(3))
+        for (index in 0..5) succeed(host, ChordCommand.SetStop(index, stops[index]))
+        succeed(host, ChordCommand.SelectCandidate(ChordIdentity(PitchClass.A, ChordQuality.MinorSeventh)))
+        val originalShape = host.current.value.draft.shape
+        assertEquals("Am7/C", ChordTheory.symbol(ChordTheory.selectedCandidate(host.current.value.draft)!!))
+        succeed(host, ChordCommand.SetCapo(2))
+        val raised = fixture.host(dispatcher).current.value.draft
+        val selected = ChordTheory.selectedCandidate(raised)!!
+        assertEquals("Bm7/D", ChordTheory.symbol(selected))
+        assertEquals("Am7/C", ChordTheory.symbol(ChordTheory.shapeCandidate(selected, raised.context.capo)))
+        assertEquals(originalShape, raised.shape)
+        succeed(host, ChordCommand.SetCapo(0))
+        val returned = ChordTheory.selectedCandidate(host.current.value.draft)!!
+        assertEquals("Am7/C", ChordTheory.symbol(returned))
+        assertEquals(originalShape, host.current.value.draft.shape)
+    }
+
     private suspend fun succeed(host: AndroidChordsHost, command: ChordCommand) {
         assertEquals(Either.Right(Unit), host.execute(command))
     }

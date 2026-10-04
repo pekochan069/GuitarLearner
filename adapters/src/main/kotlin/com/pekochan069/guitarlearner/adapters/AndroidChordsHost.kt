@@ -88,7 +88,8 @@ class AndroidChordsHost internal constructor(
                 edit(draft.copy(context = draft.context.copy(tuning = draft.context.tuning.withString(command.index, command.pitch))))
             } else failure(ChordFailure.InvalidInput)
             is ChordCommand.SetCapo -> if (command.capo in 0..12) {
-                edit(draft.copy(context = draft.context.copy(capo = command.capo)))
+                val selected = draft.selected?.let { it.copy(root = it.root.transpose(command.capo - draft.context.capo)) }
+                edit(draft.copy(context = draft.context.copy(capo = command.capo), selected = selected))
             } else failure(ChordFailure.InvalidInput)
             is ChordCommand.SetStop -> if (command.index in 0..5) {
                 edit(draft.copy(shape = draft.shape.withString(command.index, command.stop)))
