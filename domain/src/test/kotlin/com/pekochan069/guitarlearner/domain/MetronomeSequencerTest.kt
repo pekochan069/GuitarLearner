@@ -8,13 +8,29 @@ import org.junit.Test
 
 class MetronomeSequencerTest {
     @Test
-    fun eighthNote120HasEightHalfSecondPositionsPerBar() {
+    fun ninetyQuarterNoteBpmScalesClickSpacingByTheSelectedNote() {
+        val intervals = listOf(BeatUnit.Half to 64_000L, BeatUnit.Quarter to 32_000L,
+            BeatUnit.Eighth to 16_000L, BeatUnit.Sixteenth to 8_000L)
+        for ((unit, interval) in intervals) {
+            val config = MetronomeConfig(90, unit)
+            val sequencer = MetronomeSequencer(config, 48_000)
+            repeat(8) { index ->
+                val beat = sequencer.nextBeat()
+                assertEquals("$unit click $index at quarter note = 90", index * interval, beat.frame)
+                assertEquals(index % 4, beat.beatIndex)
+                assertEquals(config, beat.config)
+            }
+        }
+    }
+
+    @Test
+    fun eighthNotesAtQuarterNote120HaveEightQuarterSecondPositionsPerBar() {
         val config = MetronomeConfig(120, BeatUnit.Eighth, List(8) { BeatAccent.Normal })
         val sequencer = MetronomeSequencer(config, 48_000)
 
         repeat(16) { index ->
             val beat = sequencer.nextBeat()
-            assertEquals(index * 24_000L, beat.frame)
+            assertEquals(index * 12_000L, beat.frame)
             assertEquals(index % 8, beat.beatIndex)
             assertEquals(config, beat.config)
         }
@@ -34,12 +50,28 @@ class MetronomeSequencerTest {
 
     @Test
     fun fractionalTempoDoesNotAccumulateWholeFrameRoundingError() {
-        val sequencer = MetronomeSequencer(MetronomeConfig(137), 48_000)
+        for (unit in BeatUnit.entries) {
+            val sequencer = MetronomeSequencer(MetronomeConfig(137, unit), 48_000)
+            val denominator = 137L * unit.denominator
+            repeat(100_000) { index ->
+                val beat = sequencer.nextBeat()
+                val frameErrorTimesDenominator = abs(beat.frame * denominator - index * 11_520_000L)
+                assertTrue("$unit frame error at beat $index", frameErrorTimesDenominator < denominator)
+            }
+        }
+    }
 
-        repeat(100_000) { index ->
-            val beat = sequencer.nextBeat()
-            val frameErrorTimesBpm = abs(beat.frame * 137 - index * 2_880_000L)
-            assertTrue("Frame error at beat $index", frameErrorTimesBpm < 137)
+    @Test
+    fun minimumAndMaximumQuarterNoteTempoKeepEachNoteValueSpacing() {
+        val intervals = listOf(
+            Triple(40, BeatUnit.Half, 144_000L), Triple(40, BeatUnit.Quarter, 72_000L),
+            Triple(40, BeatUnit.Eighth, 36_000L), Triple(40, BeatUnit.Sixteenth, 18_000L),
+            Triple(240, BeatUnit.Half, 24_000L), Triple(240, BeatUnit.Quarter, 12_000L),
+            Triple(240, BeatUnit.Eighth, 6_000L), Triple(240, BeatUnit.Sixteenth, 3_000L),
+        )
+        for ((bpm, unit, interval) in intervals) {
+            val sequencer = MetronomeSequencer(MetronomeConfig(bpm, unit), 48_000)
+            repeat(8) { index -> assertEquals("$unit at $bpm BPM", index * interval, sequencer.nextBeat().frame) }
         }
     }
 
@@ -73,6 +105,7 @@ class MetronomeSequencerTest {
         assertEquals(0, boundary.beatIndex)
         assertEquals(72_000L, boundary.frame)
         assertEquals(old.copy(denominator = BeatUnit.Sixteenth, beats = newBeats), boundary.config)
+        assertEquals(78_000L, sequencer.nextBeat().frame)
     }
 
     @Test
@@ -93,7 +126,7 @@ class MetronomeSequencerTest {
         assertEquals(96_000L, boundary.frame)
         assertEquals(0, boundary.beatIndex)
         assertEquals(preset, boundary.config)
-        assertEquals(132_000L, sequencer.nextBeat().frame)
+        assertEquals(114_000L, sequencer.nextBeat().frame)
     }
 
     @Test
@@ -114,6 +147,7 @@ class MetronomeSequencerTest {
         assertEquals(0, boundary.beatIndex)
         assertEquals(72_000L, boundary.frame)
         assertEquals(preset.copy(bpm = 180), boundary.config)
+        assertEquals(80_000L, sequencer.nextBeat().frame)
     }
 
     @Test
@@ -154,7 +188,7 @@ class MetronomeSequencerTest {
 
         sequencer.reset(selected)
         assertEquals(ScheduledBeat(0, 0, selected), sequencer.nextBeat())
-        assertEquals(ScheduledBeat(72_000, 1, selected), sequencer.nextBeat())
+        assertEquals(ScheduledBeat(36_000, 1, selected), sequencer.nextBeat())
     }
 
     @Test

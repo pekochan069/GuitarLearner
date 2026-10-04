@@ -16,26 +16,53 @@ class MetronomeAudioTest {
         val sequencer = MetronomeSequencer(MetronomeConfig(120, BeatUnit.Eighth,
             listOf(BeatAccent.Accent, BeatAccent.Normal, BeatAccent.Mute)), 48_000)
         val renderer = MetronomePcm(sequencer, 48_000)
-        val samples = ShortArray(74_400)
+        val samples = ShortArray(38_400)
         val chunk = ShortArray(240)
         val beats = mutableListOf<ScheduledBeat>()
         for (offset in samples.indices step chunk.size) {
             renderer.render(chunk, chunk.size, beats::add)
             chunk.copyInto(samples, offset)
         }
-        assertEquals(listOf(2_400L, 26_400L, 50_400L), beats.map { it.frame })
+        assertEquals(listOf(2_400L, 14_400L, 26_400L), beats.map { it.frame })
         assertEquals(listOf(0, 1, 2), beats.map { it.beatIndex })
         assertTrue(samples.sliceArray(0 until 2_400).all { it == 0.toShort() })
-        assertTrue(samples.sliceArray(50_400 until 74_400).all { it == 0.toShort() })
+        assertTrue(samples.sliceArray(26_400 until 38_400).all { it == 0.toShort() })
         val accented = samples.sliceArray(2_400 until 3_360)
-        val normal = samples.sliceArray(26_400 until 27_360)
+        val normal = samples.sliceArray(14_400 until 15_360)
         assertTrue(accented.contentEquals(clickSamples(48_000, true)))
         assertTrue(normal.contentEquals(clickSamples(48_000, false)))
         fun energy(values: ShortArray): Long = values.sumOf { it.toLong() * it }
         fun crossings(values: ShortArray): Int = (1 until values.size).count { values[it - 1] <= 0 && values[it] > 0 }
         assertTrue(energy(accented) > energy(normal) * 2)
         assertTrue(crossings(accented) > crossings(normal) * 1.8)
-        assertTrue(samples.sliceArray(3_360 until 26_400).all { it == 0.toShort() })
+        assertTrue(samples.sliceArray(3_360 until 14_400).all { it == 0.toShort() })
+    }
+
+    @Test
+    fun sixteenthNotesAtQuarterNote240KeepClicksAndMarkersAlignedAcrossUnevenChunks() {
+        val config = MetronomeConfig(240, BeatUnit.Sixteenth, List(16) { BeatAccent.Normal })
+        val renderer = MetronomePcm(MetronomeSequencer(config, 48_000), 48_000)
+        val samples = ShortArray(51_721)
+        val sizes = listOf(17, 239, 1_003, 7, 480, 129)
+        val beats = mutableListOf<ScheduledBeat>()
+        var offset = 0
+        var chunkIndex = 0
+        while (offset < samples.size) {
+            val size = minOf(sizes[chunkIndex++ % sizes.size], samples.size - offset)
+            val chunk = ShortArray(size)
+            renderer.render(chunk, size, beats::add)
+            chunk.copyInto(samples, offset)
+            offset += size
+        }
+        assertEquals(List(17) { 2_400L + it * 3_000L }, beats.map { it.frame })
+        assertEquals(List(17) { it % 16 }, beats.map { it.beatIndex })
+        assertTrue(samples.sliceArray(0 until 2_400).all { it == 0.toShort() })
+        val click = clickSamples(48_000, false)
+        beats.forEach { beat ->
+            val start = beat.frame.toInt()
+            assertTrue(samples.sliceArray(start until start + click.size).contentEquals(click))
+            assertTrue(samples.sliceArray(start + click.size until minOf(start + 3_000, samples.size)).all { it == 0.toShort() })
+        }
     }
 
     @Test

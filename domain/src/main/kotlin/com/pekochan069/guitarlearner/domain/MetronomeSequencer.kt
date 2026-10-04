@@ -5,7 +5,7 @@ import kotlin.math.roundToLong
 data class ScheduledBeat(val frame: Long, val beatIndex: Int, val config: MetronomeConfig)
 
 class MetronomeSequencer(config: MetronomeConfig, sampleRate: Int) {
-    private val framesPerMinute = sampleRate.toLong() * 60
+    private val intervalNumerator = sampleRate.toLong() * 60 * 4
     private var config = config
     private var pendingTempo: Int? = null
     private var pendingBar: MetronomeConfig? = null
@@ -43,8 +43,9 @@ class MetronomeSequencer(config: MetronomeConfig, sampleRate: Int) {
 
         val beat = ScheduledBeat(nextFrame, beatIndex, config)
         beatIndex = (beatIndex + 1) % config.numerator
-        wholeFrame += framesPerMinute / config.bpm
-        fractionalFrame += (framesPerMinute % config.bpm).toDouble() / config.bpm
+        val intervalDenominator = config.bpm * config.denominator.denominator
+        wholeFrame += intervalNumerator / intervalDenominator
+        fractionalFrame += (intervalNumerator % intervalDenominator).toDouble() / intervalDenominator
         val carriedFrames = fractionalFrame.toLong()
         wholeFrame += carriedFrames
         fractionalFrame -= carriedFrames

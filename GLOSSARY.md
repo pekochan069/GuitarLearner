@@ -17,7 +17,7 @@ A beat that advances the metronome pattern and its indicator without producing a
 The number of beats in a metronome bar and the note value of each beat. In 8/8, a bar contains eight eighth-note beats.
 
 **Tempo**:
-The number of metronome beats per minute, measured in the note value shown with the BPM. At eighth note = 120, successive beats are half a second apart.
+The number of quarter notes per minute. At 90 BPM, quarter notes are about 666.667 ms apart and eighth notes are about 333.333 ms apart.
 
 **Metronome preset**:
 A named, saved tempo, time signature, and accent pattern that the user can load for a later practice session.

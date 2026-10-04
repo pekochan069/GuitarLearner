@@ -250,6 +250,29 @@ class FoundationPresentationTest {
     }
 
     @Test
+    fun tempoKeepsItsQuarterNoteReferenceWhenTheMeterChanges(): Unit {
+        val metronome = FakeMetronome()
+        val circuit = testCircuit(FakeAppearance(), metronome)
+        compose.setContent {
+            GuitarLearnerTheme(false) {
+                CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+            }
+        }
+        compose.onNodeWithTag("page_Metronome").performClick()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val tempo = context.resources.getQuantityString(com.pekochan069.guitarlearner.ui.R.plurals.tempo_bpm, 90, 90)
+        val description = context.getString(com.pekochan069.guitarlearner.ui.R.string.tempo_note_description,
+            context.getString(com.pekochan069.guitarlearner.ui.R.string.beat_quarter), tempo)
+        for (unit in listOf(2, 4, 8, 16)) {
+            compose.onNodeWithTag("beat_unit_$unit").performClick().assertIsSelected()
+            compose.onNodeWithTag("bpm_value").assertTextEquals("90").assertContentDescriptionEquals(description)
+            compose.onNodeWithTag("tempo_slider").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, description))
+            assertEquals(unit, metronome.snapshot.value.selected.denominator.denominator)
+        }
+        assertTrue(metronome.snapshot.value.playback is PlaybackState.Stopped)
+    }
+
+    @Test
     fun sixteenBeatsWrapAndRemainInteractiveAtDoubleTextSize(): Unit {
         val metronome = FakeMetronome()
         metronome.snapshot.value = MetronomeSnapshot(selected = MetronomeConfig(240, beats = List(16) { BeatAccent.Normal }))

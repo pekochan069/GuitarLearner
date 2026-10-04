@@ -11,6 +11,7 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Process
+import android.util.Log
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -28,7 +29,15 @@ import com.pekochan069.guitarlearner.domain.PlaybackState
 import com.pekochan069.guitarlearner.domain.StopReason
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -176,6 +185,56 @@ class MetronomePlaybackTest {
     }
 
     @Test
+    fun quarterNote90DoublesTheNativePresentedBeatRateForEighthNotes(): Unit = runBlocking {
+        val host = (compose.activity.application as GuitarLearnerApplication).graph.metronomeHost
+        val original = host.current.value.selected
+        val quarter = MetronomeConfig(90, BeatUnit.Quarter, List(4) { BeatAccent.Normal })
+        val eighth = quarter.copy(denominator = BeatUnit.Eighth)
+        val fast = MetronomeConfig(240, BeatUnit.Sixteenth, List(16) { BeatAccent.Normal })
+        try {
+            host.execute(MetronomeCommand.Stop).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetTempo(90)).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetPattern(quarter.denominator, quarter.beats)).assertNativeSuccess()
+            val quarterTimes = async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) {
+                presentedBeatTimes(host, quarter, 4)
+            }
+            host.execute(MetronomeCommand.Start).assertNativeSuccess()
+            val slow = quarterTimes.await()
+            val quarterTimestampUsed = host.currentAudioDiagnostics()?.timestampUsed
+            val eighthTimes = async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) {
+                presentedBeatTimes(host, eighth, 4)
+            }
+            host.execute(MetronomeCommand.SetPattern(eighth.denominator, eighth.beats)).assertNativeSuccess()
+            val doubled = eighthTimes.await()
+            val eighthTimestampUsed = host.currentAudioDiagnostics()?.timestampUsed
+            val fastTimes = async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) {
+                presentedBeatTimes(host, fast, 8)
+            }
+            host.execute(MetronomeCommand.SetTempo(fast.bpm)).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetPattern(fast.denominator, fast.beats)).assertNativeSuccess()
+            val highRate = fastTimes.await()
+            assertEquals(listOf(0, 1, 2, 3), slow.map { it.first })
+            assertEquals(listOf(0, 1, 2, 3), doubled.map { it.first })
+            assertEquals((0..7).toList(), highRate.map { it.first })
+            val quarterMeanMs = meanDeliveryIntervalMs(slow)
+            val eighthMeanMs = meanDeliveryIntervalMs(doubled)
+            val highRateMeanMs = meanDeliveryIntervalMs(highRate)
+            Log.i("MetronomePlaybackTest", "quarter90 deliveryMeanMs=$quarterMeanMs eighth90 deliveryMeanMs=$eighthMeanMs " +
+                "ratio=${quarterMeanMs / eighthMeanMs} sixteenth240 deliveryMeanMs=$highRateMeanMs " +
+                "timestampUsed quarter=$quarterTimestampUsed eighth=$eighthTimestampUsed fast=${host.currentAudioDiagnostics()?.timestampUsed}")
+            assertEquals("Quarter-note marker delivery", 666.667, quarterMeanMs, 100.0)
+            assertEquals("Eighth-note marker delivery", 333.333, eighthMeanMs, 75.0)
+            assertEquals("Quarter/eighth delivery ratio", 2.0, quarterMeanMs / eighthMeanMs, 0.35)
+            assertEquals("Sixteenth-note marker delivery at 240 BPM", 62.5, highRateMeanMs, 20.0)
+            assertEquals(0, host.currentAudioDiagnostics()?.underruns)
+        } finally {
+            host.execute(MetronomeCommand.Stop).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetPattern(original.denominator, original.beats)).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetTempo(original.bpm)).assertNativeSuccess()
+        }
+    }
+
+    @Test
     fun losingFocusStopsAndAbandoningTheInterruptionDoesNotResume(): Unit = runBlocking {
         val host = (compose.activity.application as GuitarLearnerApplication).graph.metronomeHost
         val original = host.current.value.selected
@@ -301,6 +360,17 @@ class MetronomePlaybackTest {
         assertTrue("Expected playback, received ${result.playback}", result.playback is PlaybackState.Playing)
         return result.playback as PlaybackState.Playing
     }
+
+    private suspend fun presentedBeatTimes(host: AndroidMetronomeHost, config: MetronomeConfig, count: Int): List<Pair<Int, Long>> =
+        withTimeout(5_000) {
+            host.current.mapNotNull { snapshot ->
+                assertTrue("Output failed: ${snapshot.playback}", snapshot.playback !is PlaybackState.Failed)
+                (snapshot.playback as? PlaybackState.Playing)?.takeIf { it.config == config }
+            }.distinctUntilChanged().take(count).map { it.beatIndex to System.nanoTime() }.toList()
+        }
+
+    private fun meanDeliveryIntervalMs(beats: List<Pair<Int, Long>>): Double =
+        (beats.last().second - beats.first().second).toDouble() / (beats.size - 1) / 1_000_000
 }
 
 private fun Either<MetronomeFailure, Unit>.assertNativeSuccess() {

@@ -67,13 +67,6 @@ private val BeatUnitUi.label: Int get() = when (this) {
     BeatUnitUi.Sixteenth -> R.string.beat_sixteenth
 }
 
-private val BeatUnitUi.symbol: Int get() = when (this) {
-    BeatUnitUi.Half -> R.string.note_half
-    BeatUnitUi.Quarter -> R.string.note_quarter
-    BeatUnitUi.Eighth -> R.string.note_eighth
-    BeatUnitUi.Sixteenth -> R.string.note_sixteenth
-}
-
 private val BeatAccentUi.label: Int get() = when (this) {
     BeatAccentUi.Accent -> R.string.beat_accent
     BeatAccentUi.Normal -> R.string.beat_normal
@@ -112,7 +105,7 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
     }
     val tempoLabel = stringResource(R.string.tempo)
     val tempoDescription = pluralStringResource(R.plurals.tempo_bpm, config.bpm, config.bpm)
-    val tempoNoteDescription = stringResource(R.string.tempo_note_description, stringResource(config.denominator.label), tempoDescription)
+    val tempoNoteDescription = stringResource(R.string.tempo_note_description, stringResource(R.string.beat_quarter), tempoDescription)
     val beatCountDescription = pluralStringResource(R.plurals.beats_per_bar, config.numerator, config.numerator)
     val beatUnitDescription = stringResource(config.denominator.label)
     val notice = state.notice ?: (playback as? MetronomePlaybackUi.Failed)?.notice
@@ -133,7 +126,7 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
                     modifier = Modifier.size(48.dp).testTag("decrease_bpm"),
                 ) { Icon(painterResource(R.drawable.ic_remove), stringResource(R.string.decrease_tempo)) }
                 FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
-                    Text(stringResource(R.string.tempo_note_prefix, stringResource(config.denominator.symbol)),
+                    Text(stringResource(R.string.tempo_note_prefix, stringResource(R.string.note_quarter)),
                         Modifier.align(Alignment.CenterVertically).clearAndSetSemantics { },
                         style = MaterialTheme.typography.titleLarge)
                     Text(stringResource(R.string.tempo_value, config.bpm),
@@ -158,7 +151,7 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
                 },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("tempo_slider").semantics {
                     contentDescription = tempoLabel
-                    stateDescription = tempoDescription
+                    stateDescription = tempoNoteDescription
                 },
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
