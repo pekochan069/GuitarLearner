@@ -22,7 +22,6 @@
     <string name="gallery_subtitle">Buttons, typography, colors, and shapes</string>
     <string name="tuner_demo_notice">Sample readings only. The microphone is not used.</string>
     <string name="gallery_demo_notice">Select a control to change its example state.</string>
-    <string name="metronome_playback_notice">Tap Start to play. Playback continues in the background and with the screen locked.</string>
     <string name="tuner_target">Sample target · A2</string>
     <string name="note_placeholder" translatable="false">--</string>
     <string name="note_a2" translatable="false">A2</string>
@@ -57,19 +56,16 @@
         <item quantity="other">%1$d beats per minute</item>
     </plurals>
     <string name="state_running">Playing</string>
-    <string name="state_stopped">Stopped</string>
     <string name="state_preparing">Preparing playback…</string>
     <string name="state_playback_failed">Playback unavailable</string>
     <string name="state_focus_interrupted">Stopped by an audio interruption</string>
     <string name="state_output_disconnected">Stopped because headphones disconnected</string>
     <string name="state_service_ended">Playback ended. Start again to continue.</string>
-    <string name="set_tempo">Set tempo</string>
     <string name="decrease_tempo">Decrease tempo by 1 BPM</string>
     <string name="increase_tempo">Increase tempo by 1 BPM</string>
-    <string name="tempo_range">40–240 BPM. You can change tempo during playback.</string>
     <string name="start_metronome">Start</string>
     <string name="stop_metronome">Stop</string>
-    <string name="tempo_note">%1$s = %2$d</string>
+    <string name="tempo_note_prefix">%1$s =</string>
     <string name="tempo_note_description">%1$s, %2$s</string>
     <string name="note_half" translatable="false">𝅗𝅥</string>
     <string name="note_quarter" translatable="false">♩</string>
@@ -77,6 +73,10 @@
     <string name="note_sixteenth" translatable="false">𝅘𝅥𝅯</string>
     <string name="metronome_meter">%1$d/%2$d</string>
     <string name="time_signature">Time signature</string>
+    <string name="beats_per_bar_label">Beats per bar</string>
+    <string name="note_value">Note value</string>
+    <string name="note_value_display">%1$s 1/%2$d</string>
+    <string name="note_value_option">%1$s 1/%2$d · %3$s</string>
     <plurals name="beats_per_bar">
         <item quantity="one">%1$d beat per bar</item>
         <item quantity="other">%1$d beats per bar</item>
@@ -87,19 +87,18 @@
     <string name="beat_quarter">Quarter note</string>
     <string name="beat_eighth">Eighth note</string>
     <string name="beat_sixteenth">Sixteenth note</string>
-    <string name="beat_unit_description">Each click counts one %1$s. The BPM counts these notes.</string>
-    <string name="customize_accents">Beat accents</string>
-    <string name="accent_description">Tap a beat to cycle through accent, normal, and mute. Muted beats keep their place in the pattern.</string>
     <string name="beat_accent">Accent</string>
     <string name="beat_normal">Normal</string>
     <string name="beat_mute">Mute</string>
-    <string name="beat_edit_description">Beat %1$d, %2$s. Tap to change.</string>
+    <string name="beat_edit_description">Beat %1$d, selected %2$s. Tap to change.</string>
+    <string name="beat_current">Current audible beat, %1$s</string>
+    <string name="beat_current_pending">Current audible beat, %1$s. Change pending.</string>
+    <string name="beat_applied_pending">Audible pattern: %1$s. Change pending.</string>
     <string name="current_beat_description">Beat %1$d of %2$d, %3$s</string>
-    <string name="current_beat_number">Beat %1$d / %2$d</string>
-    <string name="current_beat_ready">Ready to start</string>
-    <string name="metronome_pending">Change pending. Prepared beats continue; settings apply at the next available beat or bar.</string>
+    <string name="metronome_pending">Change pending</string>
     <string name="metronome_active_config">Playing now: %1$d/%2$d, %3$d BPM</string>
     <string name="presets">Presets</string>
+    <string name="close_presets">Close presets</string>
     <string name="preset_name">Preset name</string>
     <string name="save_preset">Save current settings</string>
     <string name="preset_saving">Saving…</string>

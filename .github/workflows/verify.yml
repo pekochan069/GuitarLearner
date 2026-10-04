@@ -80,6 +80,8 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: >-
+            adb shell wm size 360x800;
+            adb shell wm density 160;
             status=0;
             ./gradlew :app:connectedDebugAndroidTest --build-cache --console=plain || status=$?;
             adb logcat -d -v threadtime MetronomeAudio:D AudioTrack:W '*:S' > metronome-logcat.txt;

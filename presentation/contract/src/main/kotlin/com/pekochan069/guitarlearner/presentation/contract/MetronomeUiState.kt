@@ -34,6 +34,7 @@ data class MetronomeUiState(
     val playback: MetronomePlaybackUi,
     val pendingChange: Boolean,
     val presets: List<MetronomePresetUi>,
+    val presetsOpen: Boolean,
     val presetName: String,
     val overwriteName: String?,
     val savingPreset: Boolean,

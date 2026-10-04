@@ -174,35 +174,36 @@ fun DesignFoundationApp(
                 Column(
                     Modifier.widthIn(max = 680.dp).fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp, vertical = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                        .padding(if (page == Page.Metronome) 12.dp else 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (page == Page.Metronome) 12.dp else 24.dp),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             stringResource(page.title),
                             Modifier.semantics { heading() },
-                            style = MaterialTheme.typography.headlineLarge,
+                            style = if (page == Page.Metronome) MaterialTheme.typography.headlineMedium
+                                else MaterialTheme.typography.headlineLarge,
                         )
-                        Text(
-                            stringResource(page.subtitle),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (page != Page.Metronome) {
+                            Text(
+                                stringResource(page.subtitle),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        shape = MaterialTheme.shapes.medium,
-                    ) {
-                        Text(
-                            stringResource(when (page) {
-                                Page.Tuner -> R.string.tuner_demo_notice
-                                Page.Metronome -> R.string.metronome_playback_notice
-                                Page.Gallery -> R.string.gallery_demo_notice
-                            }),
-                            Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    if (page != Page.Metronome) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Text(
+                                stringResource(if (page == Page.Tuner) R.string.tuner_demo_notice else R.string.gallery_demo_notice),
+                                Modifier.padding(16.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     when (page) {
                         Page.Tuner -> TunerSample(

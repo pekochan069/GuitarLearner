@@ -22,7 +22,6 @@
     <string name="gallery_subtitle">버튼, 글꼴, 색상, 모양</string>
     <string name="tuner_demo_notice">예시 상태만 표시합니다. 마이크는 사용하지 않습니다.</string>
     <string name="gallery_demo_notice">조작 요소를 선택하면 예시 상태가 바뀝니다.</string>
-    <string name="metronome_playback_notice">시작을 눌러 재생하세요. 다른 앱을 열거나 화면을 잠가도 재생이 계속됩니다.</string>
     <string name="tuner_target">예시 목표음 · A2</string>
     <string name="reference_frequency">기준 주파수 · 110 Hz</string>
     <string name="reading_no_signal">신호 없음</string>
@@ -49,22 +48,23 @@
         <item quantity="other">분당 %1$d박</item>
     </plurals>
     <string name="state_running">재생 중</string>
-    <string name="state_stopped">정지</string>
     <string name="state_preparing">재생 준비 중…</string>
     <string name="state_playback_failed">재생할 수 없음</string>
     <string name="state_focus_interrupted">다른 오디오가 사용되어 정지했습니다</string>
     <string name="state_output_disconnected">헤드폰 연결이 끊겨 정지했습니다</string>
     <string name="state_service_ended">재생이 종료됐습니다. 계속하려면 시작을 누르세요.</string>
-    <string name="set_tempo">빠르기 조절</string>
     <string name="decrease_tempo">빠르기 1 BPM 줄이기</string>
     <string name="increase_tempo">빠르기 1 BPM 늘리기</string>
-    <string name="tempo_range">40~240 BPM. 재생 중에도 조절할 수 있습니다.</string>
     <string name="start_metronome">시작</string>
     <string name="stop_metronome">정지</string>
-    <string name="tempo_note">%1$s = %2$d</string>
+    <string name="tempo_note_prefix">%1$s =</string>
     <string name="tempo_note_description">%1$s 기준, %2$s</string>
     <string name="metronome_meter">%1$d/%2$d</string>
     <string name="time_signature">박자표</string>
+    <string name="beats_per_bar_label">한 마디의 박 수</string>
+    <string name="note_value">음표 길이</string>
+    <string name="note_value_display">%1$s 1/%2$d</string>
+    <string name="note_value_option">%1$s 1/%2$d · %3$s</string>
     <plurals name="beats_per_bar">
         <item quantity="other">한 마디에 %1$d박</item>
     </plurals>
@@ -74,19 +74,18 @@
     <string name="beat_quarter">4분음표</string>
     <string name="beat_eighth">8분음표</string>
     <string name="beat_sixteenth">16분음표</string>
-    <string name="beat_unit_description">클릭 한 번은 %1$s 하나에 해당합니다. BPM은 이 음표의 분당 개수입니다.</string>
-    <string name="customize_accents">박 강조</string>
-    <string name="accent_description">박을 누르면 강조, 보통, 무음 순으로 바뀝니다. 무음 박도 표시와 시간은 진행됩니다.</string>
     <string name="beat_accent">강조</string>
     <string name="beat_normal">보통</string>
     <string name="beat_mute">무음</string>
-    <string name="beat_edit_description">%1$d박, %2$s. 누르면 변경합니다.</string>
+    <string name="beat_edit_description">%1$d박, 선택한 설정 %2$s. 누르면 변경합니다.</string>
+    <string name="beat_current">현재 재생 중인 박, %1$s</string>
+    <string name="beat_current_pending">현재 재생 중인 박, %1$s. 변경 대기 중입니다.</string>
+    <string name="beat_applied_pending">재생 중인 패턴: %1$s. 변경 대기 중입니다.</string>
     <string name="current_beat_description">%2$d박 중 %1$d박, %3$s</string>
-    <string name="current_beat_number">현재 %1$d / %2$d박</string>
-    <string name="current_beat_ready">시작 대기</string>
-    <string name="metronome_pending">변경 대기 중. 이미 준비된 박은 재생하고, 적용 가능한 다음 박이나 마디에서 바뀝니다.</string>
+    <string name="metronome_pending">변경 대기 중</string>
     <string name="metronome_active_config">현재 재생: %1$d/%2$d, %3$d BPM</string>
     <string name="presets">프리셋</string>
+    <string name="close_presets">프리셋 닫기</string>
     <string name="preset_name">프리셋 이름</string>
     <string name="save_preset">현재 설정 저장</string>
     <string name="preset_saving">저장 중…</string>

@@ -58,6 +58,7 @@ class AndroidMetronomeHost(
     preferences: SharedPreferences,
     private val io: CoroutineDispatcher = Dispatchers.IO,
     private val main: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val outputFactory: MetronomeOutputFactory = MetronomeOutputFactory(::MetronomeAudio),
 ) : Metronome {
     private val storage = MetronomeStorage(preferences)
     private var document = storage.initial.getOrNull() ?: MetronomeDocument()
@@ -82,8 +83,10 @@ class AndroidMetronomeHost(
 
     private suspend fun change(command: MetronomeCommand): Either<MetronomeFailure, Unit> {
         val caller = currentCoroutineContext()
+        val originRunId = withContext(main) { requestedRunId }
         val result = mutations.withLock {
             caller.ensureActive()
+            val previous = document.selected
             val changed = changedDocument(command)
             changed.fold(
                 ifLeft = { it.left() },
@@ -96,14 +99,7 @@ class AndroidMetronomeHost(
                                     document = next
                                     snapshot.value = snapshot.value.copy(selected = next.selected,
                                         presets = Collections.unmodifiableList(next.presets.toList()))
-                                    run?.audio?.let { audio ->
-                                        when (command) {
-                                            is MetronomeCommand.SetTempo -> audio.setTempo(next.selected.bpm)
-                                            is MetronomeCommand.SetPattern -> audio.setPattern(next.selected.denominator, next.selected.beats)
-                                            is MetronomeCommand.LoadPreset -> audio.load(next.selected)
-                                            else -> Unit
-                                        }
-                                    }
+                                    applySavedEdit(command, previous, next.selected, originRunId)
                                 }
                                 Unit.right()
                             },
@@ -114,6 +110,29 @@ class AndroidMetronomeHost(
         }
         caller.ensureActive()
         return result
+    }
+
+    private fun applySavedEdit(
+        command: MetronomeCommand,
+        previous: MetronomeConfig,
+        selected: MetronomeConfig,
+        originRunId: Long?,
+    ) {
+        val session = run?.takeIf { it.id == requestedRunId } ?: return
+        val signatureChanged = previous.numerator != selected.numerator || previous.denominator != selected.denominator
+        if (signatureChanged && originRunId == requestedRunId) {
+            try {
+                session.startAudio(selected)
+            } catch (_: IllegalStateException) {
+                fail(session.id, MetronomeFailure.AudioUnavailable)
+            } catch (_: IllegalArgumentException) {
+                fail(session.id, MetronomeFailure.AudioUnavailable)
+            } catch (_: SecurityException) {
+                fail(session.id, MetronomeFailure.ServiceUnavailable)
+            }
+        } else {
+            session.queue(command, selected)
+        }
     }
 
     private fun changedDocument(command: MetronomeCommand): Either<MetronomeFailure, MetronomeDocument> {
@@ -187,7 +206,7 @@ class AndroidMetronomeHost(
             }
             run = session
             session.prepare()
-            if (requestedRunId == id) session.audio.start(scope)
+            if (requestedRunId == id) session.startAudio(snapshot.value.selected)
         } catch (_: IllegalStateException) {
             fail(id, MetronomeFailure.AudioUnavailable)
         } catch (_: IllegalArgumentException) {
@@ -221,7 +240,7 @@ class AndroidMetronomeHost(
         val service: Service,
         private val scope: CoroutineScope,
         var startId: Int,
-        private val id: Long,
+        val id: Long,
     ) {
         private val manager = application.getSystemService(AudioManager::class.java)
         private val notifications = application.getSystemService(NotificationManager::class.java)
@@ -236,23 +255,14 @@ class AndroidMetronomeHost(
         private var foreground = false
         private var closed = false
         private var lastConfig: MetronomeConfig? = null
+        private var audioEpoch = 0L
+        private var lastActiveOutputId: Int? = null
         private val wakeLock = application.getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "GuitarLearner:Metronome")
             .apply { setReferenceCounted(false) }
         private var wakeJob: Job? = null
-        val audio: MetronomeAudio = MetronomeAudio(manager, snapshot.value.selected,
-            onBeat = { beat -> scope.launch(main) {
-                try {
-                    present(beat)
-                } catch (_: SecurityException) {
-                    fail(id, MetronomeFailure.ServiceUnavailable)
-                } catch (_: IllegalStateException) {
-                    fail(id, MetronomeFailure.AudioUnavailable)
-                }
-            } },
-            onOutputDisconnected = { scope.launch(main) { if (requestedRunId == id) stop(StopReason.OutputDisconnected) } },
-            onFailure = { scope.launch(main) { fail(id, MetronomeFailure.AudioUnavailable) } },
-        )
+        @Volatile var audio: MetronomeOutput? = null
+            private set
         private val noisy = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY && requestedRunId == id) {
@@ -262,7 +272,9 @@ class AndroidMetronomeHost(
         }
         private val devices = object : AudioDeviceCallback() {
             override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
-                if (requestedRunId == id && removedDevices.any { it.id == audio.routedDeviceId }) stop(StopReason.OutputDisconnected)
+                if (requestedRunId == id && removedDevices.any { it.id == audio?.routedDeviceId || it.id == lastActiveOutputId }) {
+                    stop(StopReason.OutputDisconnected)
+                }
             }
         }
         private val modes = if (Build.VERSION.SDK_INT >= 31) AudioManager.OnModeChangedListener { mode ->
@@ -302,8 +314,58 @@ class AndroidMetronomeHost(
             }
         }
 
+        fun startAudio(config: MetronomeConfig) {
+            val previous = audio
+            lastActiveOutputId = previous?.routedDeviceId ?: lastActiveOutputId
+            val epoch = ++audioEpoch
+            audio = null
+            previous?.stop()
+            lastConfig = null
+            snapshot.value = snapshot.value.copy(playback = PlaybackState.Preparing)
+            media.setPlaybackState(NativePlaybackState.Builder().setActions(NativePlaybackState.ACTION_STOP)
+                .setState(NativePlaybackState.STATE_CONNECTING, NativePlaybackState.PLAYBACK_POSITION_UNKNOWN, 0f).build())
+            service.startForeground(NOTIFICATION, notification(config, preparing = true))
+            val output = outputFactory.create(manager, config,
+                onBeat = { beat -> scope.launch(main) {
+                    if (!acceptsAudio(epoch)) return@launch
+                    try {
+                        present(beat)
+                    } catch (_: SecurityException) {
+                        fail(id, MetronomeFailure.ServiceUnavailable)
+                    } catch (_: IllegalStateException) {
+                        fail(id, MetronomeFailure.AudioUnavailable)
+                    }
+                } },
+                onOutputDisconnected = { scope.launch(main) {
+                    if (acceptsAudio(epoch)) stop(StopReason.OutputDisconnected)
+                } },
+                onFailure = { scope.launch(main) {
+                    if (acceptsAudio(epoch)) fail(id, MetronomeFailure.AudioUnavailable)
+                } },
+            )
+            if (!acceptsAudio(epoch)) {
+                output.stop()
+                return
+            }
+            audio = output
+            output.start(scope)
+        }
+
+        fun queue(command: MetronomeCommand, config: MetronomeConfig) {
+            audio?.let { output ->
+                when (command) {
+                    is MetronomeCommand.SetTempo -> output.setTempo(config.bpm)
+                    is MetronomeCommand.SetPattern -> output.setPattern(config.denominator, config.beats)
+                    is MetronomeCommand.LoadPreset -> output.load(config)
+                    else -> Unit
+                }
+            }
+        }
+
+        private fun acceptsAudio(epoch: Long): Boolean = requestedRunId == id && !closed && audioEpoch == epoch
+
         private fun present(beat: ScheduledBeat) {
-            if (requestedRunId != id || closed) return
+            lastActiveOutputId = audio?.routedDeviceId ?: lastActiveOutputId
             snapshot.value = snapshot.value.copy(playback = PlaybackState.Playing(beat.config, beat.beatIndex))
             if (lastConfig != beat.config) {
                 lastConfig = beat.config
@@ -336,7 +398,9 @@ class AndroidMetronomeHost(
         fun close() {
             if (closed) return
             closed = true
-            audio.stop()
+            ++audioEpoch
+            audio?.stop()
+            audio = null
             wakeJob?.cancel()
             if (wakeLock.isHeld) wakeLock.release()
             if (focused) manager.abandonAudioFocusRequest(focus)

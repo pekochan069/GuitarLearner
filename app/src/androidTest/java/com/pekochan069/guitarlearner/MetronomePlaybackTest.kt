@@ -11,6 +11,8 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Process
+import android.util.Log
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -26,9 +28,18 @@ import com.pekochan069.guitarlearner.domain.MetronomeFailure
 import com.pekochan069.guitarlearner.domain.MetronomePreset
 import com.pekochan069.guitarlearner.domain.PlaybackState
 import com.pekochan069.guitarlearner.domain.StopReason
+import com.pekochan069.guitarlearner.ui.R as UiR
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -124,6 +135,119 @@ class MetronomePlaybackTest {
         delay(250)
         assertTrue(host.current.value.playback is PlaybackState.Stopped)
         assertEquals(null, host.currentAudioDiagnostics())
+    }
+
+    @Test
+    fun signatureEditsRestartTheNativeOutputAtBeatZeroAndStoppedEditsStayStopped(): Unit {
+        val application = compose.activity.application as GuitarLearnerApplication
+        val host = application.graph.metronomeHost
+        val original = host.current.value.selected
+        val presetName = "Issue 7 native restart ${System.nanoTime()}"
+        val preset = MetronomeConfig(137, BeatUnit.Sixteenth,
+            listOf(BeatAccent.Mute, BeatAccent.Accent, BeatAccent.Normal, BeatAccent.Mute, BeatAccent.Normal))
+        try {
+            runBlocking {
+                host.execute(MetronomeCommand.Stop).assertNativeSuccess()
+                host.execute(MetronomeCommand.SetPattern(preset.denominator, preset.beats)).assertNativeSuccess()
+                host.execute(MetronomeCommand.SetTempo(preset.bpm)).assertNativeSuccess()
+                assertTrue(host.current.value.playback is PlaybackState.Stopped)
+                assertEquals(null, host.currentAudioDiagnostics())
+                host.execute(MetronomeCommand.SavePreset(presetName, overwrite = true)).assertNativeSuccess()
+                host.execute(MetronomeCommand.SetPattern(BeatUnit.Quarter, MetronomeConfig().beats)).assertNativeSuccess()
+                host.execute(MetronomeCommand.SetTempo(40)).assertNativeSuccess()
+                host.execute(MetronomeCommand.Start).assertNativeSuccess()
+                assertEquals(0, expectPlaying(host).beatIndex)
+            }
+            val service = requireNotNull(runningOwnMetronomeService(application))
+            compose.onNodeWithTag("page_Metronome").performClick()
+
+            val seven = MetronomeConfig().beats + List(3) { BeatAccent.Normal }
+            for (unit in listOf(BeatUnit.Quarter, BeatUnit.Eighth)) {
+                compose.waitUntil(5_000) { (host.current.value.playback as? PlaybackState.Playing)?.beatIndex == 1 }
+                if (unit == BeatUnit.Quarter) {
+                    compose.onNodeWithTag("beat_count").performScrollTo().performClick()
+                    compose.onNodeWithTag("beat_count_option_7").performScrollTo().performClick()
+                } else {
+                    compose.onNodeWithTag("beat_unit").performScrollTo().performClick()
+                    compose.onNodeWithTag("beat_unit_option_8").performScrollTo().performClick()
+                }
+                val expected = MetronomeConfig(40, unit, seven)
+                compose.waitUntil(5_000) {
+                    val playback = host.current.value.playback
+                    (playback as? PlaybackState.Playing)?.config == expected || playback is PlaybackState.Failed
+                }
+                assertEquals(PlaybackState.Playing(expected, 0), host.current.value.playback)
+                assertEquals(service.activeSince, requireNotNull(runningOwnMetronomeService(application)).activeSince)
+            }
+            val loaded = runBlocking {
+                withTimeout(5_000) { host.current.first { (it.playback as? PlaybackState.Playing)?.beatIndex == 1 } }
+                host.execute(MetronomeCommand.LoadPreset(presetName)).assertNativeSuccess()
+                withTimeout(5_000) {
+                    host.current.first { (it.playback as? PlaybackState.Playing)?.config == preset || it.playback is PlaybackState.Failed }
+                }.playback
+            }
+            assertEquals(PlaybackState.Playing(preset, 0), loaded)
+            assertEquals(service.activeSince, requireNotNull(runningOwnMetronomeService(application)).activeSince)
+        } finally {
+            runBlocking {
+                host.execute(MetronomeCommand.Stop).assertNativeSuccess()
+                if (host.current.value.presets.any { it.name == presetName }) {
+                    host.execute(MetronomeCommand.DeletePreset(presetName)).assertNativeSuccess()
+                }
+                host.execute(MetronomeCommand.SetPattern(original.denominator, original.beats)).assertNativeSuccess()
+                host.execute(MetronomeCommand.SetTempo(original.bpm)).assertNativeSuccess()
+            }
+        }
+    }
+
+    @Test
+    fun quarterNote90DoublesTheNativePresentedBeatRateForEighthNotes(): Unit = runBlocking {
+        val host = (compose.activity.application as GuitarLearnerApplication).graph.metronomeHost
+        val original = host.current.value.selected
+        val quarter = MetronomeConfig(90, BeatUnit.Quarter, List(4) { BeatAccent.Normal })
+        val eighth = quarter.copy(denominator = BeatUnit.Eighth)
+        val fast = MetronomeConfig(240, BeatUnit.Sixteenth, List(16) { BeatAccent.Normal })
+        try {
+            host.execute(MetronomeCommand.Stop).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetTempo(90)).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetPattern(quarter.denominator, quarter.beats)).assertNativeSuccess()
+            val quarterTimes = async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) {
+                presentedBeatTimes(host, quarter, 4)
+            }
+            host.execute(MetronomeCommand.Start).assertNativeSuccess()
+            val slow = quarterTimes.await()
+            val quarterTimestampUsed = host.currentAudioDiagnostics()?.timestampUsed
+            val eighthTimes = async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) {
+                presentedBeatTimes(host, eighth, 4)
+            }
+            host.execute(MetronomeCommand.SetPattern(eighth.denominator, eighth.beats)).assertNativeSuccess()
+            val doubled = eighthTimes.await()
+            val eighthTimestampUsed = host.currentAudioDiagnostics()?.timestampUsed
+            val fastTimes = async(Dispatchers.Main.immediate, start = CoroutineStart.UNDISPATCHED) {
+                presentedBeatTimes(host, fast, 8)
+            }
+            host.execute(MetronomeCommand.SetTempo(fast.bpm)).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetPattern(fast.denominator, fast.beats)).assertNativeSuccess()
+            val highRate = fastTimes.await()
+            assertEquals(listOf(0, 1, 2, 3), slow.map { it.first })
+            assertEquals(listOf(0, 1, 2, 3), doubled.map { it.first })
+            assertEquals((0..7).toList(), highRate.map { it.first })
+            val quarterMeanMs = meanDeliveryIntervalMs(slow)
+            val eighthMeanMs = meanDeliveryIntervalMs(doubled)
+            val highRateMeanMs = meanDeliveryIntervalMs(highRate)
+            Log.i("MetronomePlaybackTest", "quarter90 deliveryMeanMs=$quarterMeanMs eighth90 deliveryMeanMs=$eighthMeanMs " +
+                "ratio=${quarterMeanMs / eighthMeanMs} sixteenth240 deliveryMeanMs=$highRateMeanMs " +
+                "timestampUsed quarter=$quarterTimestampUsed eighth=$eighthTimestampUsed fast=${host.currentAudioDiagnostics()?.timestampUsed}")
+            assertEquals("Quarter-note marker delivery", 666.667, quarterMeanMs, 100.0)
+            assertEquals("Eighth-note marker delivery", 333.333, eighthMeanMs, 75.0)
+            assertEquals("Quarter/eighth delivery ratio", 2.0, quarterMeanMs / eighthMeanMs, 0.35)
+            assertEquals("Sixteenth-note marker delivery at 240 BPM", 62.5, highRateMeanMs, 20.0)
+            assertEquals(0, host.currentAudioDiagnostics()?.underruns)
+        } finally {
+            host.execute(MetronomeCommand.Stop).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetPattern(original.denominator, original.beats)).assertNativeSuccess()
+            host.execute(MetronomeCommand.SetTempo(original.bpm)).assertNativeSuccess()
+        }
     }
 
     @Test
@@ -230,6 +354,9 @@ class MetronomePlaybackTest {
             withTimeout(5_000) { host.current.first { it.playback == PlaybackState.Stopped(StopReason.User) } }
             withTimeout(5_000) { while (runningOwnMetronomeService(application) != null) delay(10) }
             assertEquals(null, host.currentAudioDiagnostics())
+            compose.onNodeWithTag("metronome_status").assertDoesNotExist()
+            compose.onNodeWithTag("toggle_metronome").assertTextEquals(compose.activity.getString(UiR.string.start_metronome))
+            compose.onNodeWithTag("current_beat").assertDoesNotExist()
         } finally {
             assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.Stop))
             application.stopService(serviceIntent)
@@ -252,6 +379,21 @@ class MetronomePlaybackTest {
         assertTrue("Expected playback, received ${result.playback}", result.playback is PlaybackState.Playing)
         return result.playback as PlaybackState.Playing
     }
+
+    private suspend fun presentedBeatTimes(host: AndroidMetronomeHost, config: MetronomeConfig, count: Int): List<Pair<Int, Long>> =
+        withTimeout(5_000) {
+            host.current.mapNotNull { snapshot ->
+                assertTrue("Output failed: ${snapshot.playback}", snapshot.playback !is PlaybackState.Failed)
+                (snapshot.playback as? PlaybackState.Playing)?.takeIf { it.config == config }
+            }.distinctUntilChanged().take(count).map { it.beatIndex to System.nanoTime() }.toList()
+        }
+
+    private fun meanDeliveryIntervalMs(beats: List<Pair<Int, Long>>): Double =
+        (beats.last().second - beats.first().second).toDouble() / (beats.size - 1) / 1_000_000
+}
+
+private fun Either<MetronomeFailure, Unit>.assertNativeSuccess() {
+    assertEquals(Either.Right(Unit), this)
 }
 
 private class FailingPreferenceEditor(private val delegate: SharedPreferences) {

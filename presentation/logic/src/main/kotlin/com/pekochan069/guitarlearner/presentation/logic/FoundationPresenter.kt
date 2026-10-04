@@ -62,6 +62,7 @@ class FoundationPresenter(
         val snapshot by appearance.current.collectAsState()
         val metronomeSnapshot by metronome.current.collectAsState()
         var presetName by rememberSaveable { mutableStateOf("") }
+        var presetsOpen by rememberSaveable { mutableStateOf(false) }
         var overwriteName by rememberSaveable { mutableStateOf<String?>(null) }
         var savingPreset by remember { mutableStateOf(false) }
         var metronomeNotice by remember { mutableStateOf<MetronomeNotice?>(null) }
@@ -158,6 +159,7 @@ class FoundationPresenter(
                     it != metronomeSnapshot.selected
                 } ?: false,
                 presets = metronomeSnapshot.presets.map { MetronomePresetUi(it.name, it.config.toUi()) },
+                presetsOpen = presetsOpen,
                 presetName = presetName,
                 overwriteName = overwriteName,
                 savingPreset = savingPreset,
@@ -185,6 +187,7 @@ class FoundationPresenter(
                     is FoundationEvent.CycleBeatAccent -> setAccent(event.index) {
                         BeatAccent.entries[(it.ordinal + 1) % BeatAccent.entries.size]
                     }
+                    is FoundationEvent.SetPresetsOpen -> presetsOpen = event.value
                     is FoundationEvent.SetPresetName -> presetName = event.value
                     FoundationEvent.SavePreset -> {
                         val name = presetName.trim()

@@ -48,25 +48,25 @@ internal class MetronomeAudio(
     private val onBeat: (ScheduledBeat) -> Unit,
     private val onOutputDisconnected: () -> Unit,
     private val onFailure: () -> Unit,
-) {
+) : MetronomeOutput {
     private val edits = ConcurrentLinkedQueue<(MetronomeSequencer) -> Unit>()
     private val trackGate = Any()
     @Volatile private var track: AudioTrack? = null
-    @Volatile var routedDeviceId: Int? = null
+    @Volatile override var routedDeviceId: Int? = null
         private set
-    @Volatile var diagnostics: MetronomeAudioDiagnostics = MetronomeAudioDiagnostics()
+    @Volatile override var diagnostics: MetronomeAudioDiagnostics = MetronomeAudioDiagnostics()
         private set
     private var stopped = false
     private var routing: AudioRouting.OnRoutingChangedListener? = null
     private var job: Job? = null
 
-    fun setTempo(bpm: Int) { edits.add { it.setTempo(bpm) } }
-    fun setPattern(denominator: BeatUnit, beats: List<BeatAccent>) {
+    override fun setTempo(bpm: Int) { edits.add { it.setTempo(bpm) } }
+    override fun setPattern(denominator: BeatUnit, beats: List<BeatAccent>) {
         edits.add { it.setPattern(denominator, beats) }
     }
-    fun load(config: MetronomeConfig) { edits.add { it.setConfig(config) } }
+    override fun load(config: MetronomeConfig) { edits.add { it.setConfig(config) } }
 
-    fun start(scope: CoroutineScope) {
+    override fun start(scope: CoroutineScope) {
         val thread = HandlerThread("MetronomeAudio", Process.THREAD_PRIORITY_AUDIO).apply { start() }
         val dispatcher = Handler(thread.looper).asCoroutineDispatcher("MetronomeAudio")
         val worker = scope.launch(dispatcher) {
@@ -97,7 +97,7 @@ internal class MetronomeAudio(
         job = worker
     }
 
-    fun stop() {
+    override fun stop() {
         synchronized(trackGate) {
             stopped = true
             job?.cancel()
