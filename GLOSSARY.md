@@ -1,8 +1,17 @@
 # GuitarLearner
 
-GuitarLearner provides guitar practice tools for beginners.
+GuitarLearner supports guitar practice and learning for beginners.
 
 ## Language
+
+**Practice tool**:
+A capability for setting guitar practice conditions or inspecting and constructing musical material, including tempo, tuning, chords, and chord progressions. The menu category is 도구 in Korean and Tools in English.
+
+**Training**:
+Exercises in identifying musical information by ear or by reading, including notes, intervals, chords, and scales. The menu category is 훈련 in Korean and Training in English.
+
+**Learning**:
+Explanations and visualizations of music theory, harmony, and guitar techniques. The menu category is 학습 in Korean and Learning in English.
 
 **Metronome**:
 A practice tool that produces audible clicks at a chosen tempo and indicates the current beat.
