@@ -95,6 +95,7 @@
     <string name="metronome_pending">Change pending</string>
     <string name="metronome_active_config">Playing now: %1$d/%2$d, %3$d BPM</string>
     <string name="presets">Presets</string>
+    <string name="close_presets">Close presets</string>
     <string name="preset_name">Preset name</string>
     <string name="save_preset">Save current settings</string>
     <string name="preset_saving">Saving…</string>

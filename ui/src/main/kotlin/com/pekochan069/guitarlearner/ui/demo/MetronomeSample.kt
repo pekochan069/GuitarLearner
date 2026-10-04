@@ -243,7 +243,7 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
                         style = MaterialTheme.typography.headlineSmall)
                     IconButton(onClick = { eventSink(FoundationEvent.SetPresetsOpen(false)) },
                         modifier = Modifier.size(48.dp).testTag("close_presets")) {
-                        Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close))
+                        Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close_presets))
                     }
                 }
                 if (notice != null) MetronomeError(notice, state.notice != null, eventSink)
