@@ -23,7 +23,7 @@ object ChordTheory {
         formula("1 3 5 b7 9 11", 5, 9), formula("1 3 5 7 9 11", 5, 9), formula("1 b3 5 b7 9 11", 5, 9),
         formula("1 3 5 b7 9 11 13", 5, 9, 11), formula("1 3 5 7 9 11 13", 5, 9, 11),
         formula("1 b3 5 b7 9 11 13", 5, 9, 11), formula("1 3 b5 b7"), formula("1 3 #5 b7"),
-        formula("1 3 5 b7 b9", 5), formula("1 3 5 b7 #9", 5), formula("1 3 5 b7 9 #11", 5, 9),
+        formula("1 3 5 b7 b9", 5), formula("1 3 5 b7 #9", 5), formula("1 3 5 b7 9 #11", 5),
         formula("1 3 5 b7 b9 11 13", 5, 11),
     )
 
@@ -119,7 +119,7 @@ object ChordTheory {
             val remaining = IntArray(7)
             for (index in 5 downTo 0) {
                 remaining[index] = remaining[index + 1] or options[index].fold(0) { mask, stop ->
-                    if (stop == StringStop.Muted) mask else mask or (1 shl pitch(query.context, index, stop) % 12)
+                    if (stop == StringStop.Muted) mask else mask or (1 shl (pitch(query.context, index, stop) % 12))
                 }
             }
             val stops = MutableList<StringStop>(6) { StringStop.Muted }

@@ -60,6 +60,11 @@ class ChordTheoryTest {
         assertFalse(ChordTheory.formula(ChordQuality.Add9).optional.contains(5))
         assertFalse(ChordTheory.formula(ChordQuality.Sixth).optional.contains(5))
         assertFalse(ChordTheory.formula(ChordQuality.ThirteenthFlat9).optional.contains(9))
+        assertEquals(setOf(5), ChordTheory.formula(ChordQuality.NinthSharp11).optional)
+        val noNinth = notes(0, 4, 6, 7, 10)
+        val noNinthCandidates = (ChordTheory.analyze(noNinth.first, noNinth.second) as? ChordAnalysis.Recognized)?.candidates.orEmpty()
+        assertTrue(noNinthCandidates
+            .none { it.identity == ChordIdentity(PitchClass.C, ChordQuality.NinthSharp11) })
     }
 
     @Test fun actualMinimumPitchDeterminesBassInReorderedTuning() {
@@ -113,6 +118,22 @@ class ChordTheoryTest {
     @Test fun exhaustiveWindowPolicyHasTruthfulNoResultUnderCustomTuning() {
         val context = GuitarContext(GuitarTuning(List(6) { GuitarPitch(PitchClass.C, 2) }))
         assertTrue(ChordTheory.representatives(ChordQuery(context, ChordIdentity(PitchClass.C, ChordQuality.Seventh))).isEmpty())
+    }
+
+    @Test fun referenceChordsHaveMultipleRepresentativesAcrossCaposAndPresets() {
+        val identities = listOf(ChordIdentity(PitchClass.C, ChordQuality.Major),
+            ChordIdentity(PitchClass.C, ChordQuality.MajorSeventh),
+            ChordIdentity(PitchClass.D, ChordQuality.MinorNinth),
+            ChordIdentity(PitchClass.G, ChordQuality.SeventhFlat9))
+        for (capo in listOf(0, 2)) for (identity in identities) {
+            assertTrue("$identity capo $capo", ChordTheory.representatives(ChordQuery(standard.copy(capo = capo), identity)).size > 1)
+        }
+        for (preset in TuningPreset.entries) {
+            val query = ChordQuery(GuitarContext(preset.tuning, 2), ChordIdentity(PitchClass.D, ChordQuality.Major))
+            val representatives = ChordTheory.representatives(query)
+            assertTrue(preset.name, representatives.size > 1)
+            assertTrue(representatives.all { candidates(query.context, it).any { candidate -> candidate.identity == query.identity } })
+        }
     }
 
     @Test fun sixStringModelsCopyTheirInputsAndPresetContextHasIndependentLimits() {
