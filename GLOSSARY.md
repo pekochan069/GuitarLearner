@@ -30,3 +30,24 @@ The number of quarter notes per minute. At 90 BPM, quarter notes are about 666.6
 
 **Metronome preset**:
 A named, saved tempo, time signature, and accent pattern that the user can load for a later practice session.
+
+**Tuner**:
+A practice tool that listens to a guitar and indicates whether its pitch is below, at, or above the target pitch.
+
+**Standard tuning**:
+The six-string guitar tuning E₂–A₂–D₃–G₃–B₃–E₄, listed from string 6 to string 1.
+
+**Reference pitch**:
+The frequency assigned to A₄ that determines the tuning's target pitches. GuitarLearner uses A₄ = 440 Hz.
+
+**Target pitch**:
+The intended pitch of the string being tuned, determined by the tuning and reference pitch.
+
+**Cent**:
+A unit of pitch interval equal to one hundredth of a semitone.
+
+**Tuning tolerance**:
+The maximum allowed distance in cents between a measured pitch and its target pitch for an in-tune judgment. This is a judgment setting, not the accuracy of pitch measurement.
+
+**In tune**:
+A stable, valid pitch measurement within the selected tuning tolerance of the target pitch.
