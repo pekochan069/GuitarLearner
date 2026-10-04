@@ -383,7 +383,10 @@ class AndroidMetronomeHost(
         )
 
         private fun notification(config: MetronomeConfig, preparing: Boolean): Notification {
-            val open = PendingIntent.getActivity(application, 0, Intent(application, activityClass), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val open = PendingIntent.getActivity(application, 0,
+                Intent(application, activityClass).setAction(ACTION_OPEN_METRONOME)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             val stop = PendingIntent.getService(application, 1, serviceIntent(ACTION_STOP, id), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             return Notification.Builder(application, CHANNEL)
                 .setSmallIcon(R.drawable.ic_metronome_notification)
@@ -417,6 +420,7 @@ class AndroidMetronomeHost(
     }
 
     companion object {
+        const val ACTION_OPEN_METRONOME = "com.pekochan069.guitarlearner.metronome.OPEN"
         private const val ACTION_START = "com.pekochan069.guitarlearner.metronome.START"
         private const val ACTION_STOP = "com.pekochan069.guitarlearner.metronome.STOP"
         private const val EXTRA_RUN_ID = "run_id"

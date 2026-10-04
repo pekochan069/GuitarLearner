@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.pekochan069.guitarlearner.presentation.contract.BeatAccentUi
 import com.pekochan069.guitarlearner.presentation.contract.BeatUnitUi
+import com.pekochan069.guitarlearner.presentation.contract.FeatureId
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeNotice
 import com.pekochan069.guitarlearner.presentation.contract.MetronomePlaybackUi
@@ -104,6 +105,62 @@ private val MetronomeNotice.label: Int get() = when (this) {
     MetronomeNotice.AudioUnavailable -> R.string.metronome_audio_unavailable
 }
 
+private val MetronomePlaybackUi.statusLabel: Int? get() = when (this) {
+    MetronomePlaybackUi.Preparing -> R.string.state_preparing
+    is MetronomePlaybackUi.Playing -> R.string.state_running
+    is MetronomePlaybackUi.Failed -> R.string.state_playback_failed
+    is MetronomePlaybackUi.Stopped -> when (reason) {
+        MetronomeStopUi.FocusLoss -> R.string.state_focus_interrupted
+        MetronomeStopUi.OutputDisconnected -> R.string.state_output_disconnected
+        MetronomeStopUi.ServiceEnded -> R.string.state_service_ended
+        MetronomeStopUi.User, null -> null
+    }
+}
+
+@Composable
+internal fun CompactMetronomeControl(state: MetronomeUiState, eventSink: (FoundationEvent) -> Unit) {
+    val playback = state.playback
+    val playing = playback as? MetronomePlaybackUi.Playing
+    val active = playing != null || playback == MetronomePlaybackUi.Preparing
+    val status = playback.statusLabel
+    if (active || (playback is MetronomePlaybackUi.Stopped && status != null)) {
+        Surface(Modifier.fillMaxWidth().testTag("compact_metronome"),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.large) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.metronome_title), style = MaterialTheme.typography.titleMedium)
+                if (playing != null) {
+                    Text(stringResource(R.string.metronome_active_config, playing.config.numerator,
+                        playing.config.denominator.denominator, playing.config.bpm),
+                        Modifier.testTag("compact_metronome_config"), style = MaterialTheme.typography.bodyLarge)
+                } else if (status != null) {
+                    Text(stringResource(status), Modifier.testTag("compact_metronome_status")
+                        .semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
+                }
+                if (state.pendingChange) {
+                    Text(stringResource(R.string.metronome_pending), Modifier.testTag("compact_metronome_pending")
+                        .semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (active) {
+                        FilledTonalButton(onClick = { eventSink(FoundationEvent.SetRunning(false)) },
+                            modifier = Modifier.heightIn(min = 48.dp).testTag("compact_metronome_stop")) {
+                            Icon(painterResource(R.drawable.ic_stop), null, Modifier.padding(end = 8.dp))
+                            Text(stringResource(R.string.stop_metronome))
+                        }
+                    }
+                    TextButton(onClick = { eventSink(FoundationEvent.OpenFeature(FeatureId.Metronome)) },
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("compact_metronome_open")) {
+                        Text(stringResource(R.string.open_metronome))
+                    }
+                }
+            }
+        }
+    }
+    val notice = state.notice ?: (playback as? MetronomePlaybackUi.Failed)?.notice
+    if (notice != null) MetronomeError(notice, state.notice != null, eventSink, openMetronome = true)
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Unit): Unit {
@@ -111,17 +168,7 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
     val playback = state.playback
     val playing = playback as? MetronomePlaybackUi.Playing
     val active = playing != null || playback == MetronomePlaybackUi.Preparing
-    val status = when (playback) {
-        MetronomePlaybackUi.Preparing -> R.string.state_preparing
-        is MetronomePlaybackUi.Playing -> R.string.state_running
-        is MetronomePlaybackUi.Failed -> R.string.state_playback_failed
-        is MetronomePlaybackUi.Stopped -> when (playback.reason) {
-            MetronomeStopUi.FocusLoss -> R.string.state_focus_interrupted
-            MetronomeStopUi.OutputDisconnected -> R.string.state_output_disconnected
-            MetronomeStopUi.ServiceEnded -> R.string.state_service_ended
-            MetronomeStopUi.User, null -> null
-        }
-    }
+    val status = playback.statusLabel
     val tempoLabel = stringResource(R.string.tempo)
     val tempoDescription = pluralStringResource(R.plurals.tempo_bpm, config.bpm, config.bpm)
     val tempoNoteDescription = stringResource(R.string.tempo_note_description, stringResource(R.string.beat_quarter), tempoDescription)
@@ -414,12 +461,23 @@ private fun BeatControls(state: MetronomeUiState, eventSink: (FoundationEvent) -
 }
 
 @Composable
-private fun MetronomeError(notice: MetronomeNotice, dismissible: Boolean, eventSink: (FoundationEvent) -> Unit) {
+private fun MetronomeError(
+    notice: MetronomeNotice,
+    dismissible: Boolean,
+    eventSink: (FoundationEvent) -> Unit,
+    openMetronome: Boolean = false,
+) {
     Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(notice.label),
                 Modifier.testTag("metronome_error").semantics { liveRegion = LiveRegionMode.Polite },
                 color = MaterialTheme.colorScheme.onErrorContainer)
+            if (openMetronome) {
+                TextButton(onClick = { eventSink(FoundationEvent.OpenFeature(FeatureId.Metronome)) },
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("metronome_error_open")) {
+                    Text(stringResource(R.string.open_metronome))
+                }
+            }
             if (dismissible) {
                 TextButton(onClick = { eventSink(FoundationEvent.DismissMetronomeNotice) },
                     modifier = Modifier.heightIn(min = 48.dp).testTag("dismiss_metronome_notice")) {

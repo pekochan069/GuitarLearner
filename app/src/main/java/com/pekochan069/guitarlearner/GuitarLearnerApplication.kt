@@ -30,6 +30,7 @@ private abstract class AppScope
 interface AppGraph {
     val appearanceHost: AndroidAppearanceHost
     val metronomeHost: AndroidMetronomeHost
+    val presenterFactory: FoundationPresenter.Factory
     val circuit: Circuit
 
     @Provides
@@ -45,7 +46,7 @@ interface AppGraph {
 
     @Provides
     fun providePresenterFactory(settings: AppearanceSettings, metronome: Metronome): FoundationPresenter.Factory =
-        FoundationPresenter.Factory(settings, metronome)
+        FoundationPresenter.Factory(settings, metronome, developmentSamplesEnabled = BuildConfig.DEBUG)
 
     @Provides
     @SingleIn(AppScope::class)

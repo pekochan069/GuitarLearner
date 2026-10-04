@@ -9,6 +9,8 @@ import com.slack.circuit.runtime.ui.Ui
 import com.slack.circuit.runtime.ui.ui
 
 object FoundationUiFactory : Ui.Factory {
+    val foundationUi: Ui<FoundationState> = ui { state, modifier -> DesignFoundationApp(state, modifier) }
+
     override fun create(screen: Screen, context: CircuitContext): Ui<*>? =
-        if (screen == FoundationScreen) ui<FoundationState> { state, modifier -> DesignFoundationApp(state, modifier) } else null
+        if (screen == FoundationScreen) foundationUi else null
 }

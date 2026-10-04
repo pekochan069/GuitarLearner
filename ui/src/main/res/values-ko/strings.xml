@@ -1,5 +1,12 @@
 <resources>
     <string name="app_name">GuitarLearner</string>
+    <string name="category_tools">도구</string>
+    <string name="category_training">훈련</string>
+    <string name="category_learning">학습</string>
+    <string name="back_to_home">홈으로 돌아가기</string>
+    <string name="development_samples">개발용 예시</string>
+    <string name="development_samples_description">앱을 테스트하기 위한 예시입니다.</string>
+    <string name="open_metronome">메트로놈 열기</string>
     <string name="theme_system">시스템</string>
     <string name="theme_light">밝게</string>
     <string name="theme_dark">어둡게</string>
@@ -11,13 +18,9 @@
     <string name="appearance">화면 테마</string>
     <string name="language">언어</string>
     <string name="close">환경 설정 닫기</string>
-    <string name="page_tuner">튜너</string>
-    <string name="page_metronome">메트로놈</string>
-    <string name="page_gallery">갤러리</string>
     <string name="tuner_title">튜너 데모</string>
     <string name="tuner_subtitle">음 높이 예시</string>
     <string name="metronome_title">메트로놈</string>
-    <string name="metronome_subtitle">빠르기와 박자 설정</string>
     <string name="gallery_title">컴포넌트 예시</string>
     <string name="gallery_subtitle">버튼, 글꼴, 색상, 모양</string>
     <string name="tuner_demo_notice">예시 상태만 표시합니다. 마이크는 사용하지 않습니다.</string>

@@ -1,5 +1,11 @@
 package com.pekochan069.guitarlearner.presentation.logic
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
+import androidx.compose.runtime.saveable.SaveableStateRegistry
 import arrow.core.Either
 import com.pekochan069.guitarlearner.domain.AppearanceChange
 import com.pekochan069.guitarlearner.domain.AppearanceFailure
@@ -20,15 +26,21 @@ import com.pekochan069.guitarlearner.domain.ThemePreference
 import com.pekochan069.guitarlearner.presentation.contract.AppearanceNotice
 import com.pekochan069.guitarlearner.presentation.contract.BeatAccentUi
 import com.pekochan069.guitarlearner.presentation.contract.BeatUnitUi
+import com.pekochan069.guitarlearner.presentation.contract.DevelopmentSample
+import com.pekochan069.guitarlearner.presentation.contract.FeatureCategory
+import com.pekochan069.guitarlearner.presentation.contract.FeatureId
+import com.pekochan069.guitarlearner.presentation.contract.FoundationDestination
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
+import com.pekochan069.guitarlearner.presentation.contract.FoundationState
 import com.pekochan069.guitarlearner.presentation.contract.LanguageOption
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeNotice
 import com.pekochan069.guitarlearner.presentation.contract.MetronomePlaybackUi
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeStopUi
-import com.pekochan069.guitarlearner.presentation.contract.Page
 import com.pekochan069.guitarlearner.presentation.contract.Reading
 import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
+import com.slack.circuit.test.CircuitReceiveTurbine
+import com.slack.circuit.test.presenterTestOf
 import com.slack.circuit.test.test
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -45,6 +57,189 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FoundationPresenterTest {
+    @Test
+    fun homeCatalogOpensOnlyUsableFeaturesAndBackDismissesSettingsBeforeReturningHome(): Unit = runTest {
+        val metronome = ControlledMetronome()
+        FoundationPresenter(ControlledAppearance(), metronome).test {
+            var state = awaitItem()
+            assertEquals(FoundationDestination.Home, state.destination)
+            assertEquals(listOf(FeatureCategory.Tools), state.featureGroups.map { it.category })
+            assertEquals(listOf(FeatureId.Metronome), state.featureGroups.single().features)
+            assertTrue(state.developmentSamples.isEmpty())
+            assertFalse(state.canNavigateBack)
+            state.eventSink(FoundationEvent.OpenFeature(FeatureId.Metronome))
+            state = awaitItem()
+            assertEquals(FoundationDestination.Feature(FeatureId.Metronome), state.destination)
+            state.eventSink(FoundationEvent.SetSettingsOpen(true))
+            state = awaitItem()
+            state.eventSink(FoundationEvent.NavigateBack)
+            state = awaitItem()
+            assertFalse(state.settingsOpen)
+            assertEquals(FoundationDestination.Feature(FeatureId.Metronome), state.destination)
+            state.eventSink(FoundationEvent.NavigateBack)
+            state = awaitItem()
+            assertEquals(FoundationDestination.Home, state.destination)
+            assertFalse(state.canNavigateBack)
+            assertTrue(metronome.requests.isEmpty())
+        }
+    }
+
+    @Test
+    fun productionPresenterRejectsSampleNavigationAndSampleEdits(): Unit = runTest {
+        val metronome = ControlledMetronome()
+        FoundationPresenter(ControlledAppearance(), metronome).test {
+            val state = awaitItem()
+            state.eventSink(FoundationEvent.OpenSample(DevelopmentSample.Tuner))
+            state.eventSink(FoundationEvent.OpenSample(DevelopmentSample.Gallery))
+            state.eventSink(FoundationEvent.SetReading(Reading.Sharp))
+            state.eventSink(FoundationEvent.SetGallerySelected(false))
+            runCurrent()
+            expectNoEvents()
+            assertEquals(FoundationDestination.Home, state.destination)
+            assertEquals(Reading.NoSignal, state.reading)
+            assertTrue(state.gallerySelected)
+            assertTrue(metronome.requests.isEmpty())
+        }
+    }
+
+    @Test
+    fun obsoleteDestinationsAndLegacyOverlayPayloadsRestoreHomeSafely(): Unit = runTest {
+        val saved = captureSavedState()
+        val slots = saved.flatMap { (key, values) -> values.mapIndexed { index, value -> Triple(key, index, value) } }
+        val destinationSlot = slots.single { unwrapSavedValue(it.third) == "home" }
+        val overlaySlot = slots.single { unwrapSavedValue(it.third) == listOf("none") }
+        for ((destinationId, overlayValue) in listOf(
+            "sample:tuner" to true,
+            "sample:gallery" to false,
+            "feature:removed" to listOf("overwrite", 42),
+            "Metronome" to "old-settings",
+            "missing" to listOf("unknown"),
+        )) {
+            val restored = saved.mapValues { (key, values) ->
+                values.mapIndexed { index, value ->
+                    when (key to index) {
+                        destinationSlot.first to destinationSlot.second -> replaceSavedValue(value, destinationId)
+                        overlaySlot.first to overlaySlot.second -> replaceSavedValue(value, overlayValue)
+                        else -> value
+                    }
+                }
+            }
+            val registry = SaveableStateRegistry(restored) { true }
+            val presenter = FoundationPresenter(ControlledAppearance(), ControlledMetronome())
+            presenterTestOf({ presenter.presentWithRegistry(registry) }) {
+                val state = awaitItem()
+                assertEquals(FoundationDestination.Home, state.destination)
+                assertFalse(state.settingsOpen)
+                assertFalse(state.metronome.presetsOpen)
+                assertNull(state.metronome.overwriteName)
+                assertFalse(state.canNavigateBack)
+            }
+        }
+    }
+
+    @Test
+    fun overlaysReplaceEachOtherAndStaleDismissalsCannotCloseTheNewOverlay(): Unit = runTest {
+        val metronome = ControlledMetronome()
+        metronome.snapshot.value = MetronomeSnapshot(presets = listOf(MetronomePreset("Practice", MetronomeConfig())))
+        FoundationPresenter(ControlledAppearance(), metronome).test {
+            var state = enterMetronome()
+            state.eventSink(FoundationEvent.SetPresetsOpen(true))
+            state = awaitItem()
+            state.eventSink(FoundationEvent.SetSettingsOpen(true))
+            state = awaitItem()
+            assertTrue(state.settingsOpen)
+            assertFalse(state.metronome.presetsOpen)
+            state.eventSink(FoundationEvent.SetPresetsOpen(false))
+            runCurrent()
+            expectNoEvents()
+            state.eventSink(FoundationEvent.SetPresetsOpen(true))
+            state = awaitItem()
+            assertFalse(state.settingsOpen)
+            assertTrue(state.metronome.presetsOpen)
+            state.eventSink(FoundationEvent.SetSettingsOpen(false))
+            runCurrent()
+            expectNoEvents()
+            state.eventSink(FoundationEvent.SetPresetName("Practice"))
+            state = awaitItem()
+            state.eventSink(FoundationEvent.SavePreset)
+            state = awaitItem()
+            assertEquals("Practice", state.metronome.overwriteName)
+            assertTrue(state.metronome.presetsOpen)
+            assertFalse(state.settingsOpen)
+            state.eventSink(FoundationEvent.NavigateBack)
+            state = awaitItem()
+            assertNull(state.metronome.overwriteName)
+            assertTrue(state.metronome.presetsOpen)
+            state.eventSink(FoundationEvent.NavigateBack)
+            state = awaitItem()
+            assertFalse(state.metronome.presetsOpen)
+            assertEquals("Practice", state.metronome.presetName)
+            state.eventSink(FoundationEvent.NavigateBack)
+            assertEquals(FoundationDestination.Home, awaitItem().destination)
+            assertTrue(metronome.requests.isEmpty())
+        }
+    }
+
+    @Test
+    fun failedStopRetainsActualPlaybackAndNavigationDoesNotRestartIt(): Unit = runTest {
+        val metronome = ControlledMetronome()
+        val audible = MetronomeConfig(90, BeatUnit.Eighth, List(7) { BeatAccent.Normal })
+        metronome.snapshot.value = MetronomeSnapshot(selected = MetronomeConfig(140), playback = PlaybackState.Playing(audible, 3))
+        metronome.stopFailure = MetronomeFailure.ServiceUnavailable
+        FoundationPresenter(ControlledAppearance(), metronome).test {
+            var state = awaitItem()
+            assertEquals(90, (state.metronome.playback as MetronomePlaybackUi.Playing).config.bpm)
+            assertTrue(state.metronome.pendingChange)
+            state.eventSink(FoundationEvent.OpenFeature(FeatureId.Metronome))
+            state = awaitItem()
+            state.eventSink(FoundationEvent.NavigateBack)
+            state = awaitItem()
+            assertEquals(FoundationDestination.Home, state.destination)
+            assertEquals(3, (state.metronome.playback as MetronomePlaybackUi.Playing).beatIndex)
+            assertTrue(metronome.requests.isEmpty())
+            state.eventSink(FoundationEvent.SetRunning(false))
+            state = awaitItem()
+            assertTrue(state.running)
+            assertEquals(MetronomeNotice.ServiceUnavailable, state.metronome.notice)
+            assertEquals(listOf(MetronomeCommand.Stop), metronome.requests)
+            metronome.stopFailure = null
+            state.eventSink(FoundationEvent.SetRunning(false))
+            state = awaitItem()
+            assertFalse(state.running)
+            assertNull(state.metronome.notice)
+            assertEquals(listOf(MetronomeCommand.Stop, MetronomeCommand.Stop), metronome.requests)
+        }
+    }
+
+    @Test
+    fun dismissedPendingPresetWriteKeepsItsDraftAndCannotReopenADialogOnHome(): Unit = runTest {
+        val metronome = ControlledMetronome()
+        metronome.result = CompletableDeferred()
+        FoundationPresenter(ControlledAppearance(), metronome).test {
+            var state = enterMetronome()
+            state.eventSink(FoundationEvent.SetPresetsOpen(true))
+            state = awaitItem()
+            state.eventSink(FoundationEvent.SetPresetName("Practice"))
+            state = awaitItem()
+            state.eventSink(FoundationEvent.SavePreset)
+            state = awaitItem()
+            assertTrue(state.metronome.savingPreset)
+            state.eventSink(FoundationEvent.NavigateBack)
+            state = awaitItem()
+            state.eventSink(FoundationEvent.NavigateBack)
+            state = awaitItem()
+            assertEquals(FoundationDestination.Home, state.destination)
+            metronome.result!!.complete(Either.Left(MetronomeFailure.PresetExists))
+            state = awaitItem()
+            assertFalse(state.metronome.savingPreset)
+            assertFalse(state.metronome.presetsOpen)
+            assertNull(state.metronome.overwriteName)
+            assertEquals("Practice", state.metronome.presetName)
+            assertEquals(MetronomeNotice.PresetExists, state.metronome.notice)
+            assertEquals(listOf(MetronomeCommand.SavePreset("Practice")), metronome.requests)
+        }
+    }
+
     @Test
     fun failedSettingRetainsCommittedSelectionAndRejectsASecondTap(): Unit = runTest {
         val settings = ControlledAppearance()
@@ -69,14 +264,14 @@ class FoundationPresenterTest {
     fun samplesStayLocalAndSharedCapabilitiesAreObserved(): Unit = runTest {
         val settings = ControlledAppearance()
         val metronome = ControlledMetronome()
-        FoundationPresenter(settings, metronome).test {
+        FoundationPresenter(settings, metronome, developmentSamplesEnabled = true).test {
             var state = awaitItem()
             assertEquals(90, state.bpm)
             assertFalse(state.running)
             assertTrue(state.gallerySelected)
-            state.eventSink(FoundationEvent.SelectPage(Page.Gallery))
+            state.eventSink(FoundationEvent.OpenSample(DevelopmentSample.Gallery))
             state = awaitItem()
-            assertEquals(Page.Gallery, state.page)
+            assertEquals(FoundationDestination.Sample(DevelopmentSample.Gallery), state.destination)
             state.eventSink(FoundationEvent.SetReading(Reading.Sharp))
             state = awaitItem()
             assertEquals(Reading.Sharp, state.reading)
@@ -111,7 +306,7 @@ class FoundationPresenterTest {
     fun tempoAndQueuedPatternEditsUseTheLatestSharedSelection(): Unit = runTest {
         val metronome = ControlledMetronome()
         FoundationPresenter(ControlledAppearance(), metronome).test {
-            var state = awaitItem()
+            var state = enterMetronome()
             state.eventSink(FoundationEvent.SetBpm(999))
             state = awaitItem()
             assertEquals(240, state.bpm)
@@ -140,7 +335,7 @@ class FoundationPresenterTest {
         val metronome = ControlledMetronome()
         metronome.result = CompletableDeferred()
         FoundationPresenter(ControlledAppearance(), metronome).test {
-            var state = awaitItem()
+            var state = enterMetronome()
             state.eventSink(FoundationEvent.AdjustBpm(1))
             state.eventSink(FoundationEvent.AdjustBpm(1))
             state.eventSink(FoundationEvent.AdjustBeatCount(1))
@@ -164,7 +359,7 @@ class FoundationPresenterTest {
         metronome.snapshot.value = MetronomeSnapshot(playback = PlaybackState.Playing(MetronomeConfig(), 0))
         metronome.result = CompletableDeferred()
         FoundationPresenter(ControlledAppearance(), metronome).test {
-            var state = awaitItem()
+            var state = enterMetronome()
             assertTrue(state.running)
             state.eventSink(FoundationEvent.SetBpm(91))
             runCurrent()
@@ -187,7 +382,7 @@ class FoundationPresenterTest {
         val metronome = ControlledMetronome()
         metronome.result = CompletableDeferred()
         FoundationPresenter(ControlledAppearance(), metronome).test {
-            var state = awaitItem()
+            var state = enterMetronome()
             state.eventSink(FoundationEvent.CycleBeatAccent(0))
             state.eventSink(FoundationEvent.CycleBeatAccent(0))
             runCurrent()
@@ -208,7 +403,7 @@ class FoundationPresenterTest {
         val metronome = ControlledMetronome()
         metronome.result = CompletableDeferred()
         FoundationPresenter(ControlledAppearance(), metronome).test {
-            var state = awaitItem()
+            var state = enterMetronome()
             state.eventSink(FoundationEvent.SetBeatCount(1))
             state.eventSink(FoundationEvent.CycleBeatAccent(3))
             state.eventSink(FoundationEvent.SetBeatAccent(3, BeatAccentUi.Mute))
@@ -228,7 +423,7 @@ class FoundationPresenterTest {
         val metronome = ControlledMetronome()
         metronome.result = CompletableDeferred()
         FoundationPresenter(ControlledAppearance(), metronome).test {
-            val initial = awaitItem()
+            val initial = enterMetronome()
             initial.eventSink(FoundationEvent.SetRunning(true))
             runCurrent()
             assertEquals(listOf(MetronomeCommand.Start), metronome.requests)
@@ -251,7 +446,9 @@ class FoundationPresenterTest {
         metronome.snapshot.value = MetronomeSnapshot(presets = listOf(saved))
         metronome.result = CompletableDeferred()
         FoundationPresenter(ControlledAppearance(), metronome).test {
-            var state = awaitItem()
+            var state = enterMetronome()
+            state.eventSink(FoundationEvent.SetPresetsOpen(true))
+            state = awaitItem()
             state.eventSink(FoundationEvent.SetPresetName(" Practice "))
             state = awaitItem()
             state.eventSink(FoundationEvent.SavePreset)
@@ -283,7 +480,7 @@ class FoundationPresenterTest {
         val metronome = ControlledMetronome()
         metronome.snapshot.value = MetronomeSnapshot(readFailure = MetronomeFailure.ReadFailed)
         FoundationPresenter(ControlledAppearance(), metronome).test {
-            var state = awaitItem()
+            var state = enterMetronome()
             assertEquals(MetronomeNotice.ReadFailed, state.metronome.notice)
             state.eventSink(FoundationEvent.DismissMetronomeNotice)
             state = awaitItem()
@@ -304,6 +501,34 @@ class FoundationPresenterTest {
     }
 }
 
+private suspend fun CircuitReceiveTurbine<FoundationState>.enterMetronome(): FoundationState {
+    awaitItem().eventSink(FoundationEvent.OpenFeature(FeatureId.Metronome))
+    return awaitItem()
+}
+
+private suspend fun captureSavedState(): Map<String, List<Any?>> {
+    val registry = SaveableStateRegistry(null) { true }
+    val presenter = FoundationPresenter(ControlledAppearance(), ControlledMetronome())
+    var saved: Map<String, List<Any?>> = emptyMap()
+    presenterTestOf({ presenter.presentWithRegistry(registry) }) {
+        awaitItem()
+        saved = registry.performSave()
+    }
+    return saved
+}
+
+private fun unwrapSavedValue(value: Any?): Any? = if (value is MutableState<*>) value.value else value
+
+private fun replaceSavedValue(previous: Any?, replacement: Any): Any =
+    if (previous is MutableState<*>) mutableStateOf(replacement) else replacement
+
+@Composable
+private fun FoundationPresenter.presentWithRegistry(registry: SaveableStateRegistry): FoundationState {
+    lateinit var state: FoundationState
+    CompositionLocalProvider(LocalSaveableStateRegistry provides registry) { state = present() }
+    return state
+}
+
 private class ControlledAppearance : AppearanceSettings {
     val snapshot = MutableStateFlow(AppearanceSnapshot(ThemePreference.Light, LanguagePreference.System))
     override val current: StateFlow<AppearanceSnapshot> = snapshot.asStateFlow()
@@ -321,10 +546,12 @@ private class ControlledMetronome : Metronome {
     override val current: StateFlow<MetronomeSnapshot> = snapshot.asStateFlow()
     val requests = mutableListOf<MetronomeCommand>()
     var result: CompletableDeferred<Either<MetronomeFailure, Unit>>? = null
+    var stopFailure: MetronomeFailure? = null
 
     override suspend fun execute(command: MetronomeCommand): Either<MetronomeFailure, Unit> {
         requests += command
-        val outcome = if (command == MetronomeCommand.Stop) Either.Right(Unit) else result?.await() ?: Either.Right(Unit)
+        val outcome = if (command == MetronomeCommand.Stop) stopFailure?.let { Either.Left(it) } ?: Either.Right(Unit)
+            else result?.await() ?: Either.Right(Unit)
         if (outcome is Either.Left) return outcome
         when (command) {
             MetronomeCommand.Stop -> snapshot.value = snapshot.value.copy(playback = PlaybackState.Stopped(StopReason.User))

@@ -2,9 +2,12 @@ package com.pekochan069.guitarlearner
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -17,6 +20,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
+import com.pekochan069.guitarlearner.presentation.contract.DevelopmentSample
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -74,6 +78,125 @@ class FoundationPresentationTest {
     val compose = createComposeRule()
 
     @Test
+    fun productionHomeShowsOnlyUsableToolsAndHasNoDevelopmentSection(): Unit {
+        val metronome = FakeMetronome()
+        val circuit = testCircuit(FakeAppearance(), metronome, developmentSamplesEnabled = false)
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                GuitarLearnerTheme(false) {
+                    CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+                }
+            }
+        }
+        compose.onNodeWithTag("destination_title").assertDoesNotExist()
+        compose.onNodeWithTag("category_Tools").assertExists()
+        compose.onNodeWithTag("feature_Metronome").assertHasClickAction().assertIsDisplayed()
+        val category = compose.onNodeWithTag("category_Tools").getUnclippedBoundsInRoot()
+        val tile = compose.onNodeWithTag("feature_Metronome").getUnclippedBoundsInRoot()
+        assertEquals((category.width.value - 12f) / 2, tile.width.value, 1f)
+        assertEquals(category.left.value, tile.left.value, 1f)
+        compose.onNodeWithTag("category_Training").assertDoesNotExist()
+        compose.onNodeWithTag("category_Learning").assertDoesNotExist()
+        compose.onNodeWithTag("sample_Tuner").assertDoesNotExist()
+        compose.onNodeWithTag("sample_Gallery").assertDoesNotExist()
+        compose.onNodeWithTag("navigate_up").assertDoesNotExist()
+        compose.onNodeWithTag("settings").performClick()
+        compose.onNodeWithTag("development_samples").assertDoesNotExist()
+        compose.onNodeWithTag("close_settings").performClick()
+        compose.openMetronome()
+        compose.onNodeWithTag("navigate_up").performClick()
+        compose.onNodeWithTag("feature_Metronome").assertExists()
+        assertTrue(metronome.requests.isEmpty())
+    }
+
+    @Test
+    fun homeScrollSurvivesFeatureVisitsAndRestoration(): Unit {
+        val restore = StateRestorationTester(compose)
+        val metronome = FakeMetronome()
+        metronome.snapshot.value = MetronomeSnapshot(playback = PlaybackState.Playing(MetronomeConfig(), 0))
+        val circuit = testCircuit(FakeAppearance(), metronome)
+        restore.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                Box(Modifier.height(280.dp)) {
+                    GuitarLearnerTheme(false) {
+                        CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("feature_Metronome").performScrollTo()
+        val position = compose.onNodeWithTag("home_scroll").fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange].value()
+        assertTrue(position > 0f)
+        compose.onNodeWithTag("feature_Metronome").performClick()
+        compose.onNodeWithTag("navigate_up").performClick()
+        assertEquals(position, compose.onNodeWithTag("home_scroll").fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange].value())
+        restore.emulateSavedInstanceStateRestore()
+        assertEquals(position, compose.onNodeWithTag("home_scroll").fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange].value())
+        assertTrue(metronome.requests.isEmpty())
+    }
+
+    @Test
+    fun compactControlUsesActualPlaybackAndFailedStopKeepsItsControls(): Unit {
+        val metronome = FakeMetronome()
+        val audible = MetronomeConfig(90, com.pekochan069.guitarlearner.domain.BeatUnit.Eighth, List(7) { BeatAccent.Normal })
+        metronome.snapshot.value = MetronomeSnapshot(selected = MetronomeConfig(140), playback = PlaybackState.Playing(audible, 3))
+        metronome.stopFailure = MetronomeFailure.ServiceUnavailable
+        val circuit = testCircuit(FakeAppearance(), metronome)
+        compose.setContent {
+            GuitarLearnerTheme(false) {
+                CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+            }
+        }
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val actual = context.getString(com.pekochan069.guitarlearner.ui.R.string.metronome_active_config, 7, 8, 90)
+        compose.onNodeWithTag("compact_metronome_config").assertTextEquals(actual)
+        compose.onNodeWithTag("compact_metronome_pending").assertExists()
+        compose.onNodeWithTag("compact_metronome_open").performScrollTo().performClick()
+        compose.onNodeWithTag("bpm_value").assertTextEquals("140")
+        assertEquals(PlaybackState.Playing(audible, 3), metronome.snapshot.value.playback)
+        assertTrue(metronome.requests.isEmpty())
+        compose.onNodeWithTag("navigate_up").performClick()
+        compose.onNodeWithTag("compact_metronome_stop").performScrollTo().performClick()
+        compose.onNodeWithTag("compact_metronome_config").assertTextEquals(actual)
+        compose.onNodeWithTag("metronome_error").performScrollTo().assertTextEquals(
+            context.getString(com.pekochan069.guitarlearner.ui.R.string.metronome_service_unavailable))
+        compose.onNodeWithTag("metronome_error_open").assertHasClickAction()
+        metronome.stopFailure = null
+        compose.onNodeWithTag("compact_metronome_stop").performScrollTo().performClick()
+        compose.onNodeWithTag("compact_metronome").assertDoesNotExist()
+        compose.onNodeWithTag("metronome_error").assertDoesNotExist()
+        metronome.snapshot.value = metronome.snapshot.value.copy(playback = PlaybackState.Failed(MetronomeFailure.AudioUnavailable))
+        compose.onNodeWithTag("compact_metronome").assertDoesNotExist()
+        compose.onNodeWithTag("metronome_error").performScrollTo().assertTextEquals(
+            context.getString(com.pekochan069.guitarlearner.ui.R.string.metronome_audio_unavailable))
+        compose.onNodeWithTag("metronome_error_open").performScrollTo().performClick()
+        compose.onNodeWithTag("toggle_metronome").assertTextEquals(context.getString(com.pekochan069.guitarlearner.ui.R.string.start_metronome))
+        assertEquals(listOf(MetronomeCommand.Stop, MetronomeCommand.Stop), metronome.requests)
+    }
+
+    @Test
+    fun preparationOnHomeHasStopAndOpenWithoutClaimingAnAudibleConfiguration(): Unit {
+        val metronome = FakeMetronome()
+        metronome.snapshot.value = MetronomeSnapshot(playback = PlaybackState.Preparing)
+        val circuit = testCircuit(FakeAppearance(), metronome)
+        compose.setContent {
+            GuitarLearnerTheme(false) {
+                CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+            }
+        }
+        compose.onNodeWithTag("compact_metronome_config").assertDoesNotExist()
+        compose.onNodeWithTag("compact_metronome_status").assertTextEquals(
+            ApplicationProvider.getApplicationContext<Context>().getString(com.pekochan069.guitarlearner.ui.R.string.state_preparing))
+        compose.onNodeWithTag("compact_metronome_open").assertHasClickAction()
+        compose.onNodeWithTag("compact_metronome_stop").performScrollTo().performClick()
+        compose.onNodeWithTag("compact_metronome").assertDoesNotExist()
+        assertEquals(listOf(MetronomeCommand.Stop), metronome.requests)
+    }
+
+    @Test
     fun typedSaveFailureRendersLocalizedErrorAndKeepsCommittedChoice(): Unit {
         val settings = FakeAppearance()
         val circuit = testCircuit(settings, FakeMetronome())
@@ -106,22 +229,24 @@ class FoundationPresentationTest {
                 CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
             }
         }
+        compose.openDevelopmentSample(DevelopmentSample.Tuner)
         compose.onNodeWithTag("reading_Sharp").performScrollTo().performClick()
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         compose.onNodeWithTag("increase_bpm").performScrollTo().performClick()
         compose.onNodeWithTag("increase_bpm").performScrollTo().performClick()
         compose.onNodeWithTag("toggle_metronome").performScrollTo().performClick()
-        compose.onNodeWithTag("page_Gallery").performClick()
+        compose.openDevelopmentSample(DevelopmentSample.Gallery)
         compose.onNodeWithTag("gallery_selection").performScrollTo().performClick()
         compose.onNodeWithTag("settings").performClick()
 
         restore.emulateSavedInstanceStateRestore()
         compose.onNodeWithTag("close_settings").performScrollTo().performClick()
-        compose.onNodeWithTag("page_Gallery").assertIsSelected()
+        compose.onNodeWithTag("destination_title").assertTextEquals(
+            ApplicationProvider.getApplicationContext<Context>().getString(com.pekochan069.guitarlearner.ui.R.string.gallery_title))
         compose.onNodeWithTag("gallery_selection").performScrollTo().assertIsOff()
-        compose.onNodeWithTag("page_Tuner").performClick()
+        compose.openDevelopmentSample(DevelopmentSample.Tuner)
         compose.onNodeWithTag("reading_Sharp").performScrollTo().assertIsSelected()
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         compose.onNodeWithTag("bpm_value").assertTextEquals("92")
         val context = ApplicationProvider.getApplicationContext<Context>()
         compose.onNodeWithTag("metronome_status").assertTextEquals(context.getString(com.pekochan069.guitarlearner.ui.R.string.state_running))
@@ -147,7 +272,7 @@ class FoundationPresentationTest {
                 CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
             }
         }
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         compose.onNodeWithTag("bpm_value").assertTextEquals("140")
         val context = ApplicationProvider.getApplicationContext<Context>()
         compose.onNodeWithTag("beat_accent_3").assertHasClickAction().assertContentDescriptionEquals(
@@ -182,7 +307,7 @@ class FoundationPresentationTest {
                 CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
             }
         }
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         compose.onNodeWithTag("preset_name").assertDoesNotExist()
         compose.onNodeWithTag("open_presets").performScrollTo().performClick()
         compose.onNodeWithTag("preset_name").performScrollTo().performTextInput("Practice")
@@ -213,8 +338,8 @@ class FoundationPresentationTest {
                 CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
             }
         }
-        compose.onNodeWithTag("page_Metronome").performClick()
-        val bottomBarTop = compose.onNodeWithTag("page_Metronome").getUnclippedBoundsInRoot().top
+        compose.openMetronome()
+        val viewportBottom = compose.onNodeWithTag("feature_scroll").getUnclippedBoundsInRoot().bottom
         val minimumTouchSize = with(compose.density) { 48.dp.toPx() }
         val buttons = listOf("decrease_bpm", "increase_bpm", "beat_count", "beat_unit",
             "beat_accent_1", "beat_accent_2", "beat_accent_3", "beat_accent_4", "toggle_metronome", "open_presets")
@@ -224,7 +349,7 @@ class FoundationPresentationTest {
             val touch = button.fetchSemanticsNode().touchBoundsInRoot
             assertTrue("$tag touch width is ${touch.width}px", touch.width >= minimumTouchSize - 1f)
             assertTrue("$tag touch height is ${touch.height}px", touch.height >= minimumTouchSize - 1f)
-            assertTrue("$tag extends below practice viewport", button.getUnclippedBoundsInRoot().bottom <= bottomBarTop)
+            assertTrue("$tag extends below practice viewport", button.getUnclippedBoundsInRoot().bottom <= viewportBottom)
         }
         val slider = compose.onNodeWithTag("tempo_slider").assertIsDisplayed()
         val sliderTouch = slider.fetchSemanticsNode().touchBoundsInRoot
@@ -244,7 +369,7 @@ class FoundationPresentationTest {
                 CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
             }
         }
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         val context = ApplicationProvider.getApplicationContext<Context>()
         for ((accent, label) in listOf(BeatAccent.Normal to com.pekochan069.guitarlearner.ui.R.string.beat_normal,
             BeatAccent.Mute to com.pekochan069.guitarlearner.ui.R.string.beat_mute,
@@ -289,7 +414,7 @@ class FoundationPresentationTest {
                 }
             }
         }
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         val tags = (1..beatCount).map { "beat_accent_$it" } + listOf("toggle_metronome", "open_presets")
         val bounds = tags.associateWith { compose.onNodeWithTag(it).getUnclippedBoundsInRoot() }
         if (beatCount > 4) {
@@ -329,7 +454,7 @@ class FoundationPresentationTest {
                 }
             }
         }
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         val expectedColumns = listOf(1, 2, 3, 4, 4, 3, 4, 4, 3, 4, 4, 3, 4, 4, 3, 4)
         val tolerance = with(compose.density) { 1f.toDp().value.toDouble() }
         expectedColumns.forEachIndexed { index, columns ->
@@ -368,7 +493,7 @@ class FoundationPresentationTest {
                 CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
             }
         }
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         val context = ApplicationProvider.getApplicationContext<Context>()
         val tempo = context.resources.getQuantityString(com.pekochan069.guitarlearner.ui.R.plurals.tempo_bpm, 90, 90)
         val description = context.getString(com.pekochan069.guitarlearner.ui.R.string.tempo_note_description,
@@ -395,7 +520,7 @@ class FoundationPresentationTest {
                 }
             }
         }
-        compose.onNodeWithTag("page_Metronome").performScrollTo().performClick()
+        compose.openMetronome()
         val first = compose.onNodeWithTag("beat_accent_1").getUnclippedBoundsInRoot().top
         val last = compose.onNodeWithTag("beat_accent_16").getUnclippedBoundsInRoot().top
         assertTrue(last > first)
@@ -419,7 +544,7 @@ class FoundationPresentationTest {
                 CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
             }
         }
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         compose.onNodeWithTag("preset_name").assertDoesNotExist()
         compose.onNodeWithTag("open_presets").performScrollTo().performClick()
         compose.onNodeWithTag("preset_name").performTextInput("Practice")
@@ -457,7 +582,7 @@ class FoundationPresentationTest {
                 CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
             }
         }
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         compose.onNodeWithTag("open_presets").performScrollTo().performClick()
         compose.onNodeWithTag("preset_name").performTextInput("다음 연습")
         restore.emulateSavedInstanceStateRestore()
@@ -469,8 +594,8 @@ class FoundationPresentationTest {
     }
 }
 
-private fun testCircuit(settings: AppearanceSettings, metronome: Metronome): Circuit = Circuit.Builder()
-    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome))
+private fun testCircuit(settings: AppearanceSettings, metronome: Metronome, developmentSamplesEnabled: Boolean = true): Circuit = Circuit.Builder()
+    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome, developmentSamplesEnabled))
     .addUiFactory(FoundationUiFactory)
     .build()
 
@@ -488,9 +613,11 @@ private class FakeMetronome : Metronome {
     override val current: StateFlow<MetronomeSnapshot> = snapshot.asStateFlow()
     val requests = mutableListOf<MetronomeCommand>()
     var presetResult: CompletableDeferred<Either<MetronomeFailure, Unit>>? = null
+    var stopFailure: MetronomeFailure? = null
 
     override suspend fun execute(command: MetronomeCommand): Either<MetronomeFailure, Unit> {
         requests += command
+        if (command == MetronomeCommand.Stop) stopFailure?.let { return Either.Left(it) }
         if (command is MetronomeCommand.SavePreset || command is MetronomeCommand.LoadPreset || command is MetronomeCommand.DeletePreset) {
             presetResult?.await()?.let { if (it.isLeft()) return it }
         }
