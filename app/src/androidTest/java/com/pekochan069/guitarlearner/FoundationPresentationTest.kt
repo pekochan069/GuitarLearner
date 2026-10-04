@@ -42,6 +42,10 @@ import com.pekochan069.guitarlearner.domain.AppearanceChange
 import com.pekochan069.guitarlearner.domain.AppearanceFailure
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
 import com.pekochan069.guitarlearner.domain.AppearanceSnapshot
+import com.pekochan069.guitarlearner.domain.ChordCommand
+import com.pekochan069.guitarlearner.domain.ChordFailure
+import com.pekochan069.guitarlearner.domain.ChordWorkspace
+import com.pekochan069.guitarlearner.domain.Chords
 import com.pekochan069.guitarlearner.domain.BeatAccent
 import com.pekochan069.guitarlearner.domain.LanguagePreference
 import com.pekochan069.guitarlearner.domain.Metronome
@@ -595,7 +599,7 @@ class FoundationPresentationTest {
 }
 
 private fun testCircuit(settings: AppearanceSettings, metronome: Metronome, developmentSamplesEnabled: Boolean = true): Circuit = Circuit.Builder()
-    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome, developmentSamplesEnabled))
+    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome, FakeChords(), developmentSamplesEnabled))
     .addUiFactory(FoundationUiFactory)
     .build()
 
@@ -633,4 +637,9 @@ private class FakeMetronome : Metronome {
         }
         return Either.Right(Unit)
     }
+}
+
+private class FakeChords : Chords {
+    override val current = MutableStateFlow(ChordWorkspace()).asStateFlow()
+    override suspend fun execute(command: ChordCommand): Either<ChordFailure, Unit> = Either.Right(Unit)
 }

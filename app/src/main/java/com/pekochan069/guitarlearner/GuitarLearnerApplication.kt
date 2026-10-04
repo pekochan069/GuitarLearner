@@ -2,8 +2,10 @@ package com.pekochan069.guitarlearner
 
 import android.app.Application
 import com.pekochan069.guitarlearner.adapters.AndroidAppearanceHost
+import com.pekochan069.guitarlearner.adapters.AndroidChordsHost
 import com.pekochan069.guitarlearner.adapters.AndroidMetronomeHost
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
+import com.pekochan069.guitarlearner.domain.Chords
 import com.pekochan069.guitarlearner.domain.Metronome
 import com.pekochan069.guitarlearner.presentation.logic.FoundationPresenter
 import com.pekochan069.guitarlearner.ui.FoundationUiFactory
@@ -45,8 +47,13 @@ interface AppGraph {
     fun provideMetronomeCapability(host: AndroidMetronomeHost): Metronome = host
 
     @Provides
-    fun providePresenterFactory(settings: AppearanceSettings, metronome: Metronome): FoundationPresenter.Factory =
-        FoundationPresenter.Factory(settings, metronome, developmentSamplesEnabled = BuildConfig.DEBUG)
+    @SingleIn(AppScope::class)
+    fun provideChords(application: Application): Chords =
+        AndroidChordsHost(application.getSharedPreferences("chords", Application.MODE_PRIVATE))
+
+    @Provides
+    fun providePresenterFactory(settings: AppearanceSettings, metronome: Metronome, chords: Chords): FoundationPresenter.Factory =
+        FoundationPresenter.Factory(settings, metronome, chords, developmentSamplesEnabled = BuildConfig.DEBUG)
 
     @Provides
     @SingleIn(AppScope::class)

@@ -58,6 +58,7 @@ private val FoundationDestination.title: Int? get() = when (this) {
     FoundationDestination.Home -> null
     is FoundationDestination.Feature -> when (id) {
         FeatureId.Metronome -> R.string.metronome_title
+        FeatureId.Chords -> R.string.chord_title
     }
     is FoundationDestination.Sample -> id.title
 }
@@ -169,6 +170,7 @@ fun DesignFoundationApp(
                                 state = state.metronome,
                                 eventSink = state.eventSink,
                             )
+                            FeatureId.Chords -> ChordTool(state.chords) { state.eventSink(FoundationEvent.Chord(it)) }
                         }
                         is FoundationDestination.Sample -> when (destination.id) {
                             DevelopmentSample.Tuner -> TunerSample(
@@ -314,6 +316,19 @@ private fun HomeCatalog(state: FoundationState) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     features.forEach { feature ->
                         when (feature) {
+                            FeatureId.Chords -> Card(
+                                onClick = { state.eventSink(FoundationEvent.OpenFeature(feature)) },
+                                modifier = Modifier.weight(1f).testTag("feature_" + feature.name),
+                                shape = MaterialTheme.shapes.extraLarge,
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer),
+                            ) {
+                                Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(painterResource(R.drawable.ic_chords), null, Modifier.size(32.dp))
+                                    Text(stringResource(R.string.chord_title), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                                }
+                            }
                             FeatureId.Metronome -> Card(
                                 onClick = { state.eventSink(FoundationEvent.OpenFeature(feature)) },
                                 modifier = Modifier.weight(1f).testTag("feature_" + feature.name),
