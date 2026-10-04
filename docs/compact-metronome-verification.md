@@ -1,10 +1,20 @@
 # Compact metronome verification
 
-Verified on 2026-10-04 for [issue #7](https://github.com/pekochan069/GuitarLearner/issues/7), its [confirmed contract](https://github.com/pekochan069/GuitarLearner/issues/7#issuecomment-5976527408), and the later [quarter-note BPM correction](https://github.com/pekochan069/GuitarLearner/issues/7#issuecomment-5977297604).
+Verified on 2026-10-04 for [issue #7](https://github.com/pekochan069/GuitarLearner/issues/7), its [confirmed contract](https://github.com/pekochan069/GuitarLearner/issues/7#issuecomment-5976527408), the [quarter-note BPM correction](https://github.com/pekochan069/GuitarLearner/issues/7#issuecomment-5977297604), and the [fixed-grid and equal-size correction](https://github.com/pekochan069/GuitarLearner/issues/7#issuecomment-5977895105).
 
 ## Result
 
 The main practice surface combines tempo, meter, interactive beat accents, and Start/Stop. Default 4/4 at 360 × 800 dp fits without scrolling. Static introductory content and the permanent second accent editor are removed. Presets open in a native Material 3 bottom sheet; save, load, overwrite confirmation, delete, and entered-name restoration remain available.
+
+Meter selection uses two equally wide, labeled native Material 3 exposed dropdowns. Every beat cell has the same width and height across all rows, measured against all ordinals and localized accent labels. Accent changes and playing/pending status cannot resize or move the beat cells, Start, or Presets. The last row reserves vacant cell positions. Practice sections use 16 dp spacing.
+
+| Beats per bar | Columns per row |
+| --- | --- |
+| 1–4 | Same as beats per bar |
+| 6, 9, 12, 15 | 3 |
+| 5, 7, 8, 10, 11, 13, 14, 16 | 4 |
+
+Columns stay fixed at large text sizes. When the measured grid exceeds the viewport, all rows scroll horizontally together; the practice page scrolls vertically. This supersedes the earlier width-dependent wrapping. Start and Presets precede variable status and pending-change text.
 
 BPM now always refers to quarter notes. At 90 BPM and 48 kHz, click spacing is 64,000 frames for half notes, 32,000 for quarter notes, 16,000 for eighth notes, and 8,000 for sixteenth notes. The numeric BPM, saved preset fields, and version 1 storage format are unchanged. Existing non-quarter presets therefore play at the new quarter-reference rate.
 
@@ -29,11 +39,17 @@ pwsh -File scripts/verify-boundary-guard.ps1
 
 The static checks passed. JUnit XML reports 65 local tests with zero failures or skips: architecture lint 20, domain 13, adapters 22, and presenter 10. All three forbidden-dependency probes were rejected and their temporary build-file edits restored.
 
-On the API 37.1 emulator, the complete connected rerun reports 30 cases: 29 passed, zero failed, and one acoustic recording case explicitly skipped. These include ten controlled-output host cases, ten presentation cases, eight native playback cases, and one foundation/restoration case. Controlled-output tests exercise the real host, storage wrapper, and service with simulated output presentation; native playback tests execute AudioTrack separately.
+On the API 37.1 emulator, the complete connected rerun at the timing correction reports 30 cases: 29 passed, zero failed, and one acoustic recording case explicitly skipped. These include ten controlled-output host cases, ten presentation cases, eight native playback cases, and one foundation/restoration case. Controlled-output tests exercise the real host, storage wrapper, and service with simulated output presentation; native playback tests execute AudioTrack separately. This full run preceded the subsequent UI corrections.
 
 The first complete connected run had one failure in the existing background/recreation test. Android logged an output underrun after a 78.56 ms worker gap exceeded the existing 40 ms queue horizon at 40 BPM quarter notes. That note spacing is unchanged by this correction. The same source and APKs passed the isolated case and then the complete rerun. The failure log was retained; no buffer, threshold, or retry-code change was made. This leaves emulator scheduling sensitivity visible rather than establishing that underruns cannot occur.
 
 The final resource-only preset-close fix followed that suite. Both product lint tasks and both APK builds passed again. Native UI inspection confirmed `Close presets` and `프리셋 닫기`. The full suite was not repeated for that label-only change.
+
+For the fixed-grid follow-up, module boundaries, all product lint tasks, the same 65 local tests, and both APK builds passed. Two new accent-bounds regressions first failed against the old UI, then passed with the grid. The focused native run completed 15 passing cases, one harmless 0.00003 dp row-height comparison failure, and one aborted signature-menu test blocked by its nested coroutine fixture. The row-height comparison now permits one physical pixel, matching the existing cell-size comparisons; accent rectangle comparisons remain exact. The native signature case uses ordinary JUnit UI actions with narrowly scoped coroutine setup. A three-case rerun passed both all-meter geometry cases and native live signature replacement. Together these runs provide passing coverage for all 17 selected cases, rather than one uninterrupted 17-case pass.
+
+The final native Stop case passed separately with added rendered-state assertions: exact host `Stopped(User)`, service removal, cleared diagnostics, localized Stopped status, Start label, and no current-beat marker. These assertions were added after a manual capture continued showing Playing despite service removal. That observation was not reproduced by the controlled case; its screenshots and thread dump remain available. No production host change was made for it.
+
+During manual follow-up playback the emulator logged another underrun after a 58.172 ms worker gap exceeded the existing 40 ms queue horizon. The UI exposed the recoverable failure. Audio buffering and failure thresholds remain unchanged; the retained evidence does not establish scheduling robustness.
 
 Meaningful regression evidence includes:
 
@@ -45,16 +61,18 @@ Meaningful regression evidence includes:
 
 ## Native UI inspection
 
-The latest APK was inspected through ADB screenshots and accessibility trees at 360 × 800 dp portrait and 800 × 360 dp landscape. The following 16-beat, 200% text combinations were inspected at their upper and lower scroll positions:
+The fixed-grid APK was inspected through ADB screenshots and accessibility trees at 360 × 800 dp portrait and 800 × 360 dp landscape. The following 16-beat, 200% text combinations were inspected through their scroll positions:
 
 | Language | Theme | Portrait | Landscape |
 | --- | --- | --- | --- |
-| English | Light | Controls wrap; Start and Presets reachable | Controls reachable by vertical scroll |
-| English | Dark | Controls wrap; Start and Presets reachable | Controls reachable by vertical scroll |
-| Korean | Light | Controls wrap; Start and Presets reachable | Controls reachable by vertical scroll |
-| Korean | Dark | Controls wrap; Start and Presets reachable | Controls reachable by vertical scroll |
+| English | Light | Meter fields stack; grid scrolls horizontally; lower controls reachable | Fixed grid and lower controls reached by vertical scroll |
+| English | Dark | Meter fields stack; grid scrolls horizontally; lower controls reachable | Lower controls reached by vertical scroll |
+| Korean | Light | Meter fields stack; four grid columns fit; lower controls reachable | Meter fields and lower controls inspected by vertical scroll |
+| Korean | Dark | Meter fields stack; four grid columns fit; lower controls reachable | Fixed grid and lower controls inspected by vertical scroll |
 
-Default English/light and Korean/dark 4/4 views show all practice controls and the preset entry without scrolling. Beat taps visibly cycled Accent → Normal → Mute → Accent. Start, a live quarter-to-eighth edit, Stop, and the complete preset save/overwrite/load/delete journey were exercised. The temporary review preset was deleted. Automated UI assertions verify individual beat actions, 16-beat wrapping, truthful desired/applied state, restoration, and actual touch bounds of at least 48 dp. The native Slider's 44 dp input area was enlarged through the native Thumb layout; the 48 dp assertion was retained.
+Default English/light and Korean/dark 4/4 views show all practice controls and the preset entry without scrolling. In the English 8/8 view every beat is exactly 210 × 168 px, and both meter fields are 432 px wide. Comparing Normal and Mute snapshots found zero movement in all eight beat rectangles plus Start and Presets. Direct native touches changed a playing 4/4 configuration to 7/4 and then 7/8 while retaining the same foreground-service record.
+
+Automated UI assertions verify equal widths/heights and the prescribed row count for all 16 supported numerators at normal and 200% text, exact bounds across accent cycles, stable transport/preset bounds when pending text appears, truthful desired/applied state, preset save/overwrite/load/delete, restoration, and actual touch bounds of at least 48 dp. The earlier compact-UI inspection exercised the full native preset journey and deleted its temporary preset. The native Slider's 44 dp input area was enlarged through the native Thumb layout; the 48 dp assertion was retained.
 
 The existing app-wide navigation labels clip horizontally in 200% portrait text. Metronome controls remain readable and reachable. Home navigation is excluded by the confirmed contract; this is a remaining layout limitation, not an all-app large-text pass.
 
@@ -62,9 +80,13 @@ The existing app-wide navigation labels clip horizontally in 200% portrait text.
 | --- | --- |
 | ![English compact practice controls](screenshots/compact-metronome/default-en-light.png) | ![Korean compact practice controls](screenshots/compact-metronome/default-ko-dark.png) |
 
+![Eight equal beat cells in two fixed rows](screenshots/compact-metronome/eight-beat-grid.png)
+
 | English 200% text after scroll | English landscape 200% text after scroll |
 | --- | --- |
-| ![16 beats and lower controls with large text](screenshots/compact-metronome/large-text-portrait.png) | ![Start control in a short landscape window](screenshots/compact-metronome/large-text-landscape.png) |
+| ![Fixed grid and lower controls with large text](screenshots/compact-metronome/large-text-portrait.png) | ![Start and Presets in a short landscape window](screenshots/compact-metronome/large-text-landscape.png) |
+
+![The same grid scrolled to its rightmost columns](screenshots/compact-metronome/large-text-portrait-right.png)
 
 ## Review and limits
 
