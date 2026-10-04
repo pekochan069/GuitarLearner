@@ -47,7 +47,9 @@ The final resource-only preset-close fix followed that suite. Both product lint 
 
 For the fixed-grid follow-up, module boundaries, all product lint tasks, the same 65 local tests, and both APK builds passed. Two new accent-bounds regressions first failed against the old UI, then passed with the grid. The focused native run completed 15 passing cases, one harmless 0.00003 dp row-height comparison failure, and one aborted signature-menu test blocked by its nested coroutine fixture. The row-height comparison now permits one physical pixel, matching the existing cell-size comparisons; accent rectangle comparisons remain exact. The native signature case uses ordinary JUnit UI actions with narrowly scoped coroutine setup. A three-case rerun passed both all-meter geometry cases and native live signature replacement. Together these runs provide passing coverage for all 17 selected cases, rather than one uninterrupted 17-case pass.
 
-The final native Stop case passed separately with added rendered-state assertions: exact host `Stopped(User)`, service removal, cleared diagnostics, localized Stopped status, Start label, and no current-beat marker. These assertions were added after a manual capture continued showing Playing despite service removal. That observation was not reproduced by the controlled case; its screenshots and thread dump remain available. No production host change was made for it.
+At the grid revision, the native Stop case passed separately with added rendered-state assertions: exact host `Stopped(User)`, service removal, cleared diagnostics, localized Stopped status, Start label, and no current-beat marker. These assertions were added after a manual capture continued showing Playing despite service removal. That observation was not reproduced by the controlled case; its screenshots and thread dump remain available. No production host change was made for it.
+
+The user then requested removal of the ordinary bottom Stopped label. Initial and user-stopped playback now omit that label and its entire row; the Start action remains. Preparing, playing/current-beat information, interruption reasons, recoverable errors, and pending-change notices remain available. Both stopped-label resources were removed. Existing restoration, localization and native Stop assertions now verify absence of the status row plus the localized Start label. Product lint and both APK builds passed, followed by five passing selected native/UI cases covering restoration, pending state, localized errors, preferences and service Stop. The updated APK was installed on the connected Samsung phone with existing data preserved. Phone accessibility XML exposes Start and Presets without the stopped label; its screenshot showed the phone's always-on display, so visual confirmation comes from the emulator screenshot below.
 
 During manual follow-up playback the emulator logged another underrun after a 58.172 ms worker gap exceeded the existing 40 ms queue horizon. The UI exposed the recoverable failure. Audio buffering and failure thresholds remain unchanged; the retained evidence does not establish scheduling robustness.
 
@@ -76,6 +78,8 @@ Automated UI assertions verify equal widths/heights and the prescribed row count
 
 The existing app-wide navigation labels clip horizontally in 200% portrait text. Metronome controls remain readable and reachable. Home navigation is excluded by the confirmed contract; this is a remaining layout limitation, not an all-app large-text pass.
 
+The following grid-review screenshots precede the ordinary stopped-label removal.
+
 | Default English/light, 4/4 | Default Korean/dark, 4/4 |
 | --- | --- |
 | ![English compact practice controls](screenshots/compact-metronome/default-en-light.png) | ![Korean compact practice controls](screenshots/compact-metronome/default-ko-dark.png) |
@@ -87,6 +91,10 @@ The existing app-wide navigation labels clip horizontally in 200% portrait text.
 | ![Fixed grid and lower controls with large text](screenshots/compact-metronome/large-text-portrait.png) | ![Start and Presets in a short landscape window](screenshots/compact-metronome/large-text-landscape.png) |
 
 ![The same grid scrolled to its rightmost columns](screenshots/compact-metronome/large-text-portrait-right.png)
+
+Latest Korean 8/8 view after stopped-label removal, with the original emulator configuration restored:
+
+![Practice card ends at Presets without an ordinary stopped footer](screenshots/compact-metronome/no-stopped-footer.png)
 
 ## Review and limits
 

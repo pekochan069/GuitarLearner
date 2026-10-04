@@ -129,7 +129,8 @@ class FoundationPresentationTest {
 
         metronome.snapshot.value = metronome.snapshot.value.copy(playback = PlaybackState.Stopped())
         restore.emulateSavedInstanceStateRestore()
-        compose.onNodeWithTag("metronome_status").assertTextEquals(context.getString(com.pekochan069.guitarlearner.ui.R.string.state_stopped))
+        compose.onNodeWithTag("metronome_status").assertDoesNotExist()
+        compose.onNodeWithTag("toggle_metronome").assertTextEquals(context.getString(com.pekochan069.guitarlearner.ui.R.string.start_metronome))
         assertEquals(1, metronome.requests.count { it == MetronomeCommand.Start })
     }
 

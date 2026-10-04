@@ -48,7 +48,6 @@
         <item quantity="other">분당 %1$d박</item>
     </plurals>
     <string name="state_running">재생 중</string>
-    <string name="state_stopped">정지</string>
     <string name="state_preparing">재생 준비 중…</string>
     <string name="state_playback_failed">재생할 수 없음</string>
     <string name="state_focus_interrupted">다른 오디오가 사용되어 정지했습니다</string>

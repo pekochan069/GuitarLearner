@@ -119,7 +119,7 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
             MetronomeStopUi.FocusLoss -> R.string.state_focus_interrupted
             MetronomeStopUi.OutputDisconnected -> R.string.state_output_disconnected
             MetronomeStopUi.ServiceEnded -> R.string.state_service_ended
-            MetronomeStopUi.User, null -> R.string.state_stopped
+            MetronomeStopUi.User, null -> null
         }
     }
     val tempoLabel = stringResource(R.string.tempo)
@@ -188,16 +188,18 @@ fun MetronomeSample(state: MetronomeUiState, eventSink: (FoundationEvent) -> Uni
                 onClick = { eventSink(FoundationEvent.SetPresetsOpen(true)) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("open_presets"),
             ) { Text(stringResource(R.string.presets)) }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(status),
-                    Modifier.testTag("metronome_status").semantics { liveRegion = LiveRegionMode.Polite },
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (playing != null) {
-                    Text(stringResource(R.string.current_beat_description, playing.beatIndex + 1, playing.config.numerator,
-                        stringResource(playing.config.beats[playing.beatIndex].label)),
-                        Modifier.testTag("current_beat"), style = MaterialTheme.typography.labelLarge)
+            if (status != null) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(status),
+                        Modifier.testTag("metronome_status").semantics { liveRegion = LiveRegionMode.Polite },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (playing != null) {
+                        Text(stringResource(R.string.current_beat_description, playing.beatIndex + 1, playing.config.numerator,
+                            stringResource(playing.config.beats[playing.beatIndex].label)),
+                            Modifier.testTag("current_beat"), style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
             if (state.pendingChange) {

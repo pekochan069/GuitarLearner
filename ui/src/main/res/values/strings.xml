@@ -56,7 +56,6 @@
         <item quantity="other">%1$d beats per minute</item>
     </plurals>
     <string name="state_running">Playing</string>
-    <string name="state_stopped">Stopped</string>
     <string name="state_preparing">Preparing playback…</string>
     <string name="state_playback_failed">Playback unavailable</string>
     <string name="state_focus_interrupted">Stopped by an audio interruption</string>

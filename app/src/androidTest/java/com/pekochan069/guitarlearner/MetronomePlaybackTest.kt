@@ -354,7 +354,7 @@ class MetronomePlaybackTest {
             withTimeout(5_000) { host.current.first { it.playback == PlaybackState.Stopped(StopReason.User) } }
             withTimeout(5_000) { while (runningOwnMetronomeService(application) != null) delay(10) }
             assertEquals(null, host.currentAudioDiagnostics())
-            compose.onNodeWithTag("metronome_status").assertTextEquals(compose.activity.getString(UiR.string.state_stopped))
+            compose.onNodeWithTag("metronome_status").assertDoesNotExist()
             compose.onNodeWithTag("toggle_metronome").assertTextEquals(compose.activity.getString(UiR.string.start_metronome))
             compose.onNodeWithTag("current_beat").assertDoesNotExist()
         } finally {
