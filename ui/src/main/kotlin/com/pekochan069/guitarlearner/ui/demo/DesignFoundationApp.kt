@@ -5,39 +5,33 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -47,34 +41,33 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pekochan069.guitarlearner.ui.R
 import com.pekochan069.guitarlearner.presentation.contract.AppearanceNotice
+import com.pekochan069.guitarlearner.presentation.contract.DevelopmentSample
+import com.pekochan069.guitarlearner.presentation.contract.FeatureCategory
+import com.pekochan069.guitarlearner.presentation.contract.FeatureId
+import com.pekochan069.guitarlearner.presentation.contract.FoundationDestination
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.FoundationState
 import com.pekochan069.guitarlearner.presentation.contract.LanguageOption
-import com.pekochan069.guitarlearner.presentation.contract.Page
 import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 
-private val Page.label: Int get() = when (this) {
-    Page.Tuner -> R.string.page_tuner
-    Page.Metronome -> R.string.page_metronome
-    Page.Gallery -> R.string.page_gallery
+private val FoundationDestination.title: Int get() = when (this) {
+    FoundationDestination.Home -> R.string.home_title
+    is FoundationDestination.Feature -> when (id) {
+        FeatureId.Metronome -> R.string.metronome_title
+    }
+    is FoundationDestination.Sample -> id.title
 }
-private val Page.title: Int get() = when (this) {
-    Page.Tuner -> R.string.tuner_title
-    Page.Metronome -> R.string.metronome_title
-    Page.Gallery -> R.string.gallery_title
+private val DevelopmentSample.title: Int get() = when (this) {
+    DevelopmentSample.Tuner -> R.string.tuner_title
+    DevelopmentSample.Gallery -> R.string.gallery_title
 }
-private val Page.subtitle: Int get() = when (this) {
-    Page.Tuner -> R.string.tuner_subtitle
-    Page.Metronome -> R.string.metronome_subtitle
-    Page.Gallery -> R.string.gallery_subtitle
-}
-private val Page.icon: Int get() = when (this) {
-    Page.Tuner -> R.drawable.ic_tuner
-    Page.Metronome -> R.drawable.ic_tempo
-    Page.Gallery -> R.drawable.ic_gallery
+private val FeatureCategory.label: Int get() = when (this) {
+    FeatureCategory.Tools -> R.string.category_tools
+    FeatureCategory.Training -> R.string.category_training
+    FeatureCategory.Learning -> R.string.category_learning
 }
 private val ThemeOption.label: Int get() = when (this) {
     ThemeOption.System -> R.string.theme_system
@@ -98,126 +91,96 @@ fun DesignFoundationApp(
     state: FoundationState,
     modifier: Modifier = Modifier,
 ): Unit {
-    val page = state.page
+    val destination = state.destination
+    val metronome = destination == FoundationDestination.Feature(FeatureId.Metronome)
+    val homeScroll = rememberScrollState()
     val preferencesEnabled = state.settingsStatus != SettingsStatus.Saving
 
     Scaffold(
         modifier = modifier,
         topBar = {
-            Row(
-                Modifier.fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.app_name),
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                IconButton(
-                    onClick = { state.eventSink(FoundationEvent.SetSettingsOpen(true)) },
-                    modifier = Modifier.testTag("settings"),
-                ) {
-                    Icon(
-                        painterResource(R.drawable.ic_settings),
-                        stringResource(R.string.preferences),
-                    )
-                }
-            }
-        },
-        bottomBar = {
-            if (LocalDensity.current.fontScale > 1.3f) {
-                PrimaryScrollableTabRow(
-                    selectedTabIndex = page.ordinal,
-                    modifier = Modifier.windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
-                    ),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    edgePadding = 8.dp,
-                ) {
-                    Page.entries.forEach { destination ->
-                        Tab(
-                            selected = page == destination,
-                            onClick = { state.eventSink(FoundationEvent.SelectPage(destination)) },
-                            modifier = Modifier.testTag("page_" + destination.name),
-                        ) {
-                            Row(
-                                Modifier.heightIn(min = 64.dp).padding(16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(painterResource(destination.icon), null, Modifier.size(24.dp))
-                                Text(stringResource(destination.label))
-                            }
+            TopAppBar(
+                title = { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium) },
+                navigationIcon = {
+                    if (destination != FoundationDestination.Home) {
+                        IconButton(onClick = { state.eventSink(FoundationEvent.NavigateBack) },
+                            modifier = Modifier.testTag("navigate_up")) {
+                            Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back_to_home))
                         }
                     }
-                }
-            } else {
-                NavigationBar {
-                    Page.entries.forEach { destination ->
-                        NavigationBarItem(
-                            selected = page == destination,
-                            onClick = { state.eventSink(FoundationEvent.SelectPage(destination)) },
-                            icon = { Icon(painterResource(destination.icon), null) },
-                            label = { Text(stringResource(destination.label)) },
-                            modifier = Modifier.testTag("page_" + destination.name),
-                        )
+                },
+                actions = {
+                    IconButton(onClick = { state.eventSink(FoundationEvent.SetSettingsOpen(true)) },
+                        modifier = Modifier.testTag("settings")) {
+                        Icon(painterResource(R.drawable.ic_settings), stringResource(R.string.preferences))
                     }
-                }
-            }
+                },
+            )
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
-            key(page) {
+            key(destination) {
                 Column(
                     Modifier.widthIn(max = 680.dp).fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(if (page == Page.Metronome) 12.dp else 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (page == Page.Metronome) 12.dp else 24.dp),
+                        .verticalScroll(if (destination == FoundationDestination.Home) homeScroll else rememberScrollState())
+                        .testTag(if (destination == FoundationDestination.Home) "home_scroll" else "feature_scroll")
+                        .padding(if (metronome) 12.dp else 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (metronome) 12.dp else 24.dp),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            stringResource(page.title),
-                            Modifier.semantics { heading() },
-                            style = if (page == Page.Metronome) MaterialTheme.typography.headlineMedium
+                            stringResource(destination.title),
+                            Modifier.testTag("destination_title").semantics { heading() },
+                            style = if (metronome) MaterialTheme.typography.headlineMedium
                                 else MaterialTheme.typography.headlineLarge,
                         )
-                        if (page != Page.Metronome) {
+                        if (!metronome) {
                             Text(
-                                stringResource(page.subtitle),
+                                stringResource(when (destination) {
+                                    FoundationDestination.Home -> R.string.home_description
+                                    is FoundationDestination.Sample -> when (destination.id) {
+                                        DevelopmentSample.Tuner -> R.string.tuner_subtitle
+                                        DevelopmentSample.Gallery -> R.string.gallery_subtitle
+                                    }
+                                    is FoundationDestination.Feature -> R.string.metronome_subtitle
+                                }),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
-                    if (page != Page.Metronome) {
+                    if (!metronome) CompactMetronomeControl(state.metronome, state.eventSink)
+                    if (destination is FoundationDestination.Sample) {
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             shape = MaterialTheme.shapes.medium,
                         ) {
                             Text(
-                                stringResource(if (page == Page.Tuner) R.string.tuner_demo_notice else R.string.gallery_demo_notice),
+                                stringResource(if (destination.id == DevelopmentSample.Tuner) R.string.tuner_demo_notice else R.string.gallery_demo_notice),
                                 Modifier.padding(16.dp),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
-                    when (page) {
-                        Page.Tuner -> TunerSample(
-                            state.reading,
-                            onReadingChange = { state.eventSink(FoundationEvent.SetReading(it)) },
-                        )
-                        Page.Metronome -> MetronomeSample(
-                            state = state.metronome,
-                            eventSink = state.eventSink,
-                        )
-                        Page.Gallery -> ComponentGallery(
-                            selected = state.gallerySelected,
-                            onSelectedChange = { state.eventSink(FoundationEvent.SetGallerySelected(it)) },
-                        )
+                    when (destination) {
+                        FoundationDestination.Home -> HomeCatalog(state)
+                        is FoundationDestination.Feature -> when (destination.id) {
+                            FeatureId.Metronome -> MetronomeSample(
+                                state = state.metronome,
+                                eventSink = state.eventSink,
+                            )
+                        }
+                        is FoundationDestination.Sample -> when (destination.id) {
+                            DevelopmentSample.Tuner -> TunerSample(
+                                state.reading,
+                                onReadingChange = { state.eventSink(FoundationEvent.SetReading(it)) },
+                            )
+                            DevelopmentSample.Gallery -> ComponentGallery(
+                                selected = state.gallerySelected,
+                                onSelectedChange = { state.eventSink(FoundationEvent.SetGallerySelected(it)) },
+                            )
+                        }
                     }
                 }
             }
@@ -287,6 +250,27 @@ fun DesignFoundationApp(
                         }
                     }
                 }
+                if (state.developmentSamples.isNotEmpty()) {
+                    Text(stringResource(R.string.development_samples),
+                        Modifier.padding(horizontal = 24.dp).testTag("development_samples").semantics { heading() },
+                        style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.development_samples_description),
+                        Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    state.developmentSamples.forEach { sample ->
+                        FilledTonalButton(
+                            onClick = { state.eventSink(FoundationEvent.OpenSample(sample)) },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+                                .heightIn(min = 48.dp).testTag("sample_" + sample.name),
+                        ) {
+                            Icon(painterResource(when (sample) {
+                                DevelopmentSample.Tuner -> R.drawable.ic_tuner
+                                DevelopmentSample.Gallery -> R.drawable.ic_gallery
+                            }), null, Modifier.padding(end = 8.dp))
+                            Text(stringResource(sample.title))
+                        }
+                    }
+                }
                 Text(
                     stringResource(R.string.language),
                     Modifier.padding(horizontal = 24.dp).semantics { heading() },
@@ -313,6 +297,38 @@ fun DesignFoundationApp(
                         ) {
                             RadioButton(selected = state.language == language, onClick = null, enabled = preferencesEnabled)
                             Text(stringResource(label), style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeCatalog(state: FoundationState) {
+    state.featureGroups.forEach { group ->
+        Column(Modifier.fillMaxWidth().testTag("category_" + group.category.name),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeading(group.category.label)
+            group.features.forEach { feature ->
+                when (feature) {
+                    FeatureId.Metronome -> Card(
+                        onClick = { state.eventSink(FoundationEvent.OpenFeature(feature)) },
+                        modifier = Modifier.fillMaxWidth().testTag("feature_" + feature.name),
+                        shape = MaterialTheme.shapes.extraLarge,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
+                    ) {
+                        Row(Modifier.fillMaxWidth().heightIn(min = 96.dp).padding(20.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Icon(painterResource(R.drawable.ic_tempo), null, Modifier.size(32.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(stringResource(R.string.metronome_title), style = MaterialTheme.typography.titleLarge)
+                                Text(stringResource(R.string.metronome_subtitle), style = MaterialTheme.typography.bodyMedium)
+                            }
+                            Icon(painterResource(R.drawable.ic_arrow_forward), null)
                         }
                     }
                 }

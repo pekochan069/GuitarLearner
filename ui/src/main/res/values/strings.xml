@@ -1,5 +1,14 @@
 <resources>
     <string name="app_name">GuitarLearner</string>
+    <string name="home_title">Home</string>
+    <string name="home_description">Choose a tool for your practice.</string>
+    <string name="category_tools">Tools</string>
+    <string name="category_training">Training</string>
+    <string name="category_learning">Learning</string>
+    <string name="back_to_home">Back to Home</string>
+    <string name="development_samples">Development samples</string>
+    <string name="development_samples_description">Examples for testing the app.</string>
+    <string name="open_metronome">Open metronome</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
@@ -11,9 +20,6 @@
     <string name="appearance">Appearance</string>
     <string name="language">Language</string>
     <string name="close">Close preferences</string>
-    <string name="page_tuner">Tuner</string>
-    <string name="page_metronome">Metronome</string>
-    <string name="page_gallery">Gallery</string>
     <string name="tuner_title">Tuner demo</string>
     <string name="tuner_subtitle">Sample pitch readings</string>
     <string name="metronome_title">Metronome</string>

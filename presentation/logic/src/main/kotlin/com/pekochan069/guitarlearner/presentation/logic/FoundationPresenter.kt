@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import arrow.core.raise.either
@@ -26,6 +27,11 @@ import com.pekochan069.guitarlearner.domain.ThemePreference
 import com.pekochan069.guitarlearner.presentation.contract.AppearanceNotice
 import com.pekochan069.guitarlearner.presentation.contract.BeatAccentUi
 import com.pekochan069.guitarlearner.presentation.contract.BeatUnitUi
+import com.pekochan069.guitarlearner.presentation.contract.DevelopmentSample
+import com.pekochan069.guitarlearner.presentation.contract.FeatureCategory
+import com.pekochan069.guitarlearner.presentation.contract.FeatureGroup
+import com.pekochan069.guitarlearner.presentation.contract.FeatureId
+import com.pekochan069.guitarlearner.presentation.contract.FoundationDestination
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.FoundationScreen
 import com.pekochan069.guitarlearner.presentation.contract.FoundationState
@@ -36,7 +42,6 @@ import com.pekochan069.guitarlearner.presentation.contract.MetronomePlaybackUi
 import com.pekochan069.guitarlearner.presentation.contract.MetronomePresetUi
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeStopUi
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeUiState
-import com.pekochan069.guitarlearner.presentation.contract.Page
 import com.pekochan069.guitarlearner.presentation.contract.Reading
 import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
@@ -51,24 +56,46 @@ import kotlinx.coroutines.sync.withLock
 class FoundationPresenter(
     private val appearance: AppearanceSettings,
     private val metronome: Metronome,
+    private val developmentSamplesEnabled: Boolean = false,
 ) : Presenter<FoundationState> {
     @Composable
     override fun present(): FoundationState {
-        var pageName by rememberSaveable { mutableStateOf(Page.Tuner.name) }
+        var destinationId by rememberSaveable { mutableStateOf("home") }
         var readingName by rememberSaveable { mutableStateOf(Reading.NoSignal.name) }
         var gallerySelected by rememberSaveable { mutableStateOf(true) }
-        var settingsOpen by rememberSaveable { mutableStateOf(false) }
+        var overlay by rememberSaveable(stateSaver = OverlaySaver) { mutableStateOf<Overlay>(Overlay.None) }
         var settingsStatus by remember { mutableStateOf<SettingsStatus>(SettingsStatus.Idle) }
         val snapshot by appearance.current.collectAsState()
         val metronomeSnapshot by metronome.current.collectAsState()
         var presetName by rememberSaveable { mutableStateOf("") }
-        var presetsOpen by rememberSaveable { mutableStateOf(false) }
-        var overwriteName by rememberSaveable { mutableStateOf<String?>(null) }
         var savingPreset by remember { mutableStateOf(false) }
         var metronomeNotice by remember { mutableStateOf<MetronomeNotice?>(null) }
         var dismissedReadFailure by remember { mutableStateOf<MetronomeFailure?>(null) }
         val commands = remember { Mutex() }
         val scope = rememberCoroutineScope()
+        val samples = if (developmentSamplesEnabled) DevelopmentSample.entries else emptyList()
+        val destination = restoreDestination(destinationId, samples)
+        val visibleOverlay = when {
+            overlay == Overlay.Settings -> overlay
+            destination == FoundationDestination.Feature(FeatureId.Metronome) -> overlay
+            else -> Overlay.None
+        }
+
+        fun navigate(destination: FoundationDestination) {
+            overlay = Overlay.None
+            destinationId = destination.savedId()
+        }
+
+        fun navigateBack() {
+            overlay = when (overlay) {
+                is Overlay.Overwrite -> Overlay.Presets
+                Overlay.Settings, Overlay.Presets -> Overlay.None
+                Overlay.None -> {
+                    destinationId = "home"
+                    Overlay.None
+                }
+            }
+        }
 
         fun execute(
             presetOperation: Boolean = false,
@@ -76,6 +103,7 @@ class FoundationPresenter(
         ) {
             if (presetOperation && savingPreset) return
             if (presetOperation) savingPreset = true
+            val requestedOverlay = overlay
             scope.launch {
                 try {
                     commands.withLock {
@@ -83,14 +111,20 @@ class FoundationPresenter(
                         metronome.execute(request).fold(
                             ifLeft = {
                                 if (it == MetronomeFailure.PresetExists && request is MetronomeCommand.SavePreset && !request.overwrite) {
-                                    overwriteName = request.name.trim()
+                                    if (destinationId == "feature:metronome" && overlay == requestedOverlay && overlay == Overlay.Presets) {
+                                        overlay = Overlay.Overwrite(request.name.trim())
+                                    } else {
+                                        metronomeNotice = it.toNotice()
+                                    }
                                 } else {
                                     metronomeNotice = it.toNotice()
                                 }
                             },
                             ifRight = {
                                 metronomeNotice = null
-                                if (request is MetronomeCommand.SavePreset) overwriteName = null
+                                if (request is MetronomeCommand.SavePreset && overlay == Overlay.Overwrite(request.name)) {
+                                    overlay = Overlay.Presets
+                                }
                             },
                         )
                     }
@@ -150,7 +184,10 @@ class FoundationPresenter(
         }
 
         return FoundationState(
-            page = Page.entries.firstOrNull { it.name == pageName } ?: Page.Tuner,
+            destination = destination,
+            featureGroups = featureCatalog.filter { it.features.isNotEmpty() },
+            developmentSamples = samples,
+            canNavigateBack = destination != FoundationDestination.Home || visibleOverlay != Overlay.None,
             reading = Reading.entries.firstOrNull { it.name == readingName } ?: Reading.NoSignal,
             metronome = MetronomeUiState(
                 config = metronomeSnapshot.selected.toUi(),
@@ -159,22 +196,28 @@ class FoundationPresenter(
                     it != metronomeSnapshot.selected
                 } ?: false,
                 presets = metronomeSnapshot.presets.map { MetronomePresetUi(it.name, it.config.toUi()) },
-                presetsOpen = presetsOpen,
+                presetsOpen = visibleOverlay == Overlay.Presets || visibleOverlay is Overlay.Overwrite,
                 presetName = presetName,
-                overwriteName = overwriteName,
+                overwriteName = (visibleOverlay as? Overlay.Overwrite)?.name,
                 savingPreset = savingPreset,
                 notice = metronomeNotice ?: metronomeSnapshot.readFailure
                     ?.takeUnless { it == dismissedReadFailure }?.toNotice(),
             ),
             gallerySelected = gallerySelected,
-            settingsOpen = settingsOpen,
+            settingsOpen = visibleOverlay == Overlay.Settings,
             theme = snapshot.theme.toOption(),
             language = snapshot.language?.toOption(),
             settingsStatus = settingsStatus,
             eventSink = { event ->
                 when (event) {
-                    is FoundationEvent.SelectPage -> pageName = event.value.name
-                    is FoundationEvent.SetReading -> readingName = event.value.name
+                    is FoundationEvent.OpenFeature -> if (featureCatalog.any { event.id in it.features }) {
+                        navigate(FoundationDestination.Feature(event.id))
+                    }
+                    is FoundationEvent.OpenSample -> if (event.id in samples) {
+                        navigate(FoundationDestination.Sample(event.id))
+                    }
+                    FoundationEvent.NavigateBack -> navigateBack()
+                    is FoundationEvent.SetReading -> if (developmentSamplesEnabled) readingName = event.value.name
                     is FoundationEvent.SetBpm -> execute { MetronomeCommand.SetTempo(event.value.coerceIn(40, 240)) }
                     is FoundationEvent.AdjustBpm -> execute {
                         MetronomeCommand.SetTempo((metronome.current.value.selected.bpm + event.delta).coerceIn(40, 240))
@@ -187,29 +230,36 @@ class FoundationPresenter(
                     is FoundationEvent.CycleBeatAccent -> setAccent(event.index) {
                         BeatAccent.entries[(it.ordinal + 1) % BeatAccent.entries.size]
                     }
-                    is FoundationEvent.SetPresetsOpen -> presetsOpen = event.value
+                    is FoundationEvent.SetPresetsOpen -> {
+                        if (event.value) {
+                            if (destination == FoundationDestination.Feature(FeatureId.Metronome)) overlay = Overlay.Presets
+                        } else if (overlay == Overlay.Presets || overlay is Overlay.Overwrite) overlay = Overlay.None
+                    }
                     is FoundationEvent.SetPresetName -> presetName = event.value
                     FoundationEvent.SavePreset -> {
                         val name = presetName.trim()
                         if (!savingPreset && metronome.current.value.presets.any { it.name == name }) {
-                            overwriteName = name
+                            overlay = Overlay.Overwrite(name)
                             metronomeNotice = null
                         } else {
                             execute(presetOperation = true) { MetronomeCommand.SavePreset(name) }
                         }
                     }
-                    FoundationEvent.ConfirmPresetOverwrite -> overwriteName?.let { name ->
+                    FoundationEvent.ConfirmPresetOverwrite -> (overlay as? Overlay.Overwrite)?.name?.let { name ->
                         execute(presetOperation = true) { MetronomeCommand.SavePreset(name, overwrite = true) }
                     }
-                    FoundationEvent.CancelPresetOverwrite -> if (!savingPreset) overwriteName = null
+                    FoundationEvent.CancelPresetOverwrite -> if (overlay is Overlay.Overwrite) overlay = Overlay.Presets
                     is FoundationEvent.LoadPreset -> execute(presetOperation = true) { MetronomeCommand.LoadPreset(event.name) }
                     is FoundationEvent.DeletePreset -> execute(presetOperation = true) { MetronomeCommand.DeletePreset(event.name) }
                     FoundationEvent.DismissMetronomeNotice -> {
                         metronomeNotice = null
                         dismissedReadFailure = metronomeSnapshot.readFailure
                     }
-                    is FoundationEvent.SetGallerySelected -> gallerySelected = event.value
-                    is FoundationEvent.SetSettingsOpen -> settingsOpen = event.value
+                    is FoundationEvent.SetGallerySelected -> if (developmentSamplesEnabled) gallerySelected = event.value
+                    is FoundationEvent.SetSettingsOpen -> {
+                        if (event.value) overlay = Overlay.Settings
+                        else if (overlay == Overlay.Settings) overlay = Overlay.None
+                    }
                     is FoundationEvent.SelectTheme -> select(AppearanceChange.Theme(event.value.toPreference()))
                     is FoundationEvent.SelectLanguage -> select(AppearanceChange.Language(event.value.toPreference()))
                     FoundationEvent.DismissNotice -> if (settingsStatus is SettingsStatus.Failed) settingsStatus = SettingsStatus.Idle
@@ -218,11 +268,58 @@ class FoundationPresenter(
         )
     }
 
-    class Factory(private val appearance: AppearanceSettings, private val metronome: Metronome) : Presenter.Factory {
+    class Factory(
+        private val appearance: AppearanceSettings,
+        private val metronome: Metronome,
+        private val developmentSamplesEnabled: Boolean = false,
+    ) : Presenter.Factory {
+        fun create(): FoundationPresenter = FoundationPresenter(appearance, metronome, developmentSamplesEnabled)
+
         override fun create(screen: Screen, navigator: Navigator, context: CircuitContext): Presenter<*>? =
-            if (screen == FoundationScreen) FoundationPresenter(appearance, metronome) else null
+            if (screen == FoundationScreen) create() else null
     }
 }
+
+private val featureCatalog = listOf(FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome)))
+
+private fun FoundationDestination.savedId(): String = when (this) {
+    FoundationDestination.Home -> "home"
+    is FoundationDestination.Feature -> "feature:${id.savedId}"
+    is FoundationDestination.Sample -> "sample:${id.savedId}"
+}
+
+private fun restoreDestination(savedId: String, samples: List<DevelopmentSample>): FoundationDestination =
+    featureCatalog.flatMap { it.features }.firstOrNull { savedId == "feature:${it.savedId}" }
+        ?.let { FoundationDestination.Feature(it) }
+        ?: samples.firstOrNull { savedId == "sample:${it.savedId}" }?.let { FoundationDestination.Sample(it) }
+        ?: FoundationDestination.Home
+
+private sealed interface Overlay {
+    data object None : Overlay
+    data object Settings : Overlay
+    data object Presets : Overlay
+    data class Overwrite(val name: String) : Overlay
+}
+
+private val OverlaySaver = Saver<Overlay, Any>(
+    save = {
+        when (it) {
+            Overlay.None -> listOf("none")
+            Overlay.Settings -> listOf("settings")
+            Overlay.Presets -> listOf("presets")
+            is Overlay.Overwrite -> listOf("overwrite", it.name)
+        }
+    },
+    restore = {
+        val values = it as? List<*>
+        when (values?.firstOrNull()) {
+            "settings" -> Overlay.Settings
+            "presets" -> Overlay.Presets
+            "overwrite" -> (values.getOrNull(1) as? String)?.let(Overlay::Overwrite) ?: Overlay.None
+            else -> Overlay.None
+        }
+    },
+)
 
 private fun MetronomeConfig.withBeatCount(value: Int): MetronomeConfig = copy(
     beats = List(value.coerceIn(1, 16)) { index -> beats.getOrElse(index) { BeatAccent.Normal } },

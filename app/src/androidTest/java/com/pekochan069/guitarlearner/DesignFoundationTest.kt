@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
+import com.pekochan069.guitarlearner.presentation.contract.DevelopmentSample
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -43,6 +44,7 @@ class DesignFoundationTest {
         compose.waitForIdle()
         compose.onNodeWithTag("close_settings").performScrollTo().performClick()
 
+        compose.openDevelopmentSample(DevelopmentSample.Tuner)
         listOf(
             "NoSignal" to "No signal",
             "Flat" to "Flat",
@@ -53,7 +55,7 @@ class DesignFoundationTest {
             compose.onNodeWithTag("tuner_status").assertTextEquals(label)
         }
 
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         compose.onNodeWithTag("tempo_slider").performScrollTo().performSemanticsAction(SemanticsActions.SetProgress) { it(91f) }
         waitForText("bpm_value", "91")
         compose.onNodeWithTag("bpm_value").assertTextEquals("91")
@@ -66,7 +68,7 @@ class DesignFoundationTest {
         compose.onNodeWithTag("preset_name").performTextInput("연습 A")
         compose.onNodeWithTag("close_presets").performScrollTo().performClick()
 
-        compose.onNodeWithTag("page_Gallery").performClick()
+        compose.openDevelopmentSample(DevelopmentSample.Gallery)
         compose.onNodeWithTag("gallery_selection").performScrollTo().assertIsOn().performClick()
         compose.onNodeWithTag("gallery_selection").assertIsOff()
 
@@ -81,9 +83,9 @@ class DesignFoundationTest {
         compose.waitForIdle()
         compose.onNodeWithText(compose.activity.getString(UiR.string.gallery_title)).assertExists()
         compose.onNodeWithTag("gallery_selection").performScrollTo().assertIsOff()
-        compose.onNodeWithTag("page_Tuner").performClick()
+        compose.openDevelopmentSample(DevelopmentSample.Tuner)
         compose.onNodeWithTag("tuner_status").assertTextEquals("높음")
-        compose.onNodeWithTag("page_Metronome").performClick()
+        compose.openMetronome()
         compose.onNodeWithTag("bpm_value").assertTextEquals("92")
         compose.onNodeWithTag("metronome_status").assertDoesNotExist()
         compose.onNodeWithTag("toggle_metronome").assertTextEquals(compose.activity.getString(UiR.string.start_metronome))

@@ -159,7 +159,7 @@ class MetronomePlaybackTest {
                 assertEquals(0, expectPlaying(host).beatIndex)
             }
             val service = requireNotNull(runningOwnMetronomeService(application))
-            compose.onNodeWithTag("page_Metronome").performClick()
+            compose.openMetronome()
 
             val seven = MetronomeConfig().beats + List(3) { BeatAccent.Normal }
             for (unit in listOf(BeatUnit.Quarter, BeatUnit.Eighth)) {
@@ -327,7 +327,7 @@ class MetronomePlaybackTest {
             assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetTempo(40)))
             assertEquals(Either.Right(Unit), host.execute(MetronomeCommand.SetPattern(BeatUnit.Quarter,
                 List(8) { BeatAccent.Mute })))
-            compose.onNodeWithTag("page_Metronome").performClick()
+            compose.openMetronome()
             compose.onNodeWithTag("toggle_metronome").performScrollTo().performClick()
             expectPlaying(host)
             val started = requireNotNull(runningOwnMetronomeService(application))

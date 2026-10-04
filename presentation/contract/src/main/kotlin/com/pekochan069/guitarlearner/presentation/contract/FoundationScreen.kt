@@ -8,7 +8,17 @@ import kotlinx.parcelize.Parcelize
 @Parcelize
 data object FoundationScreen : Screen
 
-enum class Page { Tuner, Metronome, Gallery }
+enum class FeatureCategory { Tools, Training, Learning }
+enum class FeatureId(val savedId: String) { Metronome("metronome") }
+enum class DevelopmentSample(val savedId: String) { Tuner("tuner"), Gallery("gallery") }
+
+sealed interface FoundationDestination {
+    data object Home : FoundationDestination
+    data class Feature(val id: FeatureId) : FoundationDestination
+    data class Sample(val id: DevelopmentSample) : FoundationDestination
+}
+
+data class FeatureGroup(val category: FeatureCategory, val features: List<FeatureId>)
 enum class Reading { NoSignal, Flat, InTune, Sharp }
 enum class ThemeOption { System, Light, Dark }
 enum class LanguageOption { System, Korean, English }
@@ -21,7 +31,10 @@ sealed interface SettingsStatus {
 }
 
 data class FoundationState(
-    val page: Page,
+    val destination: FoundationDestination,
+    val featureGroups: List<FeatureGroup>,
+    val developmentSamples: List<DevelopmentSample>,
+    val canNavigateBack: Boolean,
     val reading: Reading,
     val metronome: MetronomeUiState,
     val gallerySelected: Boolean,
@@ -36,7 +49,9 @@ data class FoundationState(
 }
 
 sealed interface FoundationEvent : CircuitUiEvent {
-    data class SelectPage(val value: Page) : FoundationEvent
+    data class OpenFeature(val id: FeatureId) : FoundationEvent
+    data class OpenSample(val id: DevelopmentSample) : FoundationEvent
+    data object NavigateBack : FoundationEvent
     data class SetReading(val value: Reading) : FoundationEvent
     data class SetBpm(val value: Int) : FoundationEvent
     data class AdjustBpm(val delta: Int) : FoundationEvent
