@@ -53,6 +53,17 @@ import com.pekochan069.guitarlearner.domain.MetronomeSnapshot
 import com.pekochan069.guitarlearner.domain.PlaybackState
 import com.pekochan069.guitarlearner.domain.StopReason
 import com.pekochan069.guitarlearner.domain.ThemePreference
+import com.pekochan069.guitarlearner.domain.Ambiguity
+import com.pekochan069.guitarlearner.domain.StandardString
+import com.pekochan069.guitarlearner.domain.ToleranceStorageStatus
+import com.pekochan069.guitarlearner.domain.Tuner
+import com.pekochan069.guitarlearner.domain.TunerFailure
+import com.pekochan069.guitarlearner.domain.TunerListening
+import com.pekochan069.guitarlearner.domain.TunerRecovery
+import com.pekochan069.guitarlearner.domain.TunerRequest
+import com.pekochan069.guitarlearner.domain.TunerSnapshot
+import com.pekochan069.guitarlearner.domain.TuningFeedback
+import com.pekochan069.guitarlearner.domain.TuningJudgment
 import com.pekochan069.guitarlearner.presentation.contract.FoundationScreen
 import com.pekochan069.guitarlearner.presentation.logic.FoundationPresenter
 import com.pekochan069.guitarlearner.ui.FoundationUiFactory
@@ -91,6 +102,7 @@ class FoundationPresentationTest {
         compose.onNodeWithTag("destination_title").assertDoesNotExist()
         compose.onNodeWithTag("category_Tools").assertExists()
         compose.onNodeWithTag("feature_Metronome").assertHasClickAction().assertIsDisplayed()
+        compose.onNodeWithTag("feature_Tuner").assertHasClickAction().assertIsDisplayed()
         val category = compose.onNodeWithTag("category_Tools").getUnclippedBoundsInRoot()
         val tile = compose.onNodeWithTag("feature_Metronome").getUnclippedBoundsInRoot()
         assertEquals((category.width.value - 12f) / 2, tile.width.value, 1f)
@@ -229,8 +241,8 @@ class FoundationPresentationTest {
                 CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
             }
         }
-        compose.openDevelopmentSample(DevelopmentSample.Tuner)
-        compose.onNodeWithTag("reading_Sharp").performScrollTo().performClick()
+        compose.openTuner()
+        compose.onNodeWithTag("tuner_string_E4").performScrollTo().performClick()
         compose.openMetronome()
         compose.onNodeWithTag("increase_bpm").performScrollTo().performClick()
         compose.onNodeWithTag("increase_bpm").performScrollTo().performClick()
@@ -244,8 +256,8 @@ class FoundationPresentationTest {
         compose.onNodeWithTag("destination_title").assertTextEquals(
             ApplicationProvider.getApplicationContext<Context>().getString(com.pekochan069.guitarlearner.ui.R.string.gallery_title))
         compose.onNodeWithTag("gallery_selection").performScrollTo().assertIsOff()
-        compose.openDevelopmentSample(DevelopmentSample.Tuner)
-        compose.onNodeWithTag("reading_Sharp").performScrollTo().assertIsSelected()
+        compose.openTuner()
+        compose.onNodeWithTag("tuner_string_E4").performScrollTo().assertIsSelected()
         compose.openMetronome()
         compose.onNodeWithTag("bpm_value").assertTextEquals("92")
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -574,6 +586,75 @@ class FoundationPresentationTest {
     }
 
     @Test
+    fun tunerRendersOnlyCurrentEvidenceAndStopClearsNumbersAtDoubleTextSize(): Unit {
+        val tuner = FakeTuner()
+        val circuit = testCircuit(FakeAppearance(), FakeMetronome(), tuner = tuner)
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val korean = context.createConfigurationContext(Configuration(context.resources.configuration).apply { setLocale(Locale.KOREAN) })
+        compose.setContent {
+            CompositionLocalProvider(LocalContext provides korean, LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                Box(Modifier.height(320.dp)) {
+                    GuitarLearnerTheme(false) {
+                        CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+                    }
+                }
+            }
+        }
+        compose.openTuner()
+        compose.onNodeWithTag("tuner_auto").performScrollTo().assertIsSelected()
+        compose.onNodeWithTag("tuner_string_E4").performScrollTo().assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithTag("tuner_start").performScrollTo().assertHeightIsAtLeast(48.dp).performClick()
+        compose.onNodeWithTag("tuner_stop").performScrollTo().assertHasClickAction()
+        compose.onNodeWithTag("tuner_cents").assertDoesNotExist()
+        tuner.snapshot.value = tuner.snapshot.value.copy(listening = TunerListening.Listening(
+            TuningFeedback.Measured(StandardString.E4, 4.2, TuningJudgment.Settling)))
+        compose.onNodeWithTag("tuner_cents").performScrollTo().assertTextEquals(korean.getString(com.pekochan069.guitarlearner.ui.R.string.tuner_cents, 4.2))
+        compose.onNodeWithTag("tuner_status").assertTextEquals(korean.getString(com.pekochan069.guitarlearner.ui.R.string.tuner_settling))
+        tuner.snapshot.value = tuner.snapshot.value.copy(listening = TunerListening.Listening(TuningFeedback.Uncertain(Ambiguity.CompetingFundamentals)))
+        compose.onNodeWithTag("tuner_cents").assertDoesNotExist()
+        compose.onNodeWithTag("tuner_status").performScrollTo().assertTextEquals(korean.getString(com.pekochan069.guitarlearner.ui.R.string.tuner_uncertain))
+        tuner.snapshot.value = tuner.snapshot.value.copy(listening = TunerListening.Listening(
+            TuningFeedback.Measured(StandardString.E4, -1.0, TuningJudgment.InTune)))
+        compose.onNodeWithTag("tuner_status").assertTextEquals(korean.getString(com.pekochan069.guitarlearner.ui.R.string.tuner_in_tune))
+        compose.onNodeWithTag("tuner_stop").performScrollTo().performClick()
+        compose.onNodeWithTag("tuner_cents").assertDoesNotExist()
+        compose.onNodeWithTag("tuner_status").performScrollTo().assertTextEquals(korean.getString(com.pekochan069.guitarlearner.ui.R.string.tuner_stopped))
+        compose.onNodeWithTag("tuner_string_E4").performScrollTo().assertIsSelected()
+        assertEquals(1, tuner.requests.count { it == TunerRequest.Start })
+        assertEquals(TunerRequest.Stop, tuner.requests.last())
+    }
+
+    @Test
+    fun tunerRecoveryAndFailedToleranceSaveKeepTheAcceptedChoice(): Unit {
+        val tuner = FakeTuner()
+        val circuit = testCircuit(FakeAppearance(), FakeMetronome(), tuner = tuner)
+        compose.setContent {
+            GuitarLearnerTheme(false) {
+                CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) }
+            }
+        }
+        compose.openTuner()
+        tuner.snapshot.value = tuner.snapshot.value.copy(storage = ToleranceStorageStatus.Saving(com.pekochan069.guitarlearner.domain.TuningTolerance.Strict))
+        compose.onNodeWithTag("tuner_tolerance_5").performScrollTo().assertIsSelected().assertIsNotEnabled()
+        compose.onNodeWithTag("tuner_tolerance_3").assertIsNotEnabled()
+        tuner.snapshot.value = tuner.snapshot.value.copy(storage = ToleranceStorageStatus.Failed(TunerFailure.ToleranceWriteFailed),
+            listening = TunerListening.Failed(TunerFailure.PermissionDenied(TunerRecovery.AppSettings)))
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        compose.onNodeWithTag("tuner_preference_failure").performScrollTo().assertTextEquals(
+            context.getString(com.pekochan069.guitarlearner.ui.R.string.tuner_save_failed))
+        compose.onNodeWithTag("tuner_tolerance_5").performScrollTo().assertIsSelected()
+        compose.onNodeWithTag("tuner_cents").assertDoesNotExist()
+        compose.onNodeWithTag("tuner_recovery_AppSettings").performScrollTo().assertHasClickAction().performClick()
+        assertEquals(TunerRequest.OpenSettings(com.pekochan069.guitarlearner.domain.TunerSettingsPage.AppPermission), tuner.requests.last())
+        compose.onNodeWithTag("tuner_start").performScrollTo().performClick()
+        assertEquals(TunerRequest.Start, tuner.requests.last())
+        tuner.snapshot.value = tuner.snapshot.value.copy(listening = TunerListening.Failed(TunerFailure.ShutdownFailed))
+        compose.onNodeWithTag("tuner_start").assertDoesNotExist()
+        compose.onNodeWithTag("tuner_recovery_AppSettings").performScrollTo().assertHasClickAction().performClick()
+        assertEquals(TunerRequest.OpenSettings(com.pekochan069.guitarlearner.domain.TunerSettingsPage.AppPermission), tuner.requests.last())
+    }
+
+    @Test
     fun openPresetSheetAndEnteredNameSurviveStateRestoration(): Unit {
         val restore = StateRestorationTester(compose)
         val circuit = testCircuit(FakeAppearance(), FakeMetronome())
@@ -594,8 +675,9 @@ class FoundationPresentationTest {
     }
 }
 
-private fun testCircuit(settings: AppearanceSettings, metronome: Metronome, developmentSamplesEnabled: Boolean = true): Circuit = Circuit.Builder()
-    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome, developmentSamplesEnabled))
+private fun testCircuit(settings: AppearanceSettings, metronome: Metronome, developmentSamplesEnabled: Boolean = true,
+    tuner: Tuner = FakeTuner()): Circuit = Circuit.Builder()
+    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome, tuner, developmentSamplesEnabled))
     .addUiFactory(FoundationUiFactory)
     .build()
 
@@ -632,5 +714,21 @@ private class FakeMetronome : Metronome {
             is MetronomeCommand.DeletePreset -> snapshot.value = snapshot.value.copy(presets = snapshot.value.presets.filterNot { it.name == command.name })
         }
         return Either.Right(Unit)
+    }
+}
+
+private class FakeTuner : Tuner {
+    val snapshot = MutableStateFlow(TunerSnapshot())
+    override val current: StateFlow<TunerSnapshot> = snapshot.asStateFlow()
+    val requests = mutableListOf<TunerRequest>()
+    override fun submit(request: TunerRequest) {
+        requests += request
+        when (request) {
+            TunerRequest.Start -> snapshot.value = snapshot.value.copy(listening = TunerListening.Starting)
+            TunerRequest.Stop -> snapshot.value = snapshot.value.copy(listening = TunerListening.Stopped)
+            is TunerRequest.SelectTarget -> snapshot.value = snapshot.value.copy(target = request.target)
+            is TunerRequest.SelectTolerance -> snapshot.value = snapshot.value.copy(tolerance = request.tolerance)
+            else -> Unit
+        }
     }
 }

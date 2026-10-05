@@ -145,6 +145,67 @@ class ArchitectureApiDetectorTest : LintDetectorTest() {
         """).expectClean()
     }
 
+    fun testMicrophonePermissionAndRetainedLifetimeStayInNativeModules() {
+        val audioRecord = java("""
+            package android.media;
+            public class AudioRecord {
+                public void startRecording() {}
+                public void stop() {}
+                public void release() {}
+            }
+        """).indented()
+        val activity = java("""
+            package android.app;
+            public class Activity { public void requestPermissions(String[] permissions, int request) {} }
+        """).indented()
+        val viewModel = kotlin("""
+            package androidx.lifecycle
+            open class ViewModel
+        """).indented()
+        val componentActivity = java("""
+            package androidx.activity;
+            public class ComponentActivity {
+                public void registerForActivityResult(Object contract, Object callback) {}
+            }
+        """).indented()
+        for (module in listOf("domain", "contract", "logic", "ui")) {
+            source(module, """
+                package example
+                fun capture(record: android.media.AudioRecord) { record.startRecording(); record.stop(); record.release() }
+            """, audioRecord).expectErrorCount(4)
+            source(module, """
+                package example
+                fun request(activity: android.app.Activity) { activity.requestPermissions(arrayOf("microphone"), 1) }
+            """, activity).expectErrorCount(2)
+            source(module, """
+                package example
+                fun request(activity: androidx.activity.ComponentActivity) {
+                    activity.registerForActivityResult(Any(), Any())
+                }
+            """, componentActivity).expectErrorCount(2)
+        }
+        for (module in listOf("app", "adapters")) {
+            source(module, """
+                package example
+                fun capture(record: android.media.AudioRecord) { record.startRecording(); record.stop(); record.release() }
+            """, audioRecord).expectClean()
+            source(module, """
+                package example
+                fun request(activity: androidx.activity.ComponentActivity) {
+                    activity.registerForActivityResult(Any(), Any())
+                }
+            """, componentActivity).expectClean()
+        }
+        source("app", """
+            package example
+            class RetainedOwner : androidx.lifecycle.ViewModel()
+        """, viewModel).expectClean()
+        source("ui", """
+            package example
+            class ForbiddenOwner : androidx.lifecycle.ViewModel()
+        """, viewModel).expectErrorCount(2)
+    }
+
     fun testArchitectureIssueCannotBeSuppressed() {
         source("domain", """
             @file:Suppress("ArchitectureApi", "all")

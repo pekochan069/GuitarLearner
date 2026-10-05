@@ -58,11 +58,11 @@ private val FoundationDestination.title: Int? get() = when (this) {
     FoundationDestination.Home -> null
     is FoundationDestination.Feature -> when (id) {
         FeatureId.Metronome -> R.string.metronome_title
+        FeatureId.Tuner -> R.string.tuner_title
     }
     is FoundationDestination.Sample -> id.title
 }
 private val DevelopmentSample.title: Int get() = when (this) {
-    DevelopmentSample.Tuner -> R.string.tuner_title
     DevelopmentSample.Gallery -> R.string.gallery_title
 }
 private val FeatureCategory.label: Int get() = when (this) {
@@ -139,7 +139,6 @@ fun DesignFoundationApp(
                             if (destination is FoundationDestination.Sample) {
                                 Text(
                                     stringResource(when (destination.id) {
-                                        DevelopmentSample.Tuner -> R.string.tuner_subtitle
                                         DevelopmentSample.Gallery -> R.string.gallery_subtitle
                                     }),
                                     style = MaterialTheme.typography.bodyLarge,
@@ -155,7 +154,7 @@ fun DesignFoundationApp(
                             shape = MaterialTheme.shapes.medium,
                         ) {
                             Text(
-                                stringResource(if (destination.id == DevelopmentSample.Tuner) R.string.tuner_demo_notice else R.string.gallery_demo_notice),
+                                stringResource(R.string.gallery_demo_notice),
                                 Modifier.padding(16.dp),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -169,12 +168,9 @@ fun DesignFoundationApp(
                                 state = state.metronome,
                                 eventSink = state.eventSink,
                             )
+                            FeatureId.Tuner -> TunerScreen(state.tuner, state.eventSink)
                         }
                         is FoundationDestination.Sample -> when (destination.id) {
-                            DevelopmentSample.Tuner -> TunerSample(
-                                state.reading,
-                                onReadingChange = { state.eventSink(FoundationEvent.SetReading(it)) },
-                            )
                             DevelopmentSample.Gallery -> ComponentGallery(
                                 selected = state.gallerySelected,
                                 onSelectedChange = { state.eventSink(FoundationEvent.SetGallerySelected(it)) },
@@ -263,7 +259,6 @@ fun DesignFoundationApp(
                                 .heightIn(min = 48.dp).testTag("sample_" + sample.name),
                         ) {
                             Icon(painterResource(when (sample) {
-                                DevelopmentSample.Tuner -> R.drawable.ic_tuner
                                 DevelopmentSample.Gallery -> R.drawable.ic_gallery
                             }), null, Modifier.padding(end = 8.dp))
                             Text(stringResource(sample.title))
@@ -313,21 +308,25 @@ private fun HomeCatalog(state: FoundationState) {
             group.features.chunked(2).forEach { features ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     features.forEach { feature ->
-                        when (feature) {
-                            FeatureId.Metronome -> Card(
-                                onClick = { state.eventSink(FoundationEvent.OpenFeature(feature)) },
-                                modifier = Modifier.weight(1f).testTag("feature_" + feature.name),
-                                shape = MaterialTheme.shapes.extraLarge,
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
-                            ) {
-                                Row(Modifier.fillMaxWidth().padding(16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(painterResource(R.drawable.ic_tempo), null, Modifier.size(32.dp))
-                                    Text(stringResource(R.string.metronome_title), Modifier.weight(1f),
-                                        style = MaterialTheme.typography.titleLarge)
-                                }
+                        Card(
+                            onClick = { state.eventSink(FoundationEvent.OpenFeature(feature)) },
+                            modifier = Modifier.weight(1f).testTag("feature_" + feature.name),
+                            shape = MaterialTheme.shapes.extraLarge,
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
+                        ) {
+                            Row(Modifier.fillMaxWidth().padding(16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Icon(painterResource(when (feature) {
+                                    FeatureId.Metronome -> R.drawable.ic_tempo
+                                    FeatureId.Tuner -> R.drawable.ic_tuner
+                                }), null, Modifier.size(32.dp))
+                                Text(stringResource(when (feature) {
+                                    FeatureId.Metronome -> R.string.metronome_title
+                                    FeatureId.Tuner -> R.string.tuner_title
+                                }), Modifier.weight(1f),
+                                    style = MaterialTheme.typography.titleLarge)
                             }
                         }
                     }
