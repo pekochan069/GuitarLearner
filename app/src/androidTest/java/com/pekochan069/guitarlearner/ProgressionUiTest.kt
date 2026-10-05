@@ -23,30 +23,47 @@ import com.pekochan069.guitarlearner.ui.theme.GuitarLearnerTheme
 import com.slack.circuit.foundation.Circuit
 import com.slack.circuit.foundation.CircuitCompositionLocals
 import com.slack.circuit.foundation.CircuitContent
+import dev.zacsweers.metro.createGraphFactory
 import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class ProgressionUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    private lateinit var application: GuitarLearnerApplication
     private lateinit var host: AndroidProgressionsHost
     private lateinit var chords: AndroidChordsHost
     private lateinit var preferences: ControlledCommitPreferences
 
     @Before fun createWorkspace(): Unit = runBlocking {
-        val app = compose.activity.application
+        application = compose.activity.application as GuitarLearnerApplication
+        val previousGraph = application.graph
+        previousGraph.metronomeHost.execute(MetronomeCommand.Stop)
+        previousGraph.progressions.execute(ProgressionCommand.Stop)
+        val app = application
         preferences = ControlledCommitPreferences(app.getSharedPreferences("progression_ui_${UUID.randomUUID()}", Application.MODE_PRIVATE))
         host = AndroidProgressionsHost(app, ProgressionPlaybackService::class.java, MainActivity::class.java, preferences)
+        application.graphOverride = createGraphFactory<AppGraph.Factory>().create(application, previousGraph.metronomeHost, host)
         chords = AndroidChordsHost(app.getSharedPreferences("progression_source_${UUID.randomUUID()}", Application.MODE_PRIVATE))
         listOf(-1, 3, 2, 0, 1, 0).forEachIndexed { index, fret -> chords.execute(ChordCommand.SetStop(index,
             when (fret) { -1 -> StringStop.Muted; 0 -> StringStop.Open; else -> StringStop.Fretted(fret) })) }
         chords.execute(ChordCommand.SetName("Source C"))
         chords.execute(ChordCommand.SaveDraft)
+    }
+
+    @After fun restoreGraph(): Unit = runBlocking {
+        try {
+            if (::preferences.isInitialized) preferences.releaseCommit()
+            if (::host.isInitialized) host.execute(ProgressionCommand.Stop)
+        } finally {
+            if (::application.isInitialized) application.graphOverride = null
+        }
     }
 
     @Test fun chordRestTieContextAndSavedCollectionJourneyKeepsCopiedMusicIndependent(): Unit {
