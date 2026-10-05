@@ -69,8 +69,8 @@ class AndroidProgressionsHost(
     override suspend fun execute(command: ProgressionCommand): Either<ProgressionFailure, Unit> = when (command) {
         is ProgressionCommand.Play -> withContext(main) { requestStart(command.startIndex) }
         ProgressionCommand.Stop -> withContext(main) { stop(StopReason.User); Unit.right() }
-        ProgressionCommand.Pause -> withContext(main) { pause(); Unit.right() }
-        ProgressionCommand.Resume -> withContext(main) { resume(); Unit.right() }
+        ProgressionCommand.Pause -> withContext(main) { withContext(NonCancellable) { pause(); Unit.right() } }
+        ProgressionCommand.Resume -> withContext(main) { withContext(NonCancellable) { resume(); Unit.right() } }
         is ProgressionCommand.Select -> withContext(main) {
             if (command.index !in snapshot.value.draft.content.steps.indices) ProgressionFailure.InvalidInput.left()
             else { snapshot.value = snapshot.value.copy(selectedIndex = command.index); Unit.right() }
@@ -87,6 +87,7 @@ class AndroidProgressionsHost(
         }
     }
     private suspend fun change(command: ProgressionCommand): Either<ProgressionFailure, Unit> {
+        if (command.stopsPlayback()) stop(StopReason.User)
         val state = snapshot.value
         val draft = state.draft
         val content = draft.content
@@ -220,32 +221,40 @@ class AndroidProgressionsHost(
         val id = ++nextRunId
         requestedRunId = id; requestedStart = startIndex
         snapshot.value = snapshot.value.copy(playback = ProgressionPlayback.Preparing, actionFailure = null)
-        return startGate.withLock {
-            if (requestedRunId != id) return@withLock Unit.right()
-            beforeStart()
+        return withContext(NonCancellable) { startGate.withLock {
             if (requestedRunId != id) return@withLock Unit.right()
             try {
+                beforeStart()
+                if (requestedRunId != id) return@withLock Unit.right()
                 application.startForegroundService(serviceIntent(ACTION_START, id)); Unit.right()
-            } catch (_: IllegalStateException) { fail(id, ProgressionFailure.ServiceUnavailable); ProgressionFailure.ServiceUnavailable.left() }
-              catch (_: SecurityException) { fail(id, ProgressionFailure.ServiceUnavailable); ProgressionFailure.ServiceUnavailable.left() }
-        }
+            } catch (failure: IllegalStateException) {
+                if (failure is kotlinx.coroutines.CancellationException) throw failure
+                fail(id, ProgressionFailure.ServiceUnavailable); ProgressionFailure.ServiceUnavailable.left()
+            } catch (_: SecurityException) { fail(id, ProgressionFailure.ServiceUnavailable); ProgressionFailure.ServiceUnavailable.left() }
+        } }
     }
     private suspend fun pause() {
         val session = run ?: return
         if (snapshot.value.playback !is ProgressionPlayback.Playing) return
-        val position = session.audio?.pause() ?: return
-        if (requestedRunId != session.id) return
-        snapshot.value = snapshot.value.copy(playback = ProgressionPlayback.Paused(position))
-        session.pauseForeground()
+        try {
+            val position = session.audio?.pause() ?: return
+            if (requestedRunId != session.id) return
+            snapshot.value = snapshot.value.copy(playback = ProgressionPlayback.Paused(position))
+            session.pauseForeground()
+        } catch (failure: IllegalStateException) {
+            if (failure is kotlinx.coroutines.CancellationException) throw failure
+            fail(session.id, ProgressionFailure.AudioUnavailable)
+        } catch (_: SecurityException) { fail(session.id, ProgressionFailure.ServiceUnavailable) }
     }
     private suspend fun resume() {
         val session = run ?: return
         val paused = snapshot.value.playback as? ProgressionPlayback.Paused ?: return
         startGate.withLock {
             if (requestedRunId != session.id) return@withLock
-            beforeStart()
-            if (requestedRunId != session.id) return@withLock
+            if (snapshot.value.playback !is ProgressionPlayback.Paused) return@withLock
             try {
+                beforeStart()
+                if (requestedRunId != session.id) return@withLock
                 if (!session.ensureFocus()) return@withLock
                 session.audio?.resume()
                 if (requestedRunId != session.id) return@withLock
@@ -264,8 +273,8 @@ class AndroidProgressionsHost(
         when (intent?.action) {
             ACTION_START -> if (run == null) begin(service, scope, startId, id)
             ACTION_STOP -> if (id == requestedRunId) stop(StopReason.User)
-            ACTION_PAUSE -> if (id == requestedRunId) scope.launch(main) { pause() }
-            ACTION_RESUME -> if (id == requestedRunId) scope.launch(main) { resume() }
+            ACTION_PAUSE -> if (id == requestedRunId) scope.launch(main) { withContext(NonCancellable) { if (id == requestedRunId) pause() } }
+            ACTION_RESUME -> if (id == requestedRunId) scope.launch(main) { withContext(NonCancellable) { if (id == requestedRunId) resume() } }
         }
         if (run == null) service.stopSelfResult(startId)
     }
@@ -366,8 +375,8 @@ class AndroidProgressionsHost(
             notifications.createNotificationChannel(NotificationChannel(CHANNEL, application.getString(R.string.progression_notification_channel), NotificationManager.IMPORTANCE_LOW))
             media.setCallback(object : MediaSession.Callback() {
                 override fun onStop() { if (requestedRunId == id) stop(StopReason.User) }
-                override fun onPause() { if (requestedRunId == id) scope.launch(main) { pause() } }
-                override fun onPlay() { if (requestedRunId == id) scope.launch(main) { resume() } }
+                override fun onPause() { if (requestedRunId == id) scope.launch(main) { withContext(NonCancellable) { if (requestedRunId == id) pause() } } }
+                override fun onPlay() { if (requestedRunId == id) scope.launch(main) { withContext(NonCancellable) { if (requestedRunId == id) resume() } } }
             })
             media.isActive = true
             media.setPlaybackState(NativePlaybackState.Builder().setActions(NativePlaybackState.ACTION_STOP)

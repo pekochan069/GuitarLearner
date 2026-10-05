@@ -39,4 +39,35 @@ class ProgressionSequencerTest {
         assertThrows(IllegalArgumentException::class.java) { ProgressionStep.Chord("empty", ChordShape()) }
         assertEquals(3, NoteDuration(NoteValue.ThirtySecond, true).ticks)
     }
+    @Test fun selectedTiedChordAttacksAfterCompleteEighthNoteCountIn() {
+        val chord = ProgressionStep.Chord("C", shape)
+        val sequence = ProgressionSequencer(ProgressionContent(timing = MetronomeConfig(120, BeatUnit.Eighth, List(3) { BeatAccent.Normal }),
+            metronomeEnabled = false, steps = listOf(chord.copy(tieToNext = true), chord)), 1, 48_000)
+        val countIn = List(24) { sequence.nextTick() }
+        assertEquals(3, countIn.count { it.click != null })
+        assertTrue(countIn.all { it.attack == null && it.position.stepIndex == -1 })
+        val first = sequence.nextTick()
+        assertEquals(36_000L, first.frame)
+        assertEquals(1, first.position.stepIndex)
+        assertNotNull(first.attack)
+        assertNull(first.click)
+    }
+    @Test fun fractionalFramesRemainStableAcrossLongLoops() {
+        val sequence = ProgressionSequencer(ProgressionContent(timing = MetronomeConfig(bpm = 137), loop = true,
+            steps = listOf(ProgressionStep.Rest(NoteDuration(NoteValue.ThirtySecond, true)))), 0, 44_100)
+        val ticks = 32_000
+        repeat(ticks) { sequence.nextTick() }
+        val exact = ticks * 44_100.0 * 60.0 / 137 / 16
+        assertTrue(kotlin.math.abs(sequence.nextFrame - exact) < 1.0)
+    }
+    @Test fun finalShortestChordAndRestKeepTheirFullDuration() {
+        for (step in listOf(ProgressionStep.Chord("C", shape, NoteDuration(NoteValue.ThirtySecond)),
+            ProgressionStep.Rest(NoteDuration(NoteValue.ThirtySecond)))) {
+            val sequence = ProgressionSequencer(ProgressionContent(timing = MetronomeConfig(bpm = 240), steps = listOf(step)), 0, 48_000)
+            val ticks = List(66) { sequence.nextTick() }
+            assertTrue(ticks.last().complete)
+            assertEquals(49_500L, sequence.nextFrame)
+            assertEquals(1_500L, sequence.nextFrame - ticks[64].frame)
+        }
+    }
 }

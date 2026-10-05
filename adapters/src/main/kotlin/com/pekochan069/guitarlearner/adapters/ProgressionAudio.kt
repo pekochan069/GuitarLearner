@@ -188,15 +188,20 @@ internal class ProgressionAudio(
         while (true) {
             coroutineContext.ensureActive()
             val now = System.nanoTime()
-            while (true) {
-                val control = controls.poll() ?: break
-                synchronized(trackGate) {
-                    if (stopped) { control.done.cancel(); return }
-                    clock.invalidate()
-                    nextTimestampNs = 0
-                    paused = control.paused
-                    if (paused) { audio.pause(); pauseAck = control.done }
-                    else { started = false; resumeAck = control.done; lastProgressNs = now; lastLoopNs = now }
+            if (pauseAck == null && resumeAck == null) {
+                val control = controls.poll()
+                if (control != null) {
+                    synchronized(trackGate) {
+                        if (stopped) { control.done.cancel(); return }
+                        if (paused == control.paused) { control.done.complete(Unit) }
+                        else {
+                            clock.invalidate()
+                            nextTimestampNs = 0
+                            paused = control.paused
+                            if (paused) { audio.pause(); pauseAck = control.done }
+                            else { started = false; resumeAck = control.done; lastProgressNs = now; lastLoopNs = now }
+                        }
+                    }
                 }
             }
             if (paused && pauseAck == null) { delay(10); continue }

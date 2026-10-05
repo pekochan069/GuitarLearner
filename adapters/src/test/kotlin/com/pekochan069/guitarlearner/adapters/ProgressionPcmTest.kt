@@ -34,6 +34,23 @@ class ProgressionPcmTest {
         assertArrayEquals(render(merged), samples)
         assertTrue(samples.sliceArray(194_400 until 240_000).all { it == 0.toShort() })
     }
+    @Test fun shortestSingleHighStringStartsImmediatelyAndSoundsUntilRest() {
+        val high = ChordShape(List(5) { StringStop.Muted } + StringStop.Open)
+        val content = ProgressionContent(timing = MetronomeConfig(bpm = 240), metronomeEnabled = false,
+            steps = listOf(ProgressionStep.Chord("E4", high, NoteDuration(NoteValue.ThirtySecond)),
+                ProgressionStep.Rest(NoteDuration(NoteValue.ThirtySecond))))
+        val buffer = ShortArray(60_000)
+        val markers = mutableListOf<ProgressionMarker>()
+        ProgressionPcm(ProgressionSequencer(content, 0, 48_000), 48_000).render(buffer, buffer.size, markers::add)
+        val start = markers.first { it.position.stepIndex == 0 }.frame.toInt()
+        val rest = markers.first { it.position.stepIndex == 1 }.frame.toInt()
+        assertTrue(buffer.sliceArray(start until start + 150).any { abs(it.toInt()) > 100 })
+        assertTrue(buffer.sliceArray(rest - 500 until rest).count { abs(it.toInt()) > 100 } > 300)
+        assertTrue(buffer.sliceArray(rest until buffer.size).all { it == 0.toShort() })
+        val lowSlot = PluckedGuitar(48_000).apply { strum(listOf(64, null, null, null, null, null), 300) }
+        val highSlot = PluckedGuitar(48_000).apply { strum(listOf(null, null, null, null, null, 64), 300) }
+        repeat(1_500) { assertEquals(lowSlot.next(), highSlot.next(), 0.0) }
+    }
     @Test fun generatedPluckHasCorrectPitchAndUsableLongDecay() {
         val guitar = PluckedGuitar(48_000)
         guitar.strum(listOf(55, null, null, null, null, null), 0)

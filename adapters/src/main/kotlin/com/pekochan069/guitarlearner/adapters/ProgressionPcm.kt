@@ -35,7 +35,8 @@ internal class ProgressionPcm(val sequencer: ProgressionSequencer, private val s
                 if (tick.silence) guitar.silence()
                 tick.attack?.let { tones ->
                     val durationFrames = tick.durationTicks.toLong() * sampleRate * 60 / (tick.position.bpm * 16)
-                    guitar.strum(tones, minOf(sampleRate / 125, ((durationFrames - 1) / 5).toInt()))
+                    val gaps = maxOf(1, tones.count { it != null } - 1)
+                    guitar.strum(tones, minOf(sampleRate / 125, (durationFrames / 8 / gaps).toInt()))
                 }
                 tick.click?.let { click = if (it == BeatAccent.Accent) accent else normal; clickOffset = 0 }
                 if (tick.complete) endFrame = sequencer.nextFrame
@@ -50,7 +51,7 @@ internal class ProgressionPcm(val sequencer: ProgressionSequencer, private val s
 internal class PluckedGuitar(private val sampleRate: Int) {
     private var strings = emptyList<Voice>()
     fun strum(tones: List<Int?>, spreadFrames: Int) {
-        strings = tones.mapIndexedNotNull { index, midi -> midi?.let { Voice(it, index * spreadFrames, sampleRate) } }
+        strings = tones.filterNotNull().mapIndexed { index, midi -> Voice(midi, index * spreadFrames, sampleRate) }
     }
     fun silence() { strings = emptyList() }
     fun next(): Double = strings.sumOf { it.next() } * Short.MAX_VALUE * 0.16
