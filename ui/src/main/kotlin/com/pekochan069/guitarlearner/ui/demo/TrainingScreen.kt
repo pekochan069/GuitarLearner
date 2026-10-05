@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -285,32 +286,37 @@ private fun TrainingStaff(notes: List<TrainingStaffNoteUi>) {
             TrainingAccidentalUi.Flat -> R.string.training_flat
         })) }.joinToString(". ")
     Surface(shape = MaterialTheme.shapes.large, color = colors.surfaceContainer) {
-        Canvas(Modifier.fillMaxWidth().height(gap * 18).testTag("training_staff")
-            .clearAndSetSemantics { contentDescription = description }) {
-            val spacing = gap.toPx()
-            fun y(step: Int): Float = spacing * 12 - step * spacing / 2
-            for (line in 0..8 step 2) drawLine(colors.outline, Offset(spacing, y(line)), Offset(size.width - spacing, y(line)), 1.dp.toPx())
-            drawCentered(measurer, "𝄞", clefStyle.copy(color = colors.onSurface), Offset(spacing * 2, y(4)))
-            drawCentered(measurer, "8", style.copy(color = colors.onSurface), Offset(spacing * 2, y(-3)))
-            notes.forEachIndexed { index, note ->
-                val x = spacing * 5 + (size.width - spacing * 7) * (index + 1) / (notes.size + 1)
-                val noteY = y(note.step)
-                val ledger = when {
-                    note.step < 0 -> (-2 downTo note.step step 2).toList()
-                    note.step > 8 -> (10..note.step step 2).toList()
-                    else -> emptyList()
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val drawingWidth = maxWidth.coerceAtLeast(gap * 16)
+            Column(Modifier.horizontalScroll(rememberScrollState()).testTag("training_staff_scroll")) {
+                Canvas(Modifier.width(drawingWidth).height(gap * 18).testTag("training_staff")
+                    .clearAndSetSemantics { contentDescription = description }) {
+                    val spacing = gap.toPx()
+                    fun y(step: Int): Float = spacing * 12 - step * spacing / 2
+                    for (line in 0..8 step 2) drawLine(colors.outline, Offset(spacing, y(line)), Offset(size.width - spacing, y(line)), 1.dp.toPx())
+                    drawCentered(measurer, "𝄞", clefStyle.copy(color = colors.onSurface), Offset(spacing * 2, y(4)))
+                    drawCentered(measurer, "8", style.copy(color = colors.onSurface), Offset(spacing * 2, y(-3)))
+                    notes.forEachIndexed { index, note ->
+                        val x = spacing * 5 + (size.width - spacing * 7) * (index + 1) / (notes.size + 1)
+                        val noteY = y(note.step)
+                        val ledger = when {
+                            note.step < 0 -> (-2 downTo note.step step 2).toList()
+                            note.step > 8 -> (10..note.step step 2).toList()
+                            else -> emptyList()
+                        }
+                        ledger.forEach { drawLine(colors.onSurface, Offset(x - spacing, y(it)), Offset(x + spacing, y(it)), 1.dp.toPx()) }
+                        drawOval(colors.onSurface, Offset(x - spacing * 0.48f, noteY - spacing * 0.3f), Size(spacing * 0.96f, spacing * 0.6f))
+                        val up = note.step < 4
+                        val stemX = x + if (up) spacing * 0.45f else -spacing * 0.45f
+                        drawLine(colors.onSurface, Offset(stemX, noteY), Offset(stemX, noteY + if (up) -spacing * 3 else spacing * 3), 1.5.dp.toPx())
+                        drawCentered(measurer, when (note.accidental) {
+                            TrainingAccidentalUi.Natural -> "♮"
+                            TrainingAccidentalUi.Sharp -> "♯"
+                            TrainingAccidentalUi.Flat -> "♭"
+                        }, style.copy(color = colors.onSurface), Offset(x - spacing * 1.6f, noteY))
+                        drawCentered(measurer, (index + 1).toString(), style.copy(color = colors.primary), Offset(x, spacing * 17))
+                    }
                 }
-                ledger.forEach { drawLine(colors.onSurface, Offset(x - spacing, y(it)), Offset(x + spacing, y(it)), 1.dp.toPx()) }
-                drawOval(colors.onSurface, Offset(x - spacing * 0.48f, noteY - spacing * 0.3f), Size(spacing * 0.96f, spacing * 0.6f))
-                val up = note.step < 4
-                val stemX = x + if (up) spacing * 0.45f else -spacing * 0.45f
-                drawLine(colors.onSurface, Offset(stemX, noteY), Offset(stemX, noteY + if (up) -spacing * 3 else spacing * 3), 1.5.dp.toPx())
-                drawCentered(measurer, when (note.accidental) {
-                    TrainingAccidentalUi.Natural -> "♮"
-                    TrainingAccidentalUi.Sharp -> "♯"
-                    TrainingAccidentalUi.Flat -> "♭"
-                }, style.copy(color = colors.onSurface), Offset(x - spacing * 1.6f, noteY))
-                drawCentered(measurer, (index + 1).toString(), style.copy(color = colors.primary), Offset(x, spacing * 17))
             }
         }
     }

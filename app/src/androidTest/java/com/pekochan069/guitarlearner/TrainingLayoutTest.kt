@@ -11,6 +11,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
@@ -20,6 +22,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -90,6 +93,30 @@ class TrainingLayoutTest {
         val markerCenter = canvas.left + (canvas.right - canvas.left) * (11.5f / 14)
         assertTrue("Fret 11 must be visible without scrolling", markerCenter > viewport.left && markerCenter < viewport.right)
         (1..6).forEach { compose.onNodeWithTag("training_string_$it").assertIsDisplayed() }
+    }
+
+    @Test fun enlargedSameStepIntervalsKeepAccidentalsApartAndStaffScrollable() {
+        val context = localizedContext("en")
+        val stage = mutableStateOf(question(TrainingRepresentationUi.Staff))
+        compose.setContent { CompositionLocalProvider(LocalContext provides context,
+            LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+            GuitarLearnerTheme(false) {
+                Column(Modifier.width(320.dp).verticalScroll(rememberScrollState())) {
+                    TrainingScreen(TrainingUiState(stage = stage.value)) {}
+                }
+            }
+        } }
+        for ((step, accidentals) in listOf(-2 to listOf(TrainingAccidentalUi.Natural, TrainingAccidentalUi.Sharp),
+            0 to listOf(TrainingAccidentalUi.Flat, TrainingAccidentalUi.Natural))) {
+            compose.runOnIdle { stage.value = stage.value.copy(staff = accidentals.map { TrainingStaffNoteUi(step, it) }) }
+            val bounds = compose.onNodeWithTag("training_staff").getUnclippedBoundsInRoot()
+            val gap = (bounds.bottom - bounds.top) / 18
+            val noteSeparation = ((bounds.right - bounds.left) - gap * 7) / 3
+            assertTrue("A following accidental must clear the previous note head", noteSeparation > gap * 2.5f)
+        }
+        val staffScroll = compose.onNodeWithTag("training_staff_scroll")
+        staffScroll.performSemanticsAction(SemanticsActions.ScrollBy) { it(999f, 0f) }
+        assertTrue(staffScroll.fetchSemanticsNode().config[SemanticsProperties.HorizontalScrollAxisRange].value() > 0f)
     }
 
     private fun question(representation: TrainingRepresentationUi): TrainingStageUi.Question = TrainingStageUi.Question(
