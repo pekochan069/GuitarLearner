@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsSelected
@@ -26,6 +28,7 @@ import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -335,9 +338,16 @@ class FoundationPresentationTest {
         compose.onNodeWithTag("preset_name").performScrollTo().performTextInput("Practice")
         compose.onNodeWithTag("save_preset").performScrollTo().performClick()
         compose.onNodeWithTag("cancel_preset_overwrite").performClick()
+        compose.onNodeWithTag("confirm_preset_overwrite").assertDoesNotExist()
         assertTrue(metronome.requests.isEmpty())
         compose.onNodeWithTag("preset_name").assertTextContains("Practice")
-        compose.onNodeWithTag("save_preset").performScrollTo().performClick()
+        val presetRoot = compose.onNodeWithTag("save_preset").fetchSemanticsNode().root
+        check(presetRoot is ViewRootForTest)
+        compose.waitUntil(5_000) {
+            compose.runOnIdle { presetRoot.view.hasWindowFocus() && !presetRoot.hasPendingMeasureOrLayout }
+        }
+        compose.onNodeWithTag("save_preset").performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("confirm_preset_overwrite").fetchSemanticsNodes().size == 1 }
         compose.onNodeWithTag("confirm_preset_overwrite").performClick().assertIsNotEnabled()
         metronome.presetResult!!.complete(Either.Left(MetronomeFailure.WriteFailed))
         compose.onNodeWithTag("confirm_preset_overwrite").assertExists()

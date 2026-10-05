@@ -244,7 +244,7 @@ class ChordPresentationUiTest {
         if (tag.startsWith("chord_section_")) {
             compose.onNodeWithTag("feature_scroll").performScrollToNode(
                 hasScrollAction() and hasAnyDescendant(hasTestTag(tag)))
-            compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick().assertIsSelected()
+            compose.onNodeWithTag(tag).assertIsDisplayed().assertHasClickAction().performClick().assertIsSelected()
         } else {
             compose.onNodeWithTag(tag).performScrollTo().performClick()
         }

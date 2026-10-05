@@ -97,7 +97,7 @@ class ProgressionUiTest {
         val reloaded = AndroidProgressionsHost(compose.activity.application, ProgressionPlaybackService::class.java, MainActivity::class.java, preferences)
         assertEquals(saved.content, reloaded.current.value.draft.content)
         click("progression_delete_${saved.id}")
-        click("progression_confirm_delete")
+        click("progression_confirm_delete", scroll = false)
         compose.waitUntil(5_000) { host.current.value.records.isEmpty() }
         assertNull(host.current.value.draft.targetId)
     }
@@ -121,9 +121,10 @@ class ProgressionUiTest {
         compose.onNodeWithTag("chord_capo").performScrollTo().performTextReplacement("0")
         click("progression_close_sheet")
         compose.onNodeWithTag("progression_name").performScrollTo().performTextReplacement("연습")
-        compose.waitUntil(5_000) { host.current.value.draft.name == "연습" }
+        compose.waitUntil(5_000) { host.current.value.draft.name == "연습" && host.current.value.persistence == DraftPersistence.Synced }
         preferences.failNext = true
         click("progression_save")
+        compose.waitUntil(5_000) { host.current.value.actionFailure == ProgressionFailure.WriteFailed }
         compose.onNodeWithTag("progression_error").performScrollTo().assertIsDisplayed()
         assertTrue(host.current.value.records.isEmpty())
         click("progression_save")
@@ -133,8 +134,12 @@ class ProgressionUiTest {
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == 2 }
     }
 
-    private fun click(tag: String) {
-        try { compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick() }
+    private fun click(tag: String, scroll: Boolean = true) {
+        try {
+            val node = compose.onNodeWithTag(tag)
+            if (scroll) node.performScrollTo()
+            node.assertIsDisplayed().assertHasClickAction().performClick()
+        }
         catch (failure: AssertionError) { diagnostic("failed_$tag"); throw failure }
     }
     private fun fret(stringIndex: Int, fretNumber: Int): SemanticsNodeInteraction {
