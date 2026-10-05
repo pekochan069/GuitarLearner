@@ -24,6 +24,10 @@
     <string name="gallery_subtitle">버튼, 글꼴, 색상, 모양</string>
     <string name="gallery_demo_notice">조작 요소를 선택하면 예시 상태가 바뀝니다.</string>
     <string name="tuner_target">목표 줄</string>
+    <string name="tuner_headstock_three_plus_three">3+3</string>
+    <string name="tuner_headstock_inline_six">일렬 6</string>
+    <string name="tuner_headstock_three_plus_three_description">3+3 헤드스톡</string>
+    <string name="tuner_headstock_inline_six_description">일렬 6 헤드스톡</string>
     <string name="tuner_target_description">자동 모드는 가장 가까운 표준 줄을 찾습니다. 줄을 선택하면 수동으로 조율합니다.</string>
     <string name="tuner_auto">자동</string>
     <string name="tuner_string_option">%1$d번 줄 · %2$s</string>

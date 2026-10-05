@@ -35,6 +35,7 @@ import com.pekochan069.guitarlearner.presentation.contract.FoundationDestination
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.FoundationScreen
 import com.pekochan069.guitarlearner.presentation.contract.FoundationState
+import com.pekochan069.guitarlearner.presentation.contract.HeadstockLayoutUi
 import com.pekochan069.guitarlearner.presentation.contract.LanguageOption
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeConfigUi
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeNotice
@@ -65,6 +66,7 @@ class FoundationPresenter(
     @Composable
     override fun present(): FoundationState {
         var destinationId by rememberSaveable { mutableStateOf("home") }
+        var headstockLayout by rememberSaveable { mutableStateOf(HeadstockLayoutUi.ThreePlusThree) }
         var gallerySelected by rememberSaveable { mutableStateOf(true) }
         var overlay by rememberSaveable(stateSaver = OverlaySaver) { mutableStateOf<Overlay>(Overlay.None) }
         var settingsStatus by remember { mutableStateOf<SettingsStatus>(SettingsStatus.Idle) }
@@ -195,7 +197,7 @@ class FoundationPresenter(
             featureGroups = featureCatalog.filter { it.features.isNotEmpty() },
             developmentSamples = samples,
             canNavigateBack = destination != FoundationDestination.Home || visibleOverlay != Overlay.None,
-            tuner = tunerSnapshot.toUi(),
+            tuner = tunerSnapshot.toUi().copy(headstockLayout = headstockLayout),
             metronome = MetronomeUiState(
                 config = metronomeSnapshot.selected.toUi(),
                 playback = metronomeSnapshot.playback.toUi(),
@@ -226,6 +228,7 @@ class FoundationPresenter(
                     FoundationEvent.NavigateBack -> navigateBack()
                     FoundationEvent.StartTuner -> if (destinationId == "feature:tuner") tuner.submit(TunerRequest.Start)
                     FoundationEvent.StopTuner -> tuner.submit(TunerRequest.Stop)
+                    is FoundationEvent.SelectHeadstockLayout -> if (destinationId == "feature:tuner") headstockLayout = event.value
                     is FoundationEvent.SelectTunerTarget -> if (destinationId == "feature:tuner") tuner.submit(TunerRequest.SelectTarget(event.value.toDomain()))
                     is FoundationEvent.SelectTunerTolerance -> if (destinationId == "feature:tuner") tuner.submit(TunerRequest.SelectTolerance(event.value.toDomain()))
                     FoundationEvent.ReloadTunerTolerance -> tuner.submit(TunerRequest.ReloadTolerance)

@@ -33,6 +33,8 @@ import com.pekochan069.guitarlearner.domain.TunerRequest
 import com.pekochan069.guitarlearner.domain.TunerSnapshot
 import com.pekochan069.guitarlearner.domain.TunerTarget
 import com.pekochan069.guitarlearner.domain.TuningTolerance
+import com.pekochan069.guitarlearner.domain.TuningFeedback
+import com.pekochan069.guitarlearner.domain.TuningJudgment
 import com.pekochan069.guitarlearner.presentation.contract.AppearanceNotice
 import com.pekochan069.guitarlearner.presentation.contract.BeatAccentUi
 import com.pekochan069.guitarlearner.presentation.contract.BeatUnitUi
@@ -47,6 +49,7 @@ import com.pekochan069.guitarlearner.presentation.contract.MetronomeNotice
 import com.pekochan069.guitarlearner.presentation.contract.MetronomePlaybackUi
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeStopUi
 import com.pekochan069.guitarlearner.presentation.contract.GuitarStringUi
+import com.pekochan069.guitarlearner.presentation.contract.HeadstockLayoutUi
 import com.pekochan069.guitarlearner.presentation.contract.ToleranceUi
 import com.pekochan069.guitarlearner.presentation.contract.TunerActionUi
 import com.pekochan069.guitarlearner.presentation.contract.TunerListeningUi
@@ -323,6 +326,7 @@ class FoundationPresenterTest {
             assertEquals(TunerTargetUi.Automatic, state.tuner.target)
             assertEquals(ToleranceUi.Normal, state.tuner.tolerance)
             assertEquals(TunerListeningUi.Stopped, state.tuner.listening)
+            assertEquals(HeadstockLayoutUi.ThreePlusThree, state.tuner.headstockLayout)
             assertTrue(tuner.requests.isEmpty())
             state.eventSink(FoundationEvent.StartTuner)
             runCurrent()
@@ -331,6 +335,24 @@ class FoundationPresenterTest {
             state.eventSink(FoundationEvent.SelectTunerTarget(TunerTargetUi.Manual(GuitarStringUi.B3)))
             state = awaitItem()
             assertEquals(TunerTarget.Manual(StandardString.B3), tuner.current.value.target)
+            tuner.snapshot.value = tuner.snapshot.value.copy(listening = TunerListening.Listening(
+                TuningFeedback.Measured(StandardString.B3, 4.2, TuningJudgment.Settling)))
+            state = awaitItem()
+            val reading = state.tuner
+            val requests = tuner.requests.toList()
+            for (layout in listOf(HeadstockLayoutUi.InlineSix, HeadstockLayoutUi.ThreePlusThree, HeadstockLayoutUi.InlineSix)) {
+                state.eventSink(FoundationEvent.SelectHeadstockLayout(layout))
+                state = awaitItem()
+                assertEquals(reading.copy(headstockLayout = layout), state.tuner)
+                assertEquals(requests, tuner.requests)
+            }
+            state.eventSink(FoundationEvent.SelectHeadstockLayout(HeadstockLayoutUi.InlineSix))
+            runCurrent()
+            expectNoEvents()
+            assertEquals(requests, tuner.requests)
+            tuner.snapshot.value = tuner.snapshot.value.copy(listening = TunerListening.Stopped)
+            state = awaitItem()
+            assertEquals(TunerListeningUi.Stopped, state.tuner.listening)
             state.eventSink(FoundationEvent.SetSettingsOpen(true))
             state = awaitItem()
             state.eventSink(FoundationEvent.NavigateBack)
@@ -348,6 +370,7 @@ class FoundationPresenterTest {
                 state.eventSink(FoundationEvent.OpenFeature(FeatureId.Tuner))
                 state = awaitItem()
                 assertEquals(TunerTargetUi.Manual(GuitarStringUi.B3), state.tuner.target)
+                assertEquals(HeadstockLayoutUi.InlineSix, state.tuner.headstockLayout)
                 assertEquals(1, tuner.requests.count { it == TunerRequest.Start })
             }
         }

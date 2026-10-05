@@ -13,21 +13,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.GuitarStringUi
+import com.pekochan069.guitarlearner.presentation.contract.HeadstockLayoutUi
 import com.pekochan069.guitarlearner.presentation.contract.TunerFeedbackUi
 import com.pekochan069.guitarlearner.presentation.contract.TunerJudgmentUi
 import com.pekochan069.guitarlearner.presentation.contract.TunerListeningUi
+import com.pekochan069.guitarlearner.presentation.contract.TunerTargetUi
 import com.pekochan069.guitarlearner.presentation.contract.TunerUiState
 import com.pekochan069.guitarlearner.ui.demo.TunerScreen
 import com.pekochan069.guitarlearner.ui.theme.GuitarLearnerTheme
 import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -39,6 +53,7 @@ class TunerLayoutTest {
         val locale = mutableStateOf("en")
         val fontScale = mutableStateOf(1f)
         val state = mutableStateOf(TunerUiState())
+        val events = mutableListOf<FoundationEvent>()
         compose.setContent {
             val configuration = Configuration(LocalConfiguration.current).apply {
                 setLocale(Locale.forLanguageTag(locale.value))
@@ -52,7 +67,14 @@ class TunerLayoutTest {
                 GuitarLearnerTheme(false) {
                     Column(Modifier.width(320.dp).verticalScroll(rememberScrollState()).padding(24.dp),
                         verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                        TunerScreen(state.value) {}
+                        TunerScreen(state.value) { event ->
+                            events += event
+                            state.value = when (event) {
+                                is FoundationEvent.SelectHeadstockLayout -> state.value.copy(headstockLayout = event.value)
+                                is FoundationEvent.SelectTunerTarget -> state.value.copy(target = event.value)
+                                else -> state.value
+                            }
+                        }
                     }
                 }
             }
@@ -64,29 +86,106 @@ class TunerLayoutTest {
         } + listOf(-0.1, 0.1).map {
             TunerFeedbackUi.Measured(GuitarStringUi.E2, it, TunerJudgmentUi.Settling)
         } + listOf(TunerFeedbackUi.Uncertain, TunerFeedbackUi.PluckOneString, TunerFeedbackUi.WrongOctave)
-        for (language in listOf("en", "ko")) for (scale in listOf(1f, 2f)) {
+        for (language in listOf("en", "ko")) for (scale in listOf(1f, 2f)) for (layout in HeadstockLayoutUi.entries) {
             compose.runOnIdle {
                 locale.value = language
                 fontScale.value = scale
-                state.value = TunerUiState()
+                state.value = TunerUiState(headstockLayout = layout)
             }
+            compose.onNodeWithTag("tuner_headstock_" + layout.name).performScrollTo()
+                .assertIsSelected().assertHasClickAction().assertHeightIsAtLeast(48.dp)
+                .assertTextEquals(when (layout) {
+                    HeadstockLayoutUi.ThreePlusThree -> "3+3"
+                    HeadstockLayoutUi.InlineSix -> if (language == "ko") "일렬 6" else "Inline 6"
+                }).assertContentDescriptionEquals(when (layout) {
+                    HeadstockLayoutUi.ThreePlusThree -> if (language == "ko") "3+3 헤드스톡" else "3+3 headstock"
+                    HeadstockLayoutUi.InlineSix -> if (language == "ko") "일렬 6 헤드스톡" else "Inline 6 headstock"
+                }).performClick()
+            assertEquals(FoundationEvent.SelectHeadstockLayout(layout), events.last())
+            for (string in GuitarStringUi.entries) {
+                compose.onAllNodesWithTag("tuner_string_" + string.name).assertCountEquals(1)
+                compose.onNodeWithTag("tuner_string_" + string.name).performScrollTo()
+                    .assertTextEquals(string.note + string.octave)
+                    .assertContentDescriptionEquals(if (language == "ko")
+                        "${string.number}번 줄 · ${string.note}${string.octave}" else "String ${string.number} · ${string.note}${string.octave}")
+                    .assertHasClickAction().assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).assertIsNotSelected()
+            }
+            compose.onNodeWithTag("tuner_auto").performScrollTo().assertIsSelected()
             val note = compose.onNodeWithTag("tuner_note").getUnclippedBoundsInRoot()
-            val controls = compose.onNodeWithTag("tuner_auto").getUnclippedBoundsInRoot()
+            val controls = (listOf("tuner_auto") + GuitarStringUi.entries.map { "tuner_string_" + it.name }).associateWith {
+                compose.onNodeWithTag(it).getUnclippedBoundsInRoot()
+            }
+            val readingBottom = compose.onNodeWithTag("tuner_cents_placeholder").getUnclippedBoundsInRoot().bottom
+            assertTrue("Auto must follow the reading", controls.getValue("tuner_auto").top > readingBottom)
+            val stringBounds = GuitarStringUi.entries.associateWith { controls.getValue("tuner_string_" + it.name) }
+            stringBounds.values.forEach { assertTrue("Manual controls must follow Auto", it.top > controls.getValue("tuner_auto").bottom) }
+            val bounds = stringBounds.values.toList()
+            for (first in bounds.indices) for (second in first + 1 until bounds.size) {
+                val a = bounds[first]
+                val b = bounds[second]
+                assertTrue("String controls overlap for $language/$scale/$layout",
+                    a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top)
+            }
+            val leftOrder = when (layout) {
+                HeadstockLayoutUi.ThreePlusThree -> listOf(GuitarStringUi.D3, GuitarStringUi.A2, GuitarStringUi.E2)
+                HeadstockLayoutUi.InlineSix -> listOf(GuitarStringUi.E4, GuitarStringUi.B3, GuitarStringUi.G3,
+                    GuitarStringUi.D3, GuitarStringUi.A2, GuitarStringUi.E2)
+            }
+            leftOrder.zipWithNext().forEach { (first, next) ->
+                assertTrue("Strings must descend from the tip to the nut", stringBounds.getValue(first).bottom <= stringBounds.getValue(next).top)
+                assertEquals(stringBounds.getValue(first).left, stringBounds.getValue(next).left)
+            }
+            if (layout == HeadstockLayoutUi.ThreePlusThree) {
+                leftOrder.zip(listOf(GuitarStringUi.G3, GuitarStringUi.B3, GuitarStringUi.E4)).forEach { (left, right) ->
+                    val a = stringBounds.getValue(left)
+                    val b = stringBounds.getValue(right)
+                    assertEquals("Paired strings must share a row", a.top, b.top)
+                    assertEquals("Paired strings must share a row", a.bottom, b.bottom)
+                    assertTrue("Paired strings must face each other", a.right < b.left)
+                }
+            }
             for (feedback in feedbacks) {
                 compose.runOnIdle { state.value = state.value.copy(listening = TunerListeningUi.Listening(feedback)) }
-                assertEquals("Controls moved for $language/$scale/$feedback", controls,
-                    compose.onNodeWithTag("tuner_auto").getUnclippedBoundsInRoot())
-                assertEquals("Note moved for $language/$scale/$feedback", note,
+                controls.forEach { (tag, bounds) ->
+                    assertEquals("$tag moved for $language/$scale/$layout/$feedback", bounds,
+                        compose.onNodeWithTag(tag).getUnclippedBoundsInRoot())
+                }
+                assertEquals("Note moved for $language/$scale/$layout/$feedback", note,
                     compose.onNodeWithTag("tuner_note").getUnclippedBoundsInRoot())
                 if (feedback !is TunerFeedbackUi.Measured) {
                     compose.onNodeWithTag("tuner_cents").assertDoesNotExist()
                     compose.onNodeWithTag("tuner_note").assertTextEquals("--")
-                } else if (feedback.cents in -0.1..0.1) {
-                    compose.onNodeWithTag("tuner_cents").assertTextEquals(if (language == "ko") "+0센트" else "+0 cents")
+                } else {
+                    val string = feedback.string
+                    compose.onNodeWithTag("tuner_string_" + string.name).assertIsNotSelected()
+                    compose.onNodeWithTag("tuner_note").assertContentDescriptionEquals(if (language == "ko")
+                        "${string.number}번 줄 · ${string.note}${string.octave}" else "String ${string.number} · ${string.note}${string.octave}")
+                    if (feedback.cents in -0.1..0.1) {
+                        compose.onNodeWithTag("tuner_cents").assertTextEquals(if (language == "ko") "+0센트" else "+0 cents")
+                    }
                 }
             }
             compose.onNodeWithTag("tuner_status").assertTextEquals(if (language == "ko")
                 "선택한 개방현을 튕기세요" else "Pluck the selected open string")
+            for (string in GuitarStringUi.entries) {
+                compose.onNodeWithTag("tuner_string_" + string.name).performScrollTo()
+                    .performClick().assertIsSelected()
+                compose.onNodeWithTag("tuner_auto").assertIsNotSelected()
+                assertEquals(FoundationEvent.SelectTunerTarget(TunerTargetUi.Manual(string)), events.last())
+                compose.onNodeWithTag("tuner_note").assertTextEquals(string.note + when (string.octave) {
+                    2 -> "₂"
+                    3 -> "₃"
+                    else -> "₄"
+                })
+            }
+            val other = HeadstockLayoutUi.entries.first { it != layout }
+            compose.onNodeWithTag("tuner_headstock_" + other.name).performScrollTo().performClick().assertIsSelected()
+            assertEquals(FoundationEvent.SelectHeadstockLayout(other), events.last())
+            compose.onNodeWithTag("tuner_string_E4").assertIsSelected()
+            compose.onNodeWithTag("tuner_note").assertTextEquals("E₄")
+            compose.onNodeWithTag("tuner_auto").performScrollTo().performClick().assertIsSelected()
+            assertEquals(FoundationEvent.SelectTunerTarget(TunerTargetUi.Automatic), events.last())
+            compose.onNodeWithTag("tuner_note").assertTextEquals("--")
         }
     }
 }

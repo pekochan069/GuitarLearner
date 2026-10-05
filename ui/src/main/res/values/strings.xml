@@ -24,6 +24,10 @@
     <string name="gallery_subtitle">Buttons, typography, colors, and shapes</string>
     <string name="gallery_demo_notice">Select a control to change its example state.</string>
     <string name="tuner_target">Target string</string>
+    <string name="tuner_headstock_three_plus_three">3+3</string>
+    <string name="tuner_headstock_inline_six">Inline 6</string>
+    <string name="tuner_headstock_three_plus_three_description">3+3 headstock</string>
+    <string name="tuner_headstock_inline_six_description">Inline 6 headstock</string>
     <string name="tuner_target_description">Auto finds the nearest standard string. Select a string to tune it manually.</string>
     <string name="tuner_auto">Auto</string>
     <string name="tuner_string_option">String %1$d · %2$s</string>

@@ -4,6 +4,8 @@ enum class GuitarStringUi(val number: Int, val note: String, val octave: Int) {
     E2(6, "E", 2), A2(5, "A", 2), D3(4, "D", 3), G3(3, "G", 3), B3(2, "B", 3), E4(1, "E", 4),
 }
 
+enum class HeadstockLayoutUi { ThreePlusThree, InlineSix }
+
 sealed interface TunerTargetUi {
     data object Automatic : TunerTargetUi
     data class Manual(val string: GuitarStringUi) : TunerTargetUi
@@ -35,4 +37,5 @@ data class TunerUiState(
     val listening: TunerListeningUi = TunerListeningUi.Stopped,
     val savingTolerance: Boolean = false,
     val preferenceNotice: TunerNoticeUi? = null,
+    val headstockLayout: HeadstockLayoutUi = HeadstockLayoutUi.ThreePlusThree,
 )
