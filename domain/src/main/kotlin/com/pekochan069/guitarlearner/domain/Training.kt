@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 enum class TrainingSubject { Note, Interval }
 enum class TrainingRepresentation { Listening, Staff, Fretboard, Tab }
+enum class TrainingInstrument { Piano, Guitar }
 enum class IntervalPresentation { Ascending, Descending, Harmonic }
 enum class TrainingInterval(val semitones: Int) {
     Unison(0), MinorSecond(1), MajorSecond(2), MinorThird(3), MajorThird(4), PerfectFourth(5),
@@ -19,6 +20,7 @@ class TrainingSettings(
     val representation: TrainingRepresentation = TrainingRepresentation.Listening,
     val intervalPresentation: IntervalPresentation = IntervalPresentation.Ascending,
     intervals: Set<TrainingInterval> = TrainingInterval.entries.toSet(),
+    val instrument: TrainingInstrument = TrainingInstrument.Piano,
 ) {
     val intervals: Set<TrainingInterval> = Collections.unmodifiableSet(intervals.toSet())
 
@@ -27,13 +29,14 @@ class TrainingSettings(
         representation: TrainingRepresentation = this.representation,
         intervalPresentation: IntervalPresentation = this.intervalPresentation,
         intervals: Set<TrainingInterval> = this.intervals,
-    ): TrainingSettings = TrainingSettings(subject, representation, intervalPresentation, intervals)
+        instrument: TrainingInstrument = this.instrument,
+    ): TrainingSettings = TrainingSettings(subject, representation, intervalPresentation, intervals, instrument)
 
     override fun equals(other: Any?): Boolean = other is TrainingSettings && subject == other.subject &&
-        representation == other.representation && intervalPresentation == other.intervalPresentation && intervals == other.intervals
+        representation == other.representation && intervalPresentation == other.intervalPresentation && intervals == other.intervals && instrument == other.instrument
 
-    override fun hashCode(): Int = 31 * (31 * (31 * subject.hashCode() + representation.hashCode()) +
-        intervalPresentation.hashCode()) + intervals.hashCode()
+    override fun hashCode(): Int = 31 * (31 * (31 * (31 * subject.hashCode() + representation.hashCode()) +
+        intervalPresentation.hashCode()) + intervals.hashCode()) + instrument.hashCode()
 }
 
 data class TrainingPosition(val stringIndex: Int, val fret: Int) {

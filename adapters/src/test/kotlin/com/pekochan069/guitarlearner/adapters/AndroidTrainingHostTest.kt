@@ -76,6 +76,32 @@ class AndroidTrainingHostTest {
         assertEquals(1, rig.outputs.size)
     }
 
+    @Test fun questionComparisonAndNextKeepTheSessionInstrumentWhenFutureSettingsChange() = runTest {
+        for (instrument in TrainingInstrument.entries) {
+            val rig = Rig(this)
+            rig.host.submit(TrainingRequest.SetSettings(TrainingSettings(instrument = instrument)))
+            runCurrent()
+            rig.start()
+            assertEquals(instrument, rig.outputs.single().tone!!.instrument)
+            val session = rig.session()
+            val other = TrainingInstrument.entries.first { it != instrument }
+            rig.host.submit(TrainingRequest.SetSettings(rig.host.current.value.settings.copy(instrument = other)))
+            runCurrent()
+            rig.host.submit(TrainingRequest.Replay(session.key, TrainingSound.Comparison))
+            runCurrent()
+            assertEquals(listOf(60), rig.outputs.last().tone!!.pitches)
+            assertEquals(instrument, rig.outputs.last().tone!!.instrument)
+            rig.host.submit(TrainingRequest.Answer(session.key, session.question.answer))
+            rig.host.submit(TrainingRequest.Next(session.key))
+            runCurrent()
+            assertEquals(instrument, rig.outputs.last().tone!!.instrument)
+            rig.host.submit(TrainingRequest.Exit)
+            rig.start()
+            assertEquals(other, rig.outputs.last().tone!!.instrument)
+            rig.host.close()
+        }
+    }
+
     @Test fun failedPlaybackAndFinalShutdownAreFailuresAndRetainTheOutputForRetry() = runTest {
         val rig = Rig(this)
         rig.start()

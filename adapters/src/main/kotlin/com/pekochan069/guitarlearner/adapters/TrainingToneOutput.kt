@@ -17,6 +17,11 @@ import arrow.core.left
 import arrow.core.right
 import com.pekochan069.guitarlearner.domain.IntervalPresentation
 import com.pekochan069.guitarlearner.domain.TrainingFailure
+import com.pekochan069.guitarlearner.domain.TrainingInstrument
+import java.io.IOException
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -24,12 +29,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
-import kotlin.math.PI
-import kotlin.math.min
-import kotlin.math.pow
-import kotlin.math.sin
 
-internal data class TrainingTone(val pitches: List<Int>, val presentation: IntervalPresentation) {
+internal data class TrainingTone(val pitches: List<Int>, val presentation: IntervalPresentation, val instrument: TrainingInstrument = TrainingInstrument.Piano) {
     init { require(pitches.size in 1..2 && pitches.all { it in 40..76 }) }
 }
 
@@ -47,20 +48,17 @@ internal object TrainingPcm {
     const val NOTE_FRAMES: Int = 31_200
     const val GAP_FRAMES: Int = 6_720
 
-    fun render(tone: TrainingTone): ShortArray {
+    fun render(tone: TrainingTone, samples: (TrainingInstrument, Int) -> ShortArray): ShortArray {
         val simultaneous = tone.presentation == IntervalPresentation.Harmonic || tone.pitches.size == 1
         val pitches = if (tone.presentation == IntervalPresentation.Descending) tone.pitches.reversed() else tone.pitches
+        val sources = pitches.map { midi -> samples(tone.instrument, midi).also { require(it.size == NOTE_FRAMES) } }
         val frames = if (simultaneous) NOTE_FRAMES else NOTE_FRAMES * 2 + GAP_FRAMES
         return ShortArray(frames) { frame ->
             val local = if (simultaneous) frame else frame % (NOTE_FRAMES + GAP_FRAMES)
             if (local >= NOTE_FRAMES) 0 else {
-                val sounding = if (simultaneous) pitches else listOf(pitches[frame / (NOTE_FRAMES + GAP_FRAMES)])
-                val envelope = min(1.0, min(local, NOTE_FRAMES - 1 - local).toDouble() / 480.0)
-                val value = sounding.sumOf { midi ->
-                    val frequency = 440.0 * 2.0.pow((midi - 69) / 12.0)
-                    sin(2.0 * PI * frequency * local / SAMPLE_RATE)
-                } / sounding.size
-                (value * envelope * 12_000.0).toInt().toShort()
+                val value = if (simultaneous) sources.sumOf { it[local].toInt() }.toDouble() / sources.size
+                    else sources[frame / (NOTE_FRAMES + GAP_FRAMES)][local].toDouble()
+                value.toInt().toShort()
             }
         }
     }
@@ -92,7 +90,12 @@ internal class AndroidTrainingToneOutput(
         var cleanupFailure: TrainingFailure? = null
         val result = try {
             withContext(worker) {
-                val samples = TrainingPcm.render(tone)
+                val samples = TrainingPcm.render(tone) { instrument, midi ->
+                    val bytes = application.assets.open("training/${instrument.name.lowercase(Locale.ROOT)}/$midi.pcm").use { it.readBytes() }
+                    require(bytes.size == TrainingPcm.NOTE_FRAMES * Short.SIZE_BYTES)
+                    val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+                    ShortArray(TrainingPcm.NOTE_FRAMES) { buffer.short }
+                }
                 coroutineContext.ensureActive()
                 val audio = synchronized(gate) {
                     if (stopped || !permitted()) return@withContext TrainingFailure.OutputInterrupted.left()
@@ -131,6 +134,8 @@ internal class AndroidTrainingToneOutput(
                 }
                 TrainingFailure.PlaybackFailed.left()
             }
+        } catch (_: IOException) {
+            TrainingFailure.PlaybackFailed.left()
         } catch (failure: IllegalStateException) {
             if (failure is CancellationException) throw failure
             TrainingFailure.PlaybackFailed.left()

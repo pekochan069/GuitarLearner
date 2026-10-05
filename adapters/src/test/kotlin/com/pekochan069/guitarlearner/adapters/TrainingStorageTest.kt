@@ -12,8 +12,10 @@ class TrainingStorageTest {
         for (subject in TrainingSubject.entries) for (representation in TrainingRepresentation.entries) {
             for (presentation in IntervalPresentation.entries) for (pool in listOf(emptySet(), TrainingInterval.entries.toSet(),
                 setOf(TrainingInterval.MinorThird, TrainingInterval.PerfectFifth))) {
-                val settings = TrainingSettings(subject, representation, presentation, pool)
-                assertEquals(settings, decodeTrainingSettings(encodeTrainingSettings(settings)))
+                for (instrument in TrainingInstrument.entries) {
+                    val settings = TrainingSettings(subject, representation, presentation, pool, instrument)
+                    assertEquals(settings, decodeTrainingSettings(encodeTrainingSettings(settings)))
+                }
             }
         }
         val preferences = Preferences(null)
@@ -23,6 +25,23 @@ class TrainingStorageTest {
             IntervalPresentation.Descending, setOf(TrainingInterval.Octave))
         assertEquals(Either.Right(Unit), store.write(selected))
         assertEquals(Either.Right(selected), TrainingStorage(preferences.value).read())
+    }
+
+    @Test fun legacySettingsLoadPianoAndOnlyASuccessfulSaveUpgradesToTheInstrumentFormat() {
+        val legacy = "1|Interval|Staff|Descending|Unison,Octave"
+        val preferences = Preferences(legacy)
+        val store = TrainingStorage(preferences.value)
+        val settings = TrainingSettings(TrainingSubject.Interval, TrainingRepresentation.Staff, IntervalPresentation.Descending,
+            setOf(TrainingInterval.Unison, TrainingInterval.Octave))
+        assertEquals(Either.Right(settings), store.read())
+        assertEquals(TrainingInstrument.Piano, requireNotNull(store.read().getOrNull()).instrument)
+        val guitar = settings.copy(instrument = TrainingInstrument.Guitar)
+        preferences.failNextCommit = true
+        assertEquals(Either.Left(TrainingFailure.SettingsWriteFailed), store.write(guitar))
+        assertEquals(legacy, preferences.source)
+        assertEquals(Either.Right(Unit), store.write(guitar))
+        assertEquals("2|Interval|Staff|Descending|Unison,Octave|Guitar", preferences.source)
+        assertEquals(Either.Right(guitar), TrainingStorage(preferences.value).read())
     }
 
     @Test fun failedCommitRestoresAcceptedMemoryAndRetryPersistsOnlyTheAcknowledgedSelection() {
@@ -49,7 +68,8 @@ class TrainingStorageTest {
     @Test fun malformedSourcesCannotBeOverwrittenAndExplicitReloadAllowsRecovery() {
         val valid = encodeTrainingSettings(TrainingSettings())
         for (source in listOf("", "2|Note|Listening|Ascending|", "1|Note|Missing|Ascending|",
-            "1|Note|Listening|Ascending|Unison,Unison", "1|Note|Listening|Ascending|Unknown", 17)) {
+            "1|Note|Listening|Ascending|Unison,Unison", "1|Note|Listening|Ascending|Unknown",
+            "2|Note|Listening|Ascending|Unison,Unison|Piano", "2|Note|Listening|Ascending||Missing", 17)) {
             val preferences = Preferences(source)
             val store = TrainingStorage(preferences.value)
             assertEquals(Either.Left(TrainingFailure.SettingsReadFailed), store.read())

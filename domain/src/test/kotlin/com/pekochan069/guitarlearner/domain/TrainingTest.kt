@@ -97,5 +97,17 @@ class TrainingTest {
         assertThrows(IllegalArgumentException::class.java) { TrainingStage.Results(TrainingSettings(), emptyList()) }
     }
 
+    @Test fun chosenInstrumentIsPartOfSettingsAndRemainsFrozenInTheSession() {
+        val guitar = TrainingSettings(instrument = TrainingInstrument.Guitar)
+        val piano = guitar.copy(instrument = TrainingInstrument.Piano)
+        assertEquals(guitar, guitar.copy())
+        assertFalse(guitar == piano)
+        assertEquals(2, setOf(guitar, piano).size)
+        val started = requireNotNull(TrainingSession.start(1, guitar) { 0 }.getOrNull())
+        val answered = started.answer(started.key, started.question.answer)
+        assertEquals(TrainingInstrument.Guitar, (answered.next(answered.key) as TrainingStage.Active).session.settings.instrument)
+        assertEquals(TrainingInstrument.Piano, TrainingSettings().instrument)
+    }
+
     private fun session(): TrainingSession = requireNotNull(TrainingSession.start(1, TrainingSettings()) { 0 }.getOrNull())
 }

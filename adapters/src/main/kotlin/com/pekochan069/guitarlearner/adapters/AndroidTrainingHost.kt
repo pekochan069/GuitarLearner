@@ -120,7 +120,7 @@ class AndroidTrainingHost internal constructor(
                         } }
                         output = requestedOutput
                         val pitches = if (sound == TrainingSound.Comparison) listOf(60) else session.question.positions.map { it.midi }
-                        requestedOutput.play(TrainingTone(pitches, session.settings.intervalPresentation)) {
+                        requestedOutput.play(TrainingTone(pitches, session.settings.intervalPresentation, session.settings.instrument)) {
                             withContext(main) {
                                 if (accepts(token, key)) snapshot.value = snapshot.value.copy(audio = TrainingAudioStatus.Playing(sound))
                             }

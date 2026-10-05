@@ -7,6 +7,7 @@ import arrow.core.right
 import com.pekochan069.guitarlearner.domain.IntervalPresentation
 import com.pekochan069.guitarlearner.domain.TrainingFailure
 import com.pekochan069.guitarlearner.domain.TrainingInterval
+import com.pekochan069.guitarlearner.domain.TrainingInstrument
 import com.pekochan069.guitarlearner.domain.TrainingRepresentation
 import com.pekochan069.guitarlearner.domain.TrainingSettings
 import com.pekochan069.guitarlearner.domain.TrainingSubject
@@ -66,15 +67,16 @@ internal class TrainingStorage(private val preferences: SharedPreferences) : Tra
     companion object { const val KEY: String = "settings_v1" }
 }
 
-internal fun encodeTrainingSettings(settings: TrainingSettings): String = listOf("1", settings.subject.name,
+internal fun encodeTrainingSettings(settings: TrainingSettings): String = listOf("2", settings.subject.name,
     settings.representation.name, settings.intervalPresentation.name,
-    settings.intervals.sortedBy { it.semitones }.joinToString(",") { it.name }).joinToString("|")
+    settings.intervals.sortedBy { it.semitones }.joinToString(",") { it.name }, settings.instrument.name).joinToString("|")
 
 internal fun decodeTrainingSettings(source: String): TrainingSettings {
     val values = source.split('|')
-    require(values.size == 5 && values[0] == "1")
+    require(values.size == 5 && values[0] == "1" || values.size == 6 && values[0] == "2")
     val intervals = if (values[4].isEmpty()) emptyList() else values[4].split(',').map(TrainingInterval::valueOf)
     require(intervals.distinct().size == intervals.size)
     return TrainingSettings(TrainingSubject.valueOf(values[1]), TrainingRepresentation.valueOf(values[2]),
-        IntervalPresentation.valueOf(values[3]), intervals.toSet())
+        IntervalPresentation.valueOf(values[3]), intervals.toSet(),
+        if (values[0] == "1") TrainingInstrument.Piano else TrainingInstrument.valueOf(values[5]))
 }
