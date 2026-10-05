@@ -64,7 +64,11 @@
     <string name="chord_delete_title">저장한 코드를 삭제할까요?</string>
     <string name="chord_delete_description">이 휴대폰에서 “%1$s”을 삭제합니다. 현재 초안은 별도로 유지됩니다.</string>
     <string name="chord_cancel">취소</string>
-    <string name="chord_fretboard_help">상대 프렛 · O 개방현 · X 뮤트 · 1 근음</string>
+    <string name="chord_fretboard_help">상대 프렛 · O 개방현 · X 뮤트 · 진한 점 근음</string>
+    <string name="chord_fretboard_edit_help">프렛을 눌러 음을 놓고, 다시 누르면 뮤트됩니다. 옆으로 밀어 높은 프렛을 보세요.</string>
+    <string name="chord_string_axis">현</string>
+    <string name="chord_precise_input">프렛 번호로 입력</string>
+    <string name="chord_hide_precise_input">프렛 번호 입력 접기</string>
     <string name="chord_fret_position">상대 %1$d프렛</string>
     <string name="chord_string_description">%1$d번 줄, %2$s</string>
     <string name="chord_tone_description">울리는 음 %1$s</string>

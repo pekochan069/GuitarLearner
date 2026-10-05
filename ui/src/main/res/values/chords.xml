@@ -64,7 +64,11 @@
     <string name="chord_delete_title">Delete saved chord?</string>
     <string name="chord_delete_description">Remove “%1$s” from this phone. The current draft remains independent.</string>
     <string name="chord_cancel">Cancel</string>
-    <string name="chord_fretboard_help">Relative frets · O open · X muted · 1 root</string>
+    <string name="chord_fretboard_help">Relative frets · O open · X muted · dark dot: root</string>
+    <string name="chord_fretboard_edit_help">Tap a fret to place a note; tap it again to mute. Swipe for higher frets.</string>
+    <string name="chord_string_axis">String</string>
+    <string name="chord_precise_input">Enter fret numbers</string>
+    <string name="chord_hide_precise_input">Hide fret number inputs</string>
     <string name="chord_fret_position">relative fret %1$d</string>
     <string name="chord_string_description">String %1$d, %2$s</string>
     <string name="chord_tone_description">sounds %1$s</string>

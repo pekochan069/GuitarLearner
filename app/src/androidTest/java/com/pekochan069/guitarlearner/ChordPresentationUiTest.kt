@@ -1,6 +1,7 @@
 package com.pekochan069.guitarlearner
 
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.view.ContextThemeWrapper
 import androidx.activity.ComponentActivity
@@ -12,9 +13,12 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
@@ -94,6 +98,13 @@ class ChordPresentationUiTest {
         click("chord_new")
         compose.waitUntil(5_000) { !host.current.value.draft.shape.hasSound }
         compose.onNodeWithTag("chord_save").assertIsNotEnabled()
+        compose.onNodeWithTag("chord_fret_0").assertDoesNotExist()
+        val treble = compose.onNodeWithTag("chord_editor_position_5").getUnclippedBoundsInRoot()
+        val bass = compose.onNodeWithTag("chord_editor_position_0").getUnclippedBoundsInRoot()
+        assertTrue(treble.top < bass.top)
+        setFret(0, 12)
+        compose.onNodeWithTag("chord_editor_fret_0_12").assertIsOn().performClick()
+        compose.waitUntil(5_000) { host.current.value.draft.shape.stops[0] == StringStop.Muted }
         setFret(1, 3)
         setFret(2, 2)
         setOpen(3)
@@ -133,6 +144,9 @@ class ChordPresentationUiTest {
     }
 
     @Test fun englishLightLargeTextKeepsInputCorrectionAndOmissionsAccessible() { largeTextInputCorrectionJourney(Locale.ENGLISH, false) }
+    @Test fun englishLightLandscapeLargeTextKeepsInputCorrectionAndOmissionsAccessible() {
+        largeTextInputCorrectionJourney(Locale.ENGLISH, false, landscape = true)
+    }
     @Test fun koreanDarkLargeTextKeepsInputCorrectionAndOmissionsAccessible() { largeTextInputCorrectionJourney(Locale.KOREAN, true) }
 
     @Test fun unreadableCollectionShowsRecoveryUntilStorageCanConfirmItIsEmpty() {
@@ -153,7 +167,11 @@ class ChordPresentationUiTest {
         compose.onNodeWithTag("chord_collection_empty").assertExists()
     }
 
-    private fun largeTextInputCorrectionJourney(locale: Locale, dark: Boolean) {
+    private fun largeTextInputCorrectionJourney(locale: Locale, dark: Boolean, landscape: Boolean = false) {
+        if (landscape) {
+            compose.runOnUiThread { compose.activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+            compose.waitUntil(5_000) { compose.activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
+        }
         runBlocking {
             val stops = listOf(StringStop.Muted, StringStop.Fretted(3), StringStop.Fretted(2), StringStop.Fretted(3), StringStop.Fretted(1), StringStop.Open)
             for (index in 0..5) assertEquals(Either.Right(Unit), host.execute(ChordCommand.SetStop(index, stops[index])))
@@ -193,6 +211,9 @@ class ChordPresentationUiTest {
         click("chord_close_context")
         compose.onNodeWithTag("chord_context_error").assertDoesNotExist()
         compose.onNodeWithTag("chord_save").performScrollTo().assertIsEnabled()
+        compose.onNodeWithTag("chord_editor_fret_5_0").performScrollTo().assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+        click("chord_precise_input")
         compose.onNodeWithTag("chord_stop_5_Open").performScrollTo().assertHasClickAction().assertHeightIsAtLeast(48.dp)
         compose.onNodeWithTag("chord_editor_fretboard").assertExists()
         compose.onNodeWithTag("chord_editor_position_0").assertContentDescriptionEquals(
@@ -225,13 +246,13 @@ class ChordPresentationUiTest {
         }
     }
     private fun setFret(index: Int, fret: Int) {
-        click("chord_stop_${index}_Fretted")
-        compose.waitUntil(5_000) { host.current.value.draft.shape.stops[index] is StringStop.Fretted }
-        compose.onNodeWithTag("chord_fret_$index").performScrollTo().performTextReplacement(fret.toString())
+        compose.onNodeWithTag("chord_editor_fret_${index}_$fret").performScrollTo()
+            .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp).performClick()
         compose.waitUntil(5_000) { host.current.value.draft.shape.stops[index] == StringStop.Fretted(fret) }
+        compose.onNodeWithTag("chord_editor_fret_${index}_$fret").assertIsOn()
     }
     private fun setOpen(index: Int) {
-        click("chord_stop_${index}_Open")
+        compose.onNodeWithTag("chord_editor_fret_${index}_0").performScrollTo().performClick()
         compose.waitUntil(5_000) { host.current.value.draft.shape.stops[index] == StringStop.Open }
     }
 }

@@ -8,14 +8,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -31,6 +30,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -48,12 +49,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -82,10 +86,12 @@ import com.pekochan069.guitarlearner.ui.R
 @Composable
 fun ChordTool(state: ChordUiState, eventSink: (ChordEvent) -> Unit) {
     var contextOpen by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val openContext = { focusManager.clearFocus(); contextOpen = true }
     Column(Modifier.fillMaxWidth().testTag("chord_tool"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         PrimaryScrollableTabRow(selectedTabIndex = state.section.ordinal, edgePadding = 0.dp) {
             ChordSection.entries.forEach { section ->
-                Tab(selected = state.section == section, onClick = { eventSink(ChordEvent.SetSection(section)) },
+                Tab(selected = state.section == section, onClick = { focusManager.clearFocus(); eventSink(ChordEvent.SetSection(section)) },
                     modifier = Modifier.heightIn(min = 48.dp).testTag("chord_section_" + section.name),
                     text = { Text(stringResource(section.label), maxLines = 1) })
             }
@@ -103,8 +109,8 @@ fun ChordTool(state: ChordUiState, eventSink: (ChordEvent) -> Unit) {
             StatusText(stringResource(it.label), "chord_action_error", error = true)
         }
         when (state.section) {
-            ChordSection.Lookup -> ChordLookupContent(state, eventSink) { contextOpen = true }
-            ChordSection.Edit -> ChordEditor(state, eventSink) { contextOpen = true }
+            ChordSection.Lookup -> ChordLookupContent(state, eventSink, openContext)
+            ChordSection.Edit -> ChordEditor(state, eventSink, openContext)
             ChordSection.Collection -> ChordCollection(state, eventSink)
         }
     }
@@ -211,7 +217,7 @@ private fun ChordLookupContent(state: ChordUiState, eventSink: (ChordEvent) -> U
                 Text(state.lookupNotes, Modifier.testTag("chord_lookup_notes"), style = MaterialTheme.typography.bodyMedium)
                 if (state.lookupOmitted.isNotEmpty()) Text(stringResource(R.string.chord_lookup_omitted, state.lookupOmitted),
                     Modifier.testTag("chord_lookup_omitted"), style = MaterialTheme.typography.bodyMedium)
-                ChordFretboard(state.lookupStrings, "chord_lookup")
+                ChordFretboard(state.lookupStrings, "chord_lookup", state.capo)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { eventSink(ChordEvent.SelectRepresentative(state.representativeIndex - 1)) },
@@ -236,6 +242,7 @@ private fun ChordLookupContent(state: ChordUiState, eventSink: (ChordEvent) -> U
 
 @Composable
 private fun ChordEditor(state: ChordUiState, eventSink: (ChordEvent) -> Unit, openContext: () -> Unit) {
+    var preciseInput by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (state.unsynced) {
             StatusText(stringResource(R.string.chord_draft_unsynced), "chord_draft_status", error = true)
@@ -244,7 +251,7 @@ private fun ChordEditor(state: ChordUiState, eventSink: (ChordEvent) -> Unit, op
         }
         state.targetName?.let { Text(stringResource(R.string.chord_target, it), style = MaterialTheme.typography.bodyMedium) }
         ChordSummary(state.analysis, state.soundingSymbol, state.shapeSymbol, state.notes)
-        ChordFretboard(state.strings, "chord_editor")
+        ChordFretboard(state.strings, "chord_editor", state.capo, eventSink)
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ChordContextButton(state, openContext)
@@ -271,7 +278,12 @@ private fun ChordEditor(state: ChordUiState, eventSink: (ChordEvent) -> Unit, op
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("chord_save")) {
             Text(stringResource(if (state.busy) R.string.chord_saving else R.string.chord_save))
         }
-        state.strings.forEach { ChordStringControls(it, eventSink) }
+        TextButton(onClick = { preciseInput = !preciseInput }, modifier = Modifier.heightIn(min = 48.dp).testTag("chord_precise_input")) {
+            Text(stringResource(if (preciseInput) R.string.chord_hide_precise_input else R.string.chord_precise_input))
+        }
+        if (preciseInput || state.strings.any { it.fretError }) {
+            state.strings.forEach { ChordStringControls(it, eventSink) }
+        }
     }
 }
 
@@ -338,29 +350,32 @@ private fun ChordSummary(analysis: ChordAnalysisUi, sounding: String?, shape: St
 }
 
 @Composable
-private fun ChordFretboard(strings: List<ChordStringUi>, tag: String) {
-    val line = MaterialTheme.colorScheme.outlineVariant
-    val fontScale = LocalDensity.current.fontScale
-    val stringWidth = 48.dp
-    val headerHeight = 44.dp * fontScale
-    val fretHeight = 36.dp * fontScale
+private fun ChordFretboard(strings: List<ChordStringUi>, tag: String, capo: Int,
+    eventSink: ((ChordEvent) -> Unit)? = null) {
+    val colors = MaterialTheme.colorScheme
+    val focusManager = LocalFocusManager.current
+    val labelStyle = MaterialTheme.typography.labelMedium
+    val cellSize = with(LocalDensity.current) {
+        labelStyle.lineHeight.toDp() + if (eventSink == null) 8.dp else 16.dp
+    }.coerceAtLeast(if (eventSink == null) 28.dp else 48.dp)
+    val labelWidth = with(LocalDensity.current) { labelStyle.fontSize.toDp() * 4 }.coerceAtLeast(cellSize)
+    val headerHeight = with(LocalDensity.current) { labelStyle.lineHeight.toDp() + 8.dp }.coerceAtLeast(32.dp)
+    val markerSize = with(LocalDensity.current) { labelStyle.lineHeight.toDp() + 12.dp }.coerceAtMost(cellSize - 4.dp)
     val selectedFrets = strings.filter { it.stop == ChordStopUi.Fretted }.map { it.fret }
-    val lastFret = maxOf(4, selectedFrets.maxOrNull() ?: 4)
-    val firstFret = minOf(selectedFrets.minOrNull() ?: 1, lastFret - 3)
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(stringResource(R.string.chord_fretboard_help), style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Row(Modifier.horizontalScroll(rememberScrollState()).testTag(tag + "_fretboard")) {
-                Column(Modifier.width(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Spacer(Modifier.height(headerHeight))
-                    for (fret in firstFret..lastFret) {
-                        Box(Modifier.height(fretHeight), contentAlignment = Alignment.Center) {
-                            Text(fret.toString(), style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
+    val lastFret = 12
+    val lowestFret = selectedFrets.minOrNull() ?: 1
+    val firstFret = if (eventSink != null || lowestFret <= 4) 1 else minOf(lowestFret, lastFret - 3)
+    val frets = listOf(0) + (firstFret..lastFret)
+    val visibleStrings = strings.reversed()
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(if (eventSink == null) R.string.chord_fretboard_help else R.string.chord_fretboard_edit_help),
+            style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+        Row(Modifier.fillMaxWidth().testTag(tag + "_fretboard")) {
+            Column(Modifier.width(labelWidth)) {
+                Box(Modifier.size(labelWidth, headerHeight), contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.chord_string_axis), style = labelStyle)
                 }
-                strings.forEach { string ->
+                visibleStrings.forEach { string ->
                     val position = when (string.stop) {
                         ChordStopUi.Muted -> stringResource(R.string.chord_muted)
                         ChordStopUi.Open -> stringResource(R.string.chord_open)
@@ -369,37 +384,86 @@ private fun ChordFretboard(strings: List<ChordStringUi>, tag: String) {
                     val description = listOfNotNull(stringResource(R.string.chord_string_description, 6 - string.index, position),
                         string.note?.let { stringResource(R.string.chord_tone_description, it) },
                         string.degree?.let { stringResource(R.string.chord_degree_description, it) }).joinToString(", ")
-                    Column(Modifier.width(stringWidth).testTag(tag + "_position_" + string.index)
-                        .clearAndSetSemantics { contentDescription = description }, horizontalAlignment = Alignment.CenterHorizontally) {
-                        Column(Modifier.height(headerHeight), horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.SpaceEvenly) {
-                            Text((6 - string.index).toString(), style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(when (string.stop) { ChordStopUi.Muted -> "X"; ChordStopUi.Open -> "O"; ChordStopUi.Fretted -> " " },
-                                style = MaterialTheme.typography.titleMedium)
+                    Box(Modifier.size(labelWidth, cellSize).testTag(tag + "_position_" + string.index)
+                        .clearAndSetSemantics { contentDescription = description }, contentAlignment = Alignment.Center) {
+                        Text(string.tuning, style = labelStyle, color = colors.onSurfaceVariant)
+                    }
+                }
+            }
+            Column(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
+                Row {
+                    for (fret in frets) {
+                        Box(Modifier.size(cellSize, headerHeight).testTag(tag + "_fret_label_" + fret),
+                            contentAlignment = Alignment.Center) { Text(fret.toString(), style = labelStyle) }
+                    }
+                }
+                Column(Modifier.background(colors.surfaceContainer).drawBehind {
+                    val step = cellSize.toPx()
+                    for (fret in firstFret..lastFret) {
+                        val x = (fret - firstFret + 1.5f) * step
+                        when (fret + capo) {
+                            3, 5, 7, 9, 15, 17, 19, 21 -> drawCircle(colors.outlineVariant, 4.dp.toPx(), Offset(x, step * 3))
+                            12, 24 -> {
+                                drawCircle(colors.outlineVariant, 4.dp.toPx(), Offset(x, step * 2))
+                                drawCircle(colors.outlineVariant, 4.dp.toPx(), Offset(x, step * 4))
+                            }
                         }
-                        for (fret in firstFret..lastFret) {
-                            Box(Modifier.fillMaxWidth().height(fretHeight).drawBehind {
-                                drawLine(line, Offset(size.width / 2, 0f), Offset(size.width / 2, size.height), 1.dp.toPx())
-                                drawLine(line, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
-                                if (fret == firstFret) drawLine(line, Offset.Zero, Offset(size.width, 0f),
-                                    if (firstFret == 1) 2.dp.toPx() else 1.dp.toPx())
-                            }, contentAlignment = Alignment.Center) {
-                                if (string.stop == ChordStopUi.Fretted && string.fret == fret) {
-                                    Box(Modifier.size((26.dp * fontScale).coerceAtMost(44.dp))
-                                        .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.extraLarge),
-                                        contentAlignment = Alignment.Center) {
-                                        Text(string.degree ?: "●", color = MaterialTheme.colorScheme.onPrimary,
-                                            style = MaterialTheme.typography.labelLarge)
+                    }
+                    for (fret in 0..(lastFret - firstFret + 1)) {
+                        val x = (fret + 1) * step
+                        drawLine(colors.outline, Offset(x, step / 2), Offset(x, size.height - step / 2),
+                            if (fret == 0 && firstFret == 1) 4.dp.toPx() else 1.5.dp.toPx())
+                    }
+                    visibleStrings.forEachIndexed { row, string ->
+                        val y = (row + 0.5f) * step
+                        drawLine(colors.onSurfaceVariant, Offset(step, y), Offset(size.width, y),
+                            (0.75f + string.index * 0.2f).dp.toPx())
+                    }
+                }) {
+                    visibleStrings.forEach { string ->
+                        Row {
+                            for (fret in frets) {
+                                val selected = if (fret == 0) string.stop == ChordStopUi.Open
+                                    else string.stop == ChordStopUi.Fretted && string.fret == fret
+                                val marker = when {
+                                    fret == 0 && string.stop == ChordStopUi.Muted -> "X"
+                                    fret == 0 && string.stop == ChordStopUi.Open -> "O"
+                                    selected -> string.note?.dropLast(1) ?: "●"
+                                    else -> ""
+                                }
+                                val root = selected && string.degree == "1"
+                                val container = if (root) colors.primary else colors.secondaryContainer
+                                val content = if (root) colors.onPrimary else colors.onSecondaryContainer
+                                val position = if (fret == 0) stringResource(R.string.chord_open)
+                                    else stringResource(R.string.chord_fret_position, fret)
+                                val description = stringResource(R.string.chord_string_description, 6 - string.index, position)
+                                val modifier = Modifier.size(cellSize).testTag("${tag}_fret_${string.index}_$fret")
+                                if (eventSink != null) {
+                                    IconToggleButton(checked = selected, onCheckedChange = {
+                                        focusManager.clearFocus()
+                                        eventSink(if (selected) ChordEvent.SetStop(string.index, ChordStopUi.Muted)
+                                            else if (fret == 0) ChordEvent.SetStop(string.index, ChordStopUi.Open)
+                                            else ChordEvent.SetFret(string.index, fret.toString()))
+                                    }, modifier = modifier.semantics { contentDescription = description },
+                                        colors = IconButtonDefaults.iconToggleButtonColors(
+                                            containerColor = Color.Transparent, contentColor = colors.onSurfaceVariant,
+                                            checkedContainerColor = Color.Transparent, checkedContentColor = content)) {
+                                        Box(Modifier.size(markerSize)
+                                            .background(if (selected) container else Color.Transparent, CircleShape),
+                                            contentAlignment = Alignment.Center) {
+                                            Text(marker, Modifier.clearAndSetSemantics {}, style = labelStyle)
+                                        }
+                                    }
+                                } else {
+                                    Box(modifier.clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
+                                        Box(Modifier.size(cellSize - 4.dp)
+                                            .background(if (selected) container else Color.Transparent, CircleShape),
+                                            contentAlignment = Alignment.Center) {
+                                            Text(marker, style = labelStyle, color = if (selected) content else colors.onSurfaceVariant)
+                                        }
                                     }
                                 }
                             }
-                        }
-                        Column(Modifier.heightIn(min = 40.dp * fontScale).padding(top = 4.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally) {
-                            string.note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                            string.degree?.let { Text(it, style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         }
                     }
                 }
