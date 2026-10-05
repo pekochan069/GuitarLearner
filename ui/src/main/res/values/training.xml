@@ -5,7 +5,13 @@
     <string name="training_interval_exercise">Interval identification</string>
     <string name="training_notes">Notes</string>
     <string name="training_intervals">Intervals</string>
-    <string name="training_representation">Question format</string>
+    <string name="training_listening_menu">Listening training</string>
+    <string name="training_staff_menu">Staff training</string>
+    <string name="training_fretboard_menu">Fretboard training</string>
+    <string name="training_tab_menu">TAB training</string>
+    <string name="training_instrument">Instrument</string>
+    <string name="training_piano">Piano</string>
+    <string name="training_guitar">Guitar</string>
     <string name="training_listening">Listening</string>
     <string name="training_staff">Staff</string>
     <string name="training_fretboard">Fretboard</string>

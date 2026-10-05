@@ -60,6 +60,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Constraints
 import com.pekochan069.guitarlearner.presentation.contract.*
 import com.pekochan069.guitarlearner.ui.R
 import kotlin.math.abs
@@ -77,8 +78,11 @@ fun TrainingScreen(state: TrainingUiState, eventSink: (TrainingEvent) -> Unit) {
         }
         state.notice?.let { TrainingNotice(it, "training_notice") }
         when (val stage = state.stage) {
-            TrainingStageUi.Menu -> TrainingMenu(state, eventSink)
-            TrainingStageUi.Setup -> TrainingSetup(state, eventSink)
+            is TrainingStageUi.Navigation -> when (val page = stage.page) {
+                TrainingPageUi.Root -> TrainingFormats(eventSink)
+                is TrainingPageUi.Exercises -> TrainingExercises(page.format, state, eventSink)
+                is TrainingPageUi.Setup -> TrainingSetup(page, state, eventSink)
+            }
             is TrainingStageUi.Question -> TrainingQuestion(stage, state.audio, eventSink)
             is TrainingStageUi.Results -> {
                 Text(stringResource(R.string.training_results_count, stage.correctCount, stage.rows.size),
@@ -104,9 +108,44 @@ fun TrainingScreen(state: TrainingUiState, eventSink: (TrainingEvent) -> Unit) {
 }
 
 @Composable
-private fun TrainingMenu(state: TrainingUiState, eventSink: (TrainingEvent) -> Unit) {
+private fun TrainingFormats(eventSink: (TrainingEvent) -> Unit) {
+    val formats = TrainingRepresentationUi.entries
+    val titles = formats.map { stringResource(it.menuTitle) }
+    val style = MaterialTheme.typography.titleMedium
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val textWidth = with(density) { ((maxWidth - 12.dp) / 2 - 56.dp).roundToPx().coerceAtLeast(1) }
+        val textHeight = titles.maxOf { measurer.measure(it, style, constraints = Constraints(maxWidth = textWidth)).size.height }
+        val cardHeight = with(density) { textHeight.toDp().coerceAtLeast(32.dp) + 16.dp }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            formats.chunked(2).forEach { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { format ->
+                        Card(onClick = { eventSink(TrainingEvent.OpenFormat(format)) },
+                            modifier = Modifier.weight(1f).height(cardHeight).testTag("training_format_${format.name}"),
+                            shape = MaterialTheme.shapes.extraLarge,
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer)) {
+                            Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Icon(painterResource(format.icon), null, Modifier.size(32.dp))
+                                Text(titles[format.ordinal], Modifier.weight(1f), style = style)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrainingExercises(format: TrainingRepresentationUi, state: TrainingUiState, eventSink: (TrainingEvent) -> Unit) {
+    Text(stringResource(format.menuTitle), Modifier.testTag("training_format_title").semantics { heading() },
+        style = MaterialTheme.typography.headlineMedium)
     TrainingSubjectUi.entries.forEach { subject ->
-        Card(onClick = { eventSink(TrainingEvent.OpenExercise(state.settings.copy(subject = subject))) },
+        Card(onClick = { eventSink(TrainingEvent.OpenExercise(format, subject)) },
             enabled = !state.settingsSaving && state.settingsNotice != TrainingNoticeUi.SettingsReadFailed,
             modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).testTag("training_exercise_${subject.name}"),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
@@ -117,22 +156,26 @@ private fun TrainingMenu(state: TrainingUiState, eventSink: (TrainingEvent) -> U
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TrainingSetup(state: TrainingUiState, eventSink: (TrainingEvent) -> Unit) {
-    val settings = state.settings
+private fun TrainingSetup(page: TrainingPageUi.Setup, state: TrainingUiState, eventSink: (TrainingEvent) -> Unit) {
+    val settings = state.settings.copy(subject = page.subject, representation = page.format)
     val enabled = !state.settingsSaving && state.settingsNotice != TrainingNoticeUi.SettingsReadFailed
-    var formatOpen by remember { mutableStateOf(false) }
     Text(stringResource(settings.subject.exerciseTitle), Modifier.testTag("training_exercise_title").semantics { heading() },
         style = MaterialTheme.typography.headlineMedium)
-    ExposedDropdownMenuBox(expanded = formatOpen, onExpandedChange = { if (enabled) formatOpen = it }) {
-        OutlinedTextField(value = stringResource(settings.representation.label), onValueChange = {}, readOnly = true, enabled = enabled, singleLine = true,
-            label = { Text(stringResource(R.string.training_representation)) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(formatOpen) },
-            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled).fillMaxWidth().testTag("training_format"))
-        ExposedDropdownMenu(expanded = formatOpen, onDismissRequest = { formatOpen = false }) {
-            TrainingRepresentationUi.entries.forEach { representation ->
-                DropdownMenuItem(text = { Text(stringResource(representation.label)) }, enabled = enabled,
-                    modifier = Modifier.heightIn(min = 48.dp).testTag("training_format_${representation.name}"),
-                    onClick = { formatOpen = false; eventSink(TrainingEvent.SetSettings(settings.copy(representation = representation))) })
+    Text(stringResource(page.format.menuTitle), Modifier.testTag("training_fixed_format"),
+        style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (page.format == TrainingRepresentationUi.Listening) {
+        var instrumentOpen by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(expanded = instrumentOpen, onExpandedChange = { if (enabled) instrumentOpen = it }) {
+            OutlinedTextField(value = stringResource(settings.instrument.label), onValueChange = {}, readOnly = true, enabled = enabled, singleLine = true,
+                label = { Text(stringResource(R.string.training_instrument)) },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(instrumentOpen) },
+                modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled).fillMaxWidth().testTag("training_instrument"))
+            ExposedDropdownMenu(expanded = instrumentOpen, onDismissRequest = { instrumentOpen = false }) {
+                TrainingInstrumentUi.entries.forEach { instrument ->
+                    DropdownMenuItem(text = { Text(stringResource(instrument.label)) }, enabled = enabled,
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("training_instrument_${instrument.name}"),
+                        onClick = { instrumentOpen = false; eventSink(TrainingEvent.SetSettings(settings.copy(instrument = instrument))) })
+                }
             }
         }
     }
@@ -161,6 +204,7 @@ private fun TrainingSetup(state: TrainingUiState, eventSink: (TrainingEvent) -> 
         }
     }
     Button(onClick = { eventSink(TrainingEvent.Start) }, enabled = !state.settingsSaving && state.settingsNotice == null &&
+        state.settings.subject == page.subject && state.settings.representation == page.format &&
         (settings.subject != TrainingSubjectUi.Interval || settings.intervals.isNotEmpty()),
         modifier = Modifier.fillMaxWidth().testTag("training_start")) { Text(stringResource(R.string.training_start)) }
 }
@@ -384,6 +428,22 @@ private val TrainingRepresentationUi.label: Int get() = when (this) {
     TrainingRepresentationUi.Staff -> R.string.training_staff
     TrainingRepresentationUi.Fretboard -> R.string.training_fretboard
     TrainingRepresentationUi.Tab -> R.string.training_tab
+}
+private val TrainingRepresentationUi.menuTitle: Int get() = when (this) {
+    TrainingRepresentationUi.Listening -> R.string.training_listening_menu
+    TrainingRepresentationUi.Staff -> R.string.training_staff_menu
+    TrainingRepresentationUi.Fretboard -> R.string.training_fretboard_menu
+    TrainingRepresentationUi.Tab -> R.string.training_tab_menu
+}
+private val TrainingRepresentationUi.icon: Int get() = when (this) {
+    TrainingRepresentationUi.Listening -> R.drawable.ic_play
+    TrainingRepresentationUi.Staff -> R.drawable.ic_staff
+    TrainingRepresentationUi.Fretboard -> R.drawable.ic_chords
+    TrainingRepresentationUi.Tab -> R.drawable.ic_tab
+}
+private val TrainingInstrumentUi.label: Int get() = when (this) {
+    TrainingInstrumentUi.Piano -> R.string.training_piano
+    TrainingInstrumentUi.Guitar -> R.string.training_guitar
 }
 private val IntervalPresentationUi.label: Int get() = when (this) {
     IntervalPresentationUi.Ascending -> R.string.training_ascending

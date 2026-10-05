@@ -2,6 +2,7 @@ package com.pekochan069.guitarlearner.presentation.contract
 
 enum class TrainingSubjectUi { Note, Interval }
 enum class TrainingRepresentationUi { Listening, Staff, Fretboard, Tab }
+enum class TrainingInstrumentUi { Piano, Guitar }
 enum class IntervalPresentationUi { Ascending, Descending, Harmonic }
 enum class TrainingIntervalUi {
     Unison, MinorSecond, MajorSecond, MinorThird, MajorThird, PerfectFourth, Tritone,
@@ -18,6 +19,7 @@ data class TrainingSettingsUi(
     val representation: TrainingRepresentationUi = TrainingRepresentationUi.Listening,
     val intervalPresentation: IntervalPresentationUi = IntervalPresentationUi.Ascending,
     val intervals: Set<TrainingIntervalUi> = TrainingIntervalUi.entries.toSet(),
+    val instrument: TrainingInstrumentUi = TrainingInstrumentUi.Piano,
 )
 data class TrainingQuestionKeyUi(val sessionId: Long, val questionIndex: Int)
 data class TrainingPositionUi(val stringNumber: Int, val fret: Int)
@@ -28,9 +30,13 @@ sealed interface TrainingAnswerUi {
 }
 data class TrainingFeedbackUi(val chosen: TrainingAnswerUi, val answer: TrainingAnswerUi, val correct: Boolean)
 data class TrainingResultUi(val number: Int, val feedback: TrainingFeedbackUi)
+sealed interface TrainingPageUi {
+    data object Root : TrainingPageUi
+    data class Exercises(val format: TrainingRepresentationUi) : TrainingPageUi
+    data class Setup(val format: TrainingRepresentationUi, val subject: TrainingSubjectUi) : TrainingPageUi
+}
 sealed interface TrainingStageUi {
-    data object Menu : TrainingStageUi
-    data object Setup : TrainingStageUi
+    data class Navigation(val page: TrainingPageUi) : TrainingStageUi
     data class Question(val key: TrainingQuestionKeyUi, val number: Int, val settings: TrainingSettingsUi,
         val positions: List<TrainingPositionUi>, val staff: List<TrainingStaffNoteUi>,
         val choices: List<TrainingAnswerUi>, val feedback: TrainingFeedbackUi?) : TrainingStageUi
@@ -44,14 +50,15 @@ sealed interface TrainingAudioUi {
 }
 data class TrainingUiState(
     val settings: TrainingSettingsUi = TrainingSettingsUi(),
-    val stage: TrainingStageUi = TrainingStageUi.Menu,
+    val stage: TrainingStageUi = TrainingStageUi.Navigation(TrainingPageUi.Root),
     val audio: TrainingAudioUi = TrainingAudioUi.Idle,
     val settingsSaving: Boolean = false,
     val settingsNotice: TrainingNoticeUi? = null,
     val notice: TrainingNoticeUi? = null,
 )
 sealed interface TrainingEvent {
-    data class OpenExercise(val settings: TrainingSettingsUi) : TrainingEvent
+    data class OpenFormat(val format: TrainingRepresentationUi) : TrainingEvent
+    data class OpenExercise(val format: TrainingRepresentationUi, val subject: TrainingSubjectUi) : TrainingEvent
     data class SetSettings(val settings: TrainingSettingsUi) : TrainingEvent
     data object RetrySettings : TrainingEvent
     data object Start : TrainingEvent

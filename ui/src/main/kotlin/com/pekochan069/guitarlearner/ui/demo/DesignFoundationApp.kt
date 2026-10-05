@@ -54,6 +54,7 @@ import com.pekochan069.guitarlearner.presentation.contract.LanguageOption
 import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
 import com.pekochan069.guitarlearner.presentation.contract.TrainingStageUi
+import com.pekochan069.guitarlearner.presentation.contract.TrainingPageUi
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 
@@ -104,8 +105,7 @@ fun DesignFoundationApp(
     val homeScroll = rememberScrollState()
     val preferencesEnabled = state.settingsStatus != SettingsStatus.Saving
     val trainingPage = if (destination == FoundationDestination.Feature(FeatureId.Training)) when (val stage = state.training.stage) {
-        TrainingStageUi.Menu -> "menu"
-        TrainingStageUi.Setup -> state.training.settings.subject
+        is TrainingStageUi.Navigation -> stage.page
         is TrainingStageUi.Question -> stage.key
         is TrainingStageUi.Results -> "results"
     } else null
@@ -124,7 +124,8 @@ fun DesignFoundationApp(
                         IconButton(onClick = { state.eventSink(FoundationEvent.NavigateBack) },
                             modifier = Modifier.testTag("navigate_up")) {
                             Icon(painterResource(R.drawable.ic_arrow_back), stringResource(if (
-                                destination == FoundationDestination.Feature(FeatureId.Training) && state.training.stage != TrainingStageUi.Menu
+                                destination == FoundationDestination.Feature(FeatureId.Training) &&
+                                    state.training.stage != TrainingStageUi.Navigation(TrainingPageUi.Root)
                             ) R.string.training_back else R.string.back_to_home))
                         }
                     }

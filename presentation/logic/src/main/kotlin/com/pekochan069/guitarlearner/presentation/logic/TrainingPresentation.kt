@@ -10,7 +10,7 @@ internal fun TrainingSnapshot.toUi(): TrainingUiState = TrainingUiState(
         is TrainingStorageStatus.Failed -> storage.requested ?: settings
     }.toUi(),
     stage = when (val stage = stage) {
-        TrainingStage.Setup -> TrainingStageUi.Setup
+        TrainingStage.Setup -> TrainingStageUi.Navigation(TrainingPageUi.Root)
         is TrainingStage.Active -> stage.session.let { session -> TrainingStageUi.Question(
             key = session.key.toUi(), number = session.index + 1, settings = session.settings.toUi(),
             positions = session.question.positions.map { TrainingPositionUi(it.stringNumber, it.fret) },
@@ -33,8 +33,8 @@ internal fun TrainingSnapshot.toUi(): TrainingUiState = TrainingUiState(
     notice = notice?.toUi(),
 )
 
-internal fun TrainingEvent.toRequest(): TrainingRequest = when (this) {
-    is TrainingEvent.OpenExercise -> TrainingRequest.SetSettings(settings.toDomain())
+internal fun TrainingEvent.toRequest(): TrainingRequest? = when (this) {
+    is TrainingEvent.OpenFormat, is TrainingEvent.OpenExercise -> null
     is TrainingEvent.SetSettings -> TrainingRequest.SetSettings(settings.toDomain())
     TrainingEvent.RetrySettings -> TrainingRequest.RetrySettings
     TrainingEvent.Start -> TrainingRequest.Start
@@ -46,11 +46,11 @@ internal fun TrainingEvent.toRequest(): TrainingRequest = when (this) {
 
 private fun TrainingSettings.toUi(): TrainingSettingsUi = TrainingSettingsUi(TrainingSubjectUi.valueOf(subject.name),
     TrainingRepresentationUi.valueOf(representation.name), IntervalPresentationUi.valueOf(intervalPresentation.name),
-    intervals.map { TrainingIntervalUi.entries[it.semitones] }.toSet())
+    intervals.map { TrainingIntervalUi.entries[it.semitones] }.toSet(), TrainingInstrumentUi.valueOf(instrument.name))
 
 private fun TrainingSettingsUi.toDomain(): TrainingSettings = TrainingSettings(TrainingSubject.valueOf(subject.name),
     TrainingRepresentation.valueOf(representation.name), IntervalPresentation.valueOf(intervalPresentation.name),
-    intervals.map { TrainingInterval.entries[it.ordinal] }.toSet())
+    intervals.map { TrainingInterval.entries[it.ordinal] }.toSet(), TrainingInstrument.valueOf(instrument.name))
 
 private fun TrainingQuestionKey.toUi(): TrainingQuestionKeyUi = TrainingQuestionKeyUi(sessionId, questionIndex)
 private fun TrainingQuestionKeyUi.toDomain(): TrainingQuestionKey = TrainingQuestionKey(sessionId, questionIndex)
