@@ -163,10 +163,11 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             }
             is ProgressionEvent.OpenSheet -> sheetName = event.value.name
             is ProgressionEvent.OpenEditor -> {
-                if (event.index != null && content.steps.getOrNull(event.index) !is ProgressionStep.Chord) return@ProgressionPresentation
-                if (event.index != null) transport(ProgressionCommand.Stop)
-                editingIndex = event.index
-                val chord = content.steps.getOrNull(event.index ?: -1) as? ProgressionStep.Chord
+                val index = event.index
+                if (index != null && content.steps.getOrNull(index) !is ProgressionStep.Chord) return@ProgressionPresentation
+                if (index != null) transport(ProgressionCommand.Stop)
+                editingIndex = index
+                val chord = content.steps.getOrNull(index ?: -1) as? ProgressionStep.Chord
                 if (chord != null) copyShape(chord.name, chord.shape)
                 else { editorName = ""; root = 0; qualityName = ChordQualityUi.Major.name; sourceName = ProgressionChordSourceUi.Named.name }
                 lookupGeneration++
@@ -232,13 +233,15 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             is ProgressionEvent.SetLoop -> send(ProgressionCommand.SetLoop(event.value))
             is ProgressionEvent.Play -> if (state.canPlay) scope.launch {
                 if (event.selected) {
-                    sheetName = ProgressionSheetUi.None.name
                     val stopped = progressions.execute(ProgressionCommand.Stop).fold(
                         { notice = ProgressionNotice.valueOf(it.name); false }, { true })
                     if (!stopped) return@launch
                 }
                 progressions.execute(ProgressionCommand.Play(if (event.selected) workspace.selectedIndex else 0))
-                    .fold({ notice = ProgressionNotice.valueOf(it.name) }, { notice = null })
+                    .fold({ notice = ProgressionNotice.valueOf(it.name) }, {
+                        notice = null
+                        if (event.selected) sheetName = ProgressionSheetUi.None.name
+                    })
             }
             ProgressionEvent.Pause -> transport(ProgressionCommand.Pause)
             ProgressionEvent.Resume -> if (state.canPlay) transport(ProgressionCommand.Resume)
