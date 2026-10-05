@@ -52,51 +52,63 @@ class ProgressionUiTest {
     @Test fun chordRestTieContextAndSavedCollectionJourneyKeepsCopiedMusicIndependent(): Unit {
         show(Locale.ENGLISH, false, 1f)
         click("feature_Progressions")
-        compose.onNodeWithTag("progression_save").assertIsNotEnabled()
+        compose.onNodeWithTag("progression_open_save").assertIsNotEnabled()
         val source = chords.current.value.records.single()
         repeat(2) {
             click("progression_add_chord")
-            click("progression_copy_${source.id}")
+            click("progression_source_Saved")
+            click("progression_copy_${source.id}", scroll = true)
             fret(5, 0).assertIsOn()
             click("progression_commit_chord")
             compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == it + 1 }
+            awaitSheetClosed()
         }
-        click("progression_step_0")
-        click("progression_duration_0")
+        step(0)
+        click("progression_duration_0", scroll = true)
         click("progression_duration_0_option_0")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps[0].duration.value == NoteValue.Whole }
-        click("progression_dot_0")
-        click("progression_tie_0")
+        click("progression_dot_0", scroll = true)
+        click("progression_tie_0", scroll = true)
         compose.waitUntil(5_000) { (host.current.value.draft.content.steps[0] as ProgressionStep.Chord).tieToNext }
-        click("progression_step_1")
+        closeSheet()
+        step(1)
+        closeSheet()
         click("progression_add_rest")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == 3 }
-        click("progression_up_2")
+        step(2)
+        click("progression_up_2", scroll = true)
         compose.waitUntil(5_000) { host.current.value.draft.content.steps[1] is ProgressionStep.Rest }
         assertFalse((host.current.value.draft.content.steps[0] as ProgressionStep.Chord).tieToNext)
-        click("progression_down_1")
+        click("progression_down_1", scroll = true)
         compose.waitUntil(5_000) { host.current.value.draft.content.steps[2] is ProgressionStep.Rest }
-        click("progression_context")
+        closeSheet()
+        click("progression_settings")
         compose.onNodeWithTag("chord_capo").performScrollTo().performTextReplacement("2")
-        click("progression_close_sheet")
+        closeSheet()
         compose.waitUntil(5_000) { host.current.value.draft.content.context.capo == 2 }
-        click("progression_step_0")
+        step(0)
         compose.onNodeWithTag("progression_step_0_fretboard").assertExists()
         compose.onNodeWithTag("progression_step_0_position_1").assertContentDescriptionContains("D3", substring = true)
+        closeSheet()
+        click("progression_open_save")
         compose.onNodeWithTag("progression_name").performScrollTo().performTextReplacement("Practice")
-        compose.waitUntil(5_000) { host.current.value.draft.name == "Practice" }
+        compose.waitUntil(5_000) { host.current.value.draft.name == "Practice" && host.current.value.persistence == DraftPersistence.Synced }
         click("progression_save")
         compose.waitUntil(5_000) { host.current.value.records.size == 1 }
+        awaitSheetClosed()
         val saved = host.current.value.records.single()
-        click("progression_new")
+        menu("progression_new")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.isEmpty() }
         runBlocking { chords.execute(ChordCommand.DeleteRecord(source.id)); chords.execute(ChordCommand.SetStop(5, StringStop.Fretted(8))) }
-        click("progression_load_${saved.id}")
+        menu("progression_collection")
+        click("progression_load_${saved.id}", scroll = true)
         compose.waitUntil(5_000) { host.current.value.draft.targetId == saved.id }
         assertEquals(saved.content, host.current.value.draft.content)
         val reloaded = AndroidProgressionsHost(compose.activity.application, ProgressionPlaybackService::class.java, MainActivity::class.java, preferences)
         assertEquals(saved.content, reloaded.current.value.draft.content)
-        click("progression_delete_${saved.id}")
+        awaitSheetClosed()
+        menu("progression_collection")
+        click("progression_delete_${saved.id}", scroll = true)
         click("progression_confirm_delete", scroll = false)
         compose.waitUntil(5_000) { host.current.value.records.isEmpty() }
         assertNull(host.current.value.draft.targetId)
@@ -108,33 +120,110 @@ class ProgressionUiTest {
         show(Locale.KOREAN, true, 2f)
         click("feature_Progressions")
         click("progression_add_chord")
-        click("progression_copy_current")
+        click("progression_source_Saved")
+        click("progression_copy_current", scroll = true)
         fret(5, 3).performClick()
         click("progression_commit_chord")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.isNotEmpty() }
-        click("progression_context")
+        awaitSheetClosed()
+        click("progression_settings")
         compose.onNodeWithTag("chord_capo").performScrollTo().performTextReplacement("bad")
-        click("progression_close_sheet")
-        compose.onNodeWithTag("progression_context_error").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("progression_play").performScrollTo().assertIsNotEnabled()
-        click("progression_context")
+        closeSheet()
+        compose.onNodeWithTag("progression_list").performScrollToNode(hasTestTag("progression_context_error"))
+        compose.onNodeWithTag("progression_context_error").assertIsDisplayed()
+        compose.onNodeWithTag("progression_play").assertIsDisplayed().assertIsNotEnabled()
+        click("progression_settings")
         compose.onNodeWithTag("chord_capo").performScrollTo().performTextReplacement("0")
-        click("progression_close_sheet")
+        closeSheet()
+        click("progression_open_save")
         compose.onNodeWithTag("progression_name").performScrollTo().performTextReplacement("연습")
         compose.waitUntil(5_000) { host.current.value.draft.name == "연습" && host.current.value.persistence == DraftPersistence.Synced }
         preferences.failNext = true
         click("progression_save")
         compose.waitUntil(5_000) { host.current.value.actionFailure == ProgressionFailure.WriteFailed }
-        compose.onNodeWithTag("progression_error").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("progression_sheet_error").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("progression_sheet").assertExists()
+        compose.onNodeWithTag("progression_name").assertTextContains("연습")
         assertTrue(host.current.value.records.isEmpty())
         click("progression_save")
         compose.waitUntil(5_000) { host.current.value.records.size == 1 }
-        compose.onNodeWithTag("progression_play_selected").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        awaitSheetClosed()
+        step(0)
+        compose.onNodeWithTag("progression_play_selected").assertIsDisplayed().assertIsEnabled()
+        closeSheet()
         click("progression_add_rest")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == 2 }
     }
 
-    private fun click(tag: String, scroll: Boolean = true) {
+    @Test fun namedCAmFGJourneyKeepsTheMusicAndNativeTransportVisible(): Unit {
+        show(Locale.ENGLISH, false, 1f)
+        click("feature_Progressions")
+        val originalSource = chords.current.value
+        compose.onAllNodesWithTag("destination_title").assertCountEquals(1)
+        compose.onNodeWithTag("progression_empty").assertIsDisplayed()
+        compose.onNodeWithTag("progression_add_chord").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithTag("progression_transport").assertIsDisplayed()
+        compose.onNodeWithTag("progression_settings").assertTextContains("90 BPM").assertTextContains("4/4")
+        compose.onNodeWithTag("progression_name").assertDoesNotExist()
+        val identities = listOf(ChordIdentity(PitchClass.C, ChordQuality.Major), ChordIdentity(PitchClass.A, ChordQuality.Minor),
+            ChordIdentity(PitchClass.F, ChordQuality.Major), ChordIdentity(PitchClass.G, ChordQuality.Major))
+        identities.forEachIndexed { index, identity ->
+            click("progression_add_chord")
+            compose.onNodeWithTag("progression_root").assertIsDisplayed()
+            compose.onNodeWithTag("progression_quality").assertIsDisplayed()
+            if (identity.root != PitchClass.C) {
+                click("progression_root")
+                click("progression_root_option_${identity.root.ordinal}", scroll = true)
+            }
+            if (identity.quality != ChordQuality.Major) {
+                click("progression_quality")
+                click("progression_quality_option_${identity.quality.ordinal}")
+            }
+            val symbol = identity.root.symbol + identity.quality.symbol
+            compose.waitUntil(10_000) {
+                compose.onAllNodes(hasTestTag("progression_lookup_shape") and hasText("Shape name without capo · $symbol")).fetchSemanticsNodes().size == 1 &&
+                    compose.onAllNodes(hasTestTag("progression_commit_chord") and isEnabled()).fetchSemanticsNodes().size == 1
+            }
+            compose.onNodeWithTag("progression_lookup_fretboard").assertExists()
+            compose.onNodeWithTag("progression_commit_chord").assertIsDisplayed().assertIsEnabled()
+            click("progression_commit_chord")
+            compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == index + 1 }
+            awaitSheetClosed()
+            val inserted = host.current.value.draft.content.steps[index] as ProgressionStep.Chord
+            assertEquals("", inserted.name)
+            assertEquals(NoteDuration(NoteValue.Quarter), inserted.duration)
+            assertTrue((ChordTheory.analyze(host.current.value.draft.content.context, inserted.shape) as ChordAnalysis.Recognized)
+                .candidates.any { it.identity == identity })
+        }
+        identities.indices.forEach { index ->
+            compose.onNodeWithTag("progression_step_$index").assertIsDisplayed().assertTextContains("Quarter note", substring = true)
+        }
+        compose.onNodeWithTag("progression_add_chord").assertIsDisplayed()
+        compose.onNodeWithTag("progression_play").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithTag("progression_stop").assertIsDisplayed()
+        compose.onNodeWithTag("progression_loop").assertIsDisplayed()
+        assertEquals(originalSource, chords.current.value)
+        click("progression_loop")
+        click("progression_play")
+        compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Playing }
+        compose.onNodeWithTag("progression_pause").assertIsDisplayed().assertIsEnabled()
+        step(0)
+        compose.onNodeWithTag("progression_step_0_fretboard").assertExists()
+        assertTrue(host.current.value.playback is ProgressionPlayback.Playing)
+        click("progression_play_selected")
+        awaitSheetClosed()
+        compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Playing }
+        click("progression_pause")
+        compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Paused }
+        compose.onNodeWithTag("progression_resume").assertIsDisplayed().assertIsEnabled()
+        click("progression_resume")
+        compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Playing }
+        click("progression_stop")
+        compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Stopped }
+        assertEquals(originalSource, chords.current.value)
+    }
+
+    private fun click(tag: String, scroll: Boolean = false) {
         try {
             val node = compose.onNodeWithTag(tag)
             if (scroll) node.performScrollTo()
@@ -142,6 +231,13 @@ class ProgressionUiTest {
         }
         catch (failure: AssertionError) { diagnostic("failed_$tag"); throw failure }
     }
+    private fun menu(tag: String) { click("progression_actions"); click(tag) }
+    private fun step(index: Int) {
+        compose.onNodeWithTag("progression_list").performScrollToNode(hasTestTag("progression_step_$index"))
+        click("progression_step_$index")
+    }
+    private fun closeSheet() { click("progression_close_sheet"); awaitSheetClosed() }
+    private fun awaitSheetClosed() { compose.waitUntil(5_000) { compose.onAllNodesWithTag("progression_sheet").fetchSemanticsNodes().isEmpty() } }
     private fun fret(stringIndex: Int, fretNumber: Int): SemanticsNodeInteraction {
         val tag = "progression_editor_fret_${stringIndex}_$fretNumber"
         try {
