@@ -27,7 +27,7 @@
     <string name="tuner_target_description">Auto finds the nearest standard string. Select a string to tune it manually.</string>
     <string name="tuner_auto">Auto</string>
     <string name="tuner_string_option">String %1$d · %2$s</string>
-    <string name="tuner_string_number">String %1$d</string>
+    <string name="tuner_string_number">String %1$s</string>
     <string name="tuner_selected_string">Selected string</string>
     <string name="tuner_detected_string">Detected string</string>
     <string name="tuner_reference">Standard tuning · A4 = 440 Hz</string>
@@ -45,7 +45,8 @@
     <string name="tuner_high">High · lower the pitch</string>
     <string name="tuner_settling">Hold steady…</string>
     <string name="tuner_in_tune">In tune</string>
-    <string name="tuner_cents">%1$+.1f cents</string>
+    <string name="tuner_cents">%1$+.0f cents</string>
+    <string name="tuner_cents_placeholder">-- cents</string>
     <string name="tuner_tolerance">In-tune tolerance</string>
     <string name="tuner_tolerance_description">Choose how close the pitch must be. A steady reading for 300 ms earns In tune. This choice is saved on this phone.</string>
     <plurals name="tuner_tolerance_option">

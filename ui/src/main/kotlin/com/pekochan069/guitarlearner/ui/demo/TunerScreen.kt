@@ -3,6 +3,8 @@ package com.pekochan069.guitarlearner.ui.demo
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -18,11 +20,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -30,6 +33,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.GuitarStringUi
@@ -42,6 +47,7 @@ import com.pekochan069.guitarlearner.presentation.contract.TunerNoticeUi
 import com.pekochan069.guitarlearner.presentation.contract.TunerTargetUi
 import com.pekochan069.guitarlearner.presentation.contract.TunerUiState
 import com.pekochan069.guitarlearner.ui.R
+import kotlin.math.roundToInt
 
 @Composable
 fun TunerScreen(state: TunerUiState, eventSink: (FoundationEvent) -> Unit) {
@@ -127,8 +133,8 @@ private fun TunerReading(state: TunerUiState) {
     val selected = (state.target as? TunerTargetUi.Manual)?.string ?: measured?.string
     val colors = MaterialTheme.colorScheme
     val inTune = measured?.judgment == TunerJudgmentUi.InTune
-    val needle by animateFloatAsState(targetValue = ((measured?.cents ?: 0.0) / 50).toFloat().coerceIn(-1f, 1f),
-        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(), label = "pitchIndicator")
+    val needle = animateFloatAsState(targetValue = ((measured?.cents ?: 0.0) / 50).toFloat().coerceIn(-1f, 1f),
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(), label = "pitchIndicator")
     val status = when (state.listening) {
         TunerListeningUi.Stopped -> R.string.tuner_stopped
         TunerListeningUi.Starting -> R.string.tuner_starting
@@ -148,7 +154,7 @@ private fun TunerReading(state: TunerUiState) {
         }
     }
     Surface(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge,
-        color = if (inTune) colors.primaryContainer else colors.surfaceContainerLow) {
+        color = colors.surfaceContainerLow) {
         Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(if (state.target == TunerTargetUi.Automatic) R.string.tuner_detected_string else R.string.tuner_selected_string),
@@ -156,9 +162,11 @@ private fun TunerReading(state: TunerUiState) {
             val noteDescription = selected?.let { stringResource(R.string.tuner_string_option, it.number, it.note + it.octave) }
             Text(selected?.let { it.note + when (it.octave) { 2 -> "₂"; 3 -> "₃"; else -> "₄" } }
                 ?: stringResource(R.string.note_placeholder),
-                Modifier.testTag("tuner_note").semantics { if (noteDescription != null) contentDescription = noteDescription },
-                style = MaterialTheme.typography.displayLarge, color = colors.primary)
-            selected?.let { Text(stringResource(R.string.tuner_string_number, it.number), style = MaterialTheme.typography.bodyMedium) }
+                Modifier.fillMaxWidth().testTag("tuner_note").semantics { if (noteDescription != null) contentDescription = noteDescription },
+                style = MaterialTheme.typography.displayLarge, color = colors.primary, textAlign = TextAlign.Center)
+            Text(stringResource(R.string.tuner_string_number,
+                selected?.number?.toString() ?: stringResource(R.string.note_placeholder)),
+                style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.tuner_reference), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             Canvas(Modifier.fillMaxWidth().height(64.dp).clearAndSetSemantics {}) {
                 val left = 12.dp.toPx()
@@ -171,7 +179,7 @@ private fun TunerReading(state: TunerUiState) {
                     drawLine(colors.outline, Offset(x, centerY - halfHeight), Offset(x, centerY + halfHeight), 2.dp.toPx())
                 }
                 if (measured != null) {
-                    val x = left + width * (needle + 1) / 2
+                    val x = left + width * (needle.value + 1) / 2
                     drawLine(colors.primary, Offset(x, centerY - 24.dp.toPx()), Offset(x, centerY + 24.dp.toPx()), 4.dp.toPx())
                 }
             }
@@ -180,10 +188,31 @@ private fun TunerReading(state: TunerUiState) {
                 Text(stringResource(R.string.pitch_center), style = MaterialTheme.typography.bodySmall)
                 Text(stringResource(R.string.pitch_high), style = MaterialTheme.typography.bodySmall)
             }
-            Text(stringResource(status), Modifier.testTag("tuner_status").semantics { liveRegion = LiveRegionMode.Polite },
-                style = MaterialTheme.typography.headlineSmall)
-            if (measured != null) Text(stringResource(R.string.tuner_cents, measured.cents), Modifier.testTag("tuner_cents"),
-                style = MaterialTheme.typography.labelLarge)
+            TunerStatus(status, inTune)
+            Text(measured?.let { stringResource(R.string.tuner_cents, it.cents.roundToInt().toDouble()) }
+                ?: stringResource(R.string.tuner_cents_placeholder),
+                Modifier.fillMaxWidth().testTag(if (measured != null) "tuner_cents" else "tuner_cents_placeholder"),
+                style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"), textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+private fun TunerStatus(status: Int, inTune: Boolean) {
+    val labels = listOf(R.string.tuner_stopped, R.string.tuner_starting, R.string.tuner_stopping,
+        R.string.tuner_unavailable, R.string.tuner_pluck, R.string.tuner_uncertain, R.string.tuner_wrong_octave,
+        R.string.tuner_low, R.string.tuner_high, R.string.tuner_settling, R.string.tuner_in_tune).map { stringResource(it) }
+    val style = MaterialTheme.typography.headlineSmall
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val height = remember(labels, constraints.maxWidth, style, measurer) {
+            labels.maxOf { measurer.measure(it, style, constraints = constraints.copy(minWidth = 0, minHeight = 0)).size.height }
+        }
+        Box(Modifier.fillMaxWidth().height(with(density) { height.toDp() }), contentAlignment = Alignment.Center) {
+            Text(stringResource(status), Modifier.fillMaxWidth().testTag("tuner_status")
+                .semantics { liveRegion = LiveRegionMode.Polite }, style = style, textAlign = TextAlign.Center,
+                color = if (inTune) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
         }
     }
 }

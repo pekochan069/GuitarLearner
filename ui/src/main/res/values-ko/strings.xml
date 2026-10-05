@@ -27,7 +27,7 @@
     <string name="tuner_target_description">자동 모드는 가장 가까운 표준 줄을 찾습니다. 줄을 선택하면 수동으로 조율합니다.</string>
     <string name="tuner_auto">자동</string>
     <string name="tuner_string_option">%1$d번 줄 · %2$s</string>
-    <string name="tuner_string_number">%1$d번 줄</string>
+    <string name="tuner_string_number">%1$s번 줄</string>
     <string name="tuner_selected_string">선택한 줄</string>
     <string name="tuner_detected_string">감지한 줄</string>
     <string name="tuner_reference">표준 튜닝 · A4 = 440 Hz</string>
@@ -45,7 +45,8 @@
     <string name="tuner_high">높음 · 음을 낮추세요</string>
     <string name="tuner_settling">음을 유지하세요…</string>
     <string name="tuner_in_tune">정확함</string>
-    <string name="tuner_cents">%1$+.1f센트</string>
+    <string name="tuner_cents">%1$+.0f센트</string>
+    <string name="tuner_cents_placeholder">--센트</string>
     <string name="tuner_tolerance">조율 허용 오차</string>
     <string name="tuner_tolerance_description">목표음에 얼마나 가까워야 하는지 선택하세요. 300밀리초 동안 안정된 음이 이어지면 정확함으로 표시됩니다. 이 선택은 이 기기에 저장됩니다.</string>
     <plurals name="tuner_tolerance_option">
