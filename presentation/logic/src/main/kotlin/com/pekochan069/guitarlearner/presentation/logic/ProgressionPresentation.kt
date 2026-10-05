@@ -188,7 +188,7 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
                 openSheet(ProgressionSheetUi.Chord)
             }
             ProgressionEvent.CloseSheet -> closeSheet()
-            is ProgressionEvent.SetChordSource -> {
+            is ProgressionEvent.SetChordSource -> if (sourceName != event.value.name) {
                 lookup = ChordLookup.Idle; lookupContext = null
                 sourceName = event.value.name
                 if (event.value == ProgressionChordSourceUi.Named && editingIndex == null) editorName = ""

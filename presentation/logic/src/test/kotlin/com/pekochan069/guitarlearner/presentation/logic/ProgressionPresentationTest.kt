@@ -174,6 +174,8 @@ class ProgressionPresentationTest {
             assertEquals("C", state.progressions.editor.lookupShapeSymbol)
             assertEquals("D", state.progressions.editor.lookupSymbol)
             assertEquals("", state.progressions.editor.name)
+            state.progression(ProgressionEvent.SetChordSource(ProgressionChordSourceUi.Named))
+            runCurrent()
             state.progression(ProgressionEvent.CommitEditor)
             stateWhere { it.progressions.sheet == ProgressionSheetUi.None && it.progressions.editor.lookup == ChordLookupUi.Idle && !it.progressions.busy }
             val inserted = (port.commands.single() as ProgressionCommand.Insert).step as ProgressionStep.Chord
