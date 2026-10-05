@@ -12,6 +12,14 @@ Module boundaries, UI/app debug lint, presenter unit tests and both debug APK bu
 
 The installed app matched the accepted APK SHA-256 `7702A1F7232AEE079513F14BD1CA28E66290DD42660CFB6C6F3F92CDCD78F7FB`. Build and phone test logs remain in `build/chord10/fretboard-accepted-static.log` and `build/chord10/fretboard-phone-accepted-tests.log`. This bounded phone acceptance does not replace the full connected gate described below.
 
+## Representative shape correction
+
+The regression test `familiarStrummingShapesComeBeforeSparseNoteCombinations` first failed because C returned `x3x0x0` ahead of `x32010`. Standard tuning now prioritizes familiar open shapes and movable barre forms after musical completeness and root-bass checks. Generated alternatives prefer uninterrupted sounding strings and lower positions before fret span. Every result still passes the selected tuning/capo and chord-tone checks. Reference examples include Fender's [C](https://www.fender.com/articles/chords/learn-how-to-play-c-guitar-chord), [G](https://www.fender.com/articles/chords/learn-how-to-play-the-g-major-chord-on-guitar) and [F barre](https://www.fender.com/articles/chords/learn-how-to-play-f-chord-on-guitar) forms.
+
+All 14 regression shapes passed at capos 0 and 2. Module boundaries, product lint, both APK builds and domain/adapter/presenter tests passed: 127 local cases, 126 passes and one existing optional fixture skip. Five chord UI tests passed on the phone, including the first C shape and its per-string display. An initial added UI assertion used the phone's Korean resources against an English fixture; correcting the expected fixture language preserved the exact assertion. The phone's installed SHA-256 matched `43D2004B08C98325ADFC8E30335AA90837F79142AB49627484029BD6279815AA`. Failure and success logs remain under `build/chord10/representative-ranking-*`.
+
+![C x32010 shown by the accepted APK on the phone](screenshots/chords/lookup-ko-light-horizontal.png)
+
 ## Runnable checks
 
 ```powershell

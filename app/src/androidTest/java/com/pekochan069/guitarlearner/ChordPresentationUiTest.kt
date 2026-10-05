@@ -90,8 +90,12 @@ class ChordPresentationUiTest {
         compose.onNodeWithTag("compact_metronome").assertExists()
         click("chord_search")
         compose.waitUntil(10_000) { (host.current.value.lookup as? ChordLookup.Ready)?.shapes?.isNotEmpty() == true }
+        assertEquals(listOf(StringStop.Muted, StringStop.Fretted(3), StringStop.Fretted(2), StringStop.Open,
+            StringStop.Fretted(1), StringStop.Open), (host.current.value.lookup as ChordLookup.Ready).shapes.first().stops)
         compose.onNodeWithTag("chord_lookup_fretboard").assertExists()
         compose.onNodeWithTag("chord_lookup_summary").assertTextEquals("C")
+        compose.onNodeWithTag("chord_lookup_position_2").assertContentDescriptionEquals(
+            "String 4, relative fret 2, sounds E3, degree 3")
         click("chord_next")
         click("chord_copy")
         compose.onNodeWithTag("chord_editor_fretboard").assertExists()

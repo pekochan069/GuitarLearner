@@ -27,6 +27,24 @@ object ChordTheory {
         formula("1 3 5 b7 b9 11 13", 5, 11),
     )
 
+    private val familiarShapes = buildSet {
+        listOf("x32010", "320003", "xx0232", "x02220", "022100", "x02210", "022000", "xx0231",
+            "x32000", "x32310", "320001", "xx0212", "x02020", "020100", "x21202",
+            "x02010", "020000", "xx0211", "xx3210", "x02120", "xx0222", "021100",
+            "x02200", "x02230", "xx0230", "xx0233", "022200").forEach { add(referenceShape(it)) }
+        listOf("022100", "x02220", "022000", "x02210", "020100", "x02020",
+            "020000", "x02010", "021100", "x02120", "022200", "x02230", "x02200").forEach { source ->
+            for (offset in 1..9) add(referenceShape(source, offset))
+        }
+    }
+
+    private fun referenceShape(source: String, offset: Int = 0): ChordShape = ChordShape(source.map {
+        if (it == 'x') StringStop.Muted else when (val fret = it.digitToInt() + offset) {
+            0 -> StringStop.Open
+            else -> StringStop.Fretted(fret)
+        }
+    })
+
     fun formula(quality: ChordQuality): ChordFormula = formulas[quality.ordinal]
 
     fun tones(context: GuitarContext, shape: ChordShape): List<Int?> = Collections.unmodifiableList(
@@ -102,9 +120,13 @@ object ChordTheory {
         val ranked = mutableListOf<Pair<ChordShape, ChordCandidate>>()
         val order = compareBy<Pair<ChordShape, ChordCandidate>> { it.second.omitted.size }
             .thenBy { it.second.bass != query.identity.root }
-            .thenBy { pair -> frets(pair.first).let { if (it.isEmpty()) 0 else it.max() - it.min() } }
+            .thenBy { query.context.tuning == TuningPreset.Standard.tuning && it.first !in familiarShapes }
+            .thenBy { pair -> pair.first.stops.dropWhile { it == StringStop.Muted }
+                .dropLastWhile { it == StringStop.Muted }.count { it == StringStop.Muted } }
             .thenBy { pair -> frets(pair.first).maxOrNull() ?: 0 }
             .thenBy { pair -> pair.first.stops.count { it == StringStop.Muted } }
+            .thenBy { pair -> frets(pair.first).size }
+            .thenBy { pair -> frets(pair.first).let { if (it.isEmpty()) 0 else it.max() - it.min() } }
             .thenBy { pair -> pair.first.stops.joinToString(",") { stopCode(it).toString().padStart(2, '0') } }
         for (start in 1..9) {
             val options = query.context.tuning.pitches.map { pitch ->

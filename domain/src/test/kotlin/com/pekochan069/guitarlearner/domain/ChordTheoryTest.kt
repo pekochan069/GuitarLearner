@@ -136,6 +136,30 @@ class ChordTheoryTest {
         }
     }
 
+    @Test fun familiarStrummingShapesComeBeforeSparseNoteCombinations() {
+        val fixtures = listOf(
+            Triple(PitchClass.C, ChordQuality.Major, "x32010"),
+            Triple(PitchClass.G, ChordQuality.Major, "320003"),
+            Triple(PitchClass.D, ChordQuality.Major, "xx0232"),
+            Triple(PitchClass.A, ChordQuality.Major, "x02220"),
+            Triple(PitchClass.E, ChordQuality.Major, "022100"),
+            Triple(PitchClass.A, ChordQuality.Minor, "x02210"),
+            Triple(PitchClass.E, ChordQuality.Minor, "022000"),
+            Triple(PitchClass.D, ChordQuality.Minor, "xx0231"),
+            Triple(PitchClass.F, ChordQuality.Major, "133211"),
+            Triple(PitchClass.B, ChordQuality.Minor, "x24432"),
+            Triple(PitchClass.G, ChordQuality.Seventh, "320001"),
+            Triple(PitchClass.B, ChordQuality.Major, "x24442"),
+            Triple(PitchClass.C, ChordQuality.Minor, "x35543"),
+            Triple(PitchClass.F, ChordQuality.Minor, "133111"),
+        )
+        for (capo in listOf(0, 2)) for ((root, quality, stops) in fixtures) {
+            val identity = ChordIdentity(root.transpose(capo), quality)
+            val first = ChordTheory.representatives(ChordQuery(standard.copy(capo = capo), identity)).first()
+            assertEquals("$identity capo $capo", shape(stops).stops, first.stops)
+        }
+    }
+
     @Test fun sixStringModelsCopyTheirInputsAndPresetContextHasIndependentLimits() {
         val values = MutableList<StringStop>(6) { StringStop.Open }
         val immutable = ChordShape(values)
