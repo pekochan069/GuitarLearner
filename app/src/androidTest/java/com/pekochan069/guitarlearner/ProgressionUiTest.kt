@@ -9,6 +9,9 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
+import android.graphics.Bitmap
+import android.util.Log
 import arrow.core.Either
 import com.pekochan069.guitarlearner.adapters.AndroidChordsHost
 import com.pekochan069.guitarlearner.adapters.AndroidProgressionsHost
@@ -22,6 +25,7 @@ import com.slack.circuit.foundation.CircuitCompositionLocals
 import com.slack.circuit.foundation.CircuitContent
 import java.util.Locale
 import java.util.UUID
+import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
@@ -61,7 +65,9 @@ class ProgressionUiTest {
         }
         click("progression_step_0")
         click("progression_duration_0")
-        compose.onNodeWithText("1/1").performClick()
+        diagnostic("after_duration_anchor")
+        click("progression_duration_0_option_0")
+        compose.waitUntil(5_000) { host.current.value.draft.content.steps[0].duration.value == NoteValue.Whole }
         click("progression_dot_0")
         click("progression_tie_0")
         compose.waitUntil(5_000) { (host.current.value.draft.content.steps[0] as ProgressionStep.Chord).tieToNext }
@@ -106,8 +112,11 @@ class ProgressionUiTest {
         click("feature_Progressions")
         click("progression_add_chord")
         click("progression_copy_current")
-        compose.onNodeWithTag("progression_editor_fret_5_3").performScrollTo().assertHasClickAction()
-            .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp).performClick()
+        compose.onNodeWithTag("progression_editor_fret_5_3").performScrollTo().assertIsDisplayed().assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+        diagnostic("before_fret")
+        compose.onNodeWithTag("progression_editor_fret_5_3").performClick()
+        diagnostic("after_fret")
         click("progression_commit_chord")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.isNotEmpty() }
         click("progression_context")
@@ -131,7 +140,18 @@ class ProgressionUiTest {
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == 2 }
     }
 
-    private fun click(tag: String) { compose.onNodeWithTag(tag).performScrollTo().performClick() }
+    private fun click(tag: String) {
+        try { compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick() }
+        catch (failure: AssertionError) { diagnostic("failed_$tag"); throw failure }
+    }
+    private fun diagnostic(label: String) {
+        compose.onAllNodes(isRoot(), useUnmergedTree = true).printToLog("ProgressionUiDiagnostic", maxDepth = 8)
+        InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap ->
+            val file = File(compose.activity.getExternalFilesDir(null), "progression_$label.png")
+            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            Log.d("ProgressionUiDiagnostic", "$label screenshot: ${file.absolutePath}")
+        }
+    }
     private fun show(locale: Locale, dark: Boolean, scale: Float) {
         val circuit = Circuit.Builder().addPresenterFactory(FoundationPresenter.Factory(ProgressionUiAppearance(),
             ProgressionUiMetronome(), FakeTuner(), chords, host)).addUiFactory(FoundationUiFactory).build()
