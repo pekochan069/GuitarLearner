@@ -21,6 +21,7 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState as NativePlaybackState
 import android.os.Build
 import android.os.PowerManager
+import androidx.core.net.toUri
 import androidx.core.content.ContextCompat
 import arrow.core.Either
 import arrow.core.left
@@ -324,7 +325,7 @@ class AndroidProgressionsHost(
     }
 
     private fun serviceIntent(action: String, id: Long): Intent = Intent(application, serviceClass)
-        .setAction(action).putExtra(EXTRA_RUN_ID, id)
+        .setAction(action).setData("guitarlearner://progression/$id/$action".toUri()).putExtra(EXTRA_RUN_ID, id)
 
     private inner class PlaybackRun(
         val service: Service,

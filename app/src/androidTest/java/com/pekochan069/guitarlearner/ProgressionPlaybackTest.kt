@@ -2,7 +2,11 @@ package com.pekochan069.guitarlearner
 
 import android.app.Application
 import android.app.NotificationManager
+import android.app.Notification
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.os.Handler
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -26,6 +30,7 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.json.JSONObject
 
 class ProgressionPlaybackTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
@@ -178,14 +183,38 @@ class ProgressionPlaybackTest {
         assertNull(host.current.value.draft.targetId)
     }
 
-    @Test fun noisyOutputStopsPausedPlaybackAndResumeCannotRestartIt(): Unit = runBlocking {
+    @Test fun registeredNoisyReceiverHandlesASimulatedSystemInterruptionWithoutRestart(): Unit = runBlocking {
+        val nativeRegistration = NoisyReceiverApplication(application)
+        host = AndroidProgressionsHost(nativeRegistration, ProgressionPlaybackService::class.java, MainActivity::class.java, preferences)
+        application.graphOverride = createGraphFactory<AppGraph.Factory>().create(application, metronome, host)
         host.execute(ProgressionCommand.Play()).success()
         await { it is ProgressionPlayback.Playing }
         host.execute(ProgressionCommand.Pause).success()
-        application.sendBroadcast(Intent(AudioManager.ACTION_AUDIO_BECOMING_NOISY).setPackage(application.packageName))
+        withContext(Dispatchers.Main) {
+            requireNotNull(nativeRegistration.noisy).onReceive(nativeRegistration, Intent(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
+        }
         await { it == ProgressionPlayback.Stopped(StopReason.OutputDisconnected) }
         host.execute(ProgressionCommand.Resume).success()
         assertEquals(ProgressionPlayback.Stopped(StopReason.OutputDisconnected), host.current.value.playback)
+    }
+
+    @Test fun retainedNotificationActionsCannotControlALaterRun(): Unit = runBlocking {
+        host.execute(ProgressionCommand.Play()).success()
+        await { it is ProgressionPlayback.Playing }
+        val previous = notification()
+        val stalePause = previous.actions[0].actionIntent
+        val staleStop = previous.actions[1].actionIntent
+        host.execute(ProgressionCommand.Stop).success()
+        host.execute(ProgressionCommand.Play()).success()
+        await { it is ProgressionPlayback.Playing }
+        val current = notification()
+        assertNotEquals(stalePause, current.actions[0].actionIntent)
+        assertNotEquals(staleStop, current.actions[1].actionIntent)
+        stalePause.send(); staleStop.send()
+        delay(100)
+        assertTrue(host.current.value.playback is ProgressionPlayback.Playing)
+        current.actions[0].actionIntent.send()
+        await { it is ProgressionPlayback.Paused }
     }
 
     @Test fun transientFocusLossStopsUntilTheNextManualPlay(): Unit = runBlocking {
@@ -228,12 +257,59 @@ class ProgressionPlaybackTest {
         await { it == ProgressionPlayback.Stopped(StopReason.OutputDisconnected) }
     }
 
+    @Test fun unknownSoundingShapeSurvivesRealJsonReloadAndNativePlayback(): Unit = runBlocking {
+        val context = GuitarContext(GuitarTuning(List(6) { GuitarPitch(if (it % 2 == 0) PitchClass.C else PitchClass.Cs, 3) }))
+        val unknown = ChordShape(List(6) { StringStop.Open })
+        assertEquals(ChordAnalysis.Unrecognized, ChordTheory.analyze(context, unknown))
+        host.execute(ProgressionCommand.NewDraft).success()
+        host.execute(ProgressionCommand.SetContext(context)).success()
+        host.execute(ProgressionCommand.Insert(ProgressionStep.Chord("Unknown", unknown))).success()
+        host.execute(ProgressionCommand.SetName("Unknown practice")).success()
+        host.execute(ProgressionCommand.Save).success()
+        val saved = host.current.value.records.single()
+        host = AndroidProgressionsHost(application, ProgressionPlaybackService::class.java, MainActivity::class.java, preferences)
+        application.graphOverride = createGraphFactory<AppGraph.Factory>().create(application, metronome, host)
+        assertEquals(saved.content, host.current.value.draft.content)
+        assertEquals(saved.id, host.current.value.draft.targetId)
+        host.execute(ProgressionCommand.Play()).success()
+        await { it is ProgressionPlayback.Playing && it.position.stepIndex == 0 }
+    }
+
+    @Test fun invalidJsonVersionsShapesAndTiesRemainProtectedFromOverwrite(): Unit = runBlocking {
+        val valid = JSONObject(requireNotNull(preferences.getString("document", null)))
+        val changed = listOf<(JSONObject) -> Unit>(
+            { it.put("version", 2) },
+            { json -> json.getJSONObject("draft").getJSONObject("content").getJSONArray("steps").getJSONObject(0).put("tie", true) },
+            { json -> val stops = json.getJSONObject("draft").getJSONObject("content").getJSONArray("steps").getJSONObject(0).getJSONArray("stops")
+                repeat(6) { stops.put(it, -1) } },
+        )
+        for (mutate in changed) {
+            val source = JSONObject(valid.toString()).also(mutate).toString()
+            assertTrue(preferences.edit().putString("document", source).commit())
+            val protected = AndroidProgressionsHost(application, ProgressionPlaybackService::class.java, MainActivity::class.java, preferences)
+            assertEquals(ProgressionFailure.ReadFailed, protected.current.value.readFailure)
+            assertEquals(Either.Left(ProgressionFailure.ReadFailed), protected.execute(ProgressionCommand.SetName("Keep existing data")))
+            assertEquals(source, preferences.getString("document", null))
+        }
+    }
+
     private suspend fun await(predicate: (ProgressionPlayback) -> Boolean) {
         withTimeout(5_000) { host.current.first { predicate(it.playback) } }
     }
-    private fun token(): MediaSession.Token = requireNotNull(BundleCompat.getParcelable(application
-        .getSystemService(NotificationManager::class.java).activeNotifications.single { it.id == 2 }.notification.extras,
+    private fun notification(): Notification = application.getSystemService(NotificationManager::class.java)
+        .activeNotifications.single { it.id == 2 }.notification
+    private fun token(): MediaSession.Token = requireNotNull(BundleCompat.getParcelable(notification().extras,
         android.app.Notification.EXTRA_MEDIA_SESSION, MediaSession.Token::class.java))
+}
+
+private class NoisyReceiverApplication(delegate: Application) : Application() {
+    var noisy: BroadcastReceiver? = null
+        private set
+    init { attachBaseContext(delegate) }
+    override fun registerReceiver(receiver: BroadcastReceiver?, filter: IntentFilter, permission: String?, scheduler: Handler?, flags: Int): Intent? {
+        if (filter.hasAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)) noisy = receiver
+        return super.registerReceiver(receiver, filter, permission, scheduler, flags)
+    }
 }
 
 private fun Either<ProgressionFailure, Unit>.success() { assertEquals(Either.Right(Unit), this) }

@@ -34,6 +34,8 @@ class ProgressionSequencerTest {
     @Test fun invalidTiesRejectAndEditedAdjacencyClearsOnlyInvalidJoins() {
         val chord = ProgressionStep.Chord("C", shape, tieToNext = true)
         assertThrows(IllegalArgumentException::class.java) { ProgressionContent(steps = listOf(chord, ProgressionStep.Rest())) }
+        assertThrows(IllegalArgumentException::class.java) { ProgressionContent(steps = listOf(chord,
+            chord.copy(shape = shape.withString(5, StringStop.Fretted(3)), tieToNext = false))) }
         val valid = ProgressionContent(steps = listOf(chord, chord.copy(tieToNext = false)))
         assertFalse((valid.withEditedSteps(listOf(chord, ProgressionStep.Rest())).steps.first() as ProgressionStep.Chord).tieToNext)
         assertThrows(IllegalArgumentException::class.java) { ProgressionStep.Chord("empty", ChordShape()) }
@@ -69,5 +71,14 @@ class ProgressionSequencerTest {
             assertEquals(49_500L, sequence.nextFrame)
             assertEquals(1_500L, sequence.nextFrame - ticks[64].frame)
         }
+    }
+    @Test fun enabledRestKeepsBeatClicksAndStepPositionWhileSilencingVoices() {
+        val sequence = ProgressionSequencer(ProgressionContent(steps = listOf(ProgressionStep.Rest(NoteDuration(NoteValue.Whole, true)))), 0, 48_000)
+        val ticks = List(64 + 96) { sequence.nextTick() }.drop(64)
+        assertTrue(ticks.first().silence)
+        assertTrue(ticks.all { it.position.stepIndex == 0 && it.position.countInBeat == null && it.attack == null })
+        assertEquals(6, ticks.count { it.click != null })
+        assertEquals(listOf(BeatAccent.Accent, BeatAccent.Normal, BeatAccent.Normal, BeatAccent.Normal, BeatAccent.Accent, BeatAccent.Normal), ticks.mapNotNull { it.click })
+        assertEquals(192_000L, sequence.nextFrame - ticks.first().frame)
     }
 }
