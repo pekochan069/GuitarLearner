@@ -18,39 +18,59 @@
     <string name="appearance">Appearance</string>
     <string name="language">Language</string>
     <string name="close">Close preferences</string>
-    <string name="tuner_title">Tuner demo</string>
-    <string name="tuner_subtitle">Sample pitch readings</string>
+    <string name="tuner_title">Tuner</string>
     <string name="metronome_title">Metronome</string>
     <string name="gallery_title">Component examples</string>
     <string name="gallery_subtitle">Buttons, typography, colors, and shapes</string>
-    <string name="tuner_demo_notice">Sample readings only. The microphone is not used.</string>
     <string name="gallery_demo_notice">Select a control to change its example state.</string>
-    <string name="tuner_target">Sample target · A2</string>
+    <string name="tuner_target">Target string</string>
+    <string name="tuner_target_description">Auto finds the nearest standard string. Select a string to tune it manually.</string>
+    <string name="tuner_auto">Auto</string>
+    <string name="tuner_string_option">String %1$d · %2$s</string>
+    <string name="tuner_string_number">String %1$d</string>
+    <string name="tuner_selected_string">Selected string</string>
+    <string name="tuner_detected_string">Detected string</string>
+    <string name="tuner_reference">Standard tuning · A4 = 440 Hz</string>
+    <string name="tuner_start">Start listening</string>
+    <string name="tuner_stop">Stop listening</string>
+    <string name="tuner_retry">Retry</string>
+    <string name="tuner_stopped">Stopped</string>
+    <string name="tuner_starting">Preparing microphone…</string>
+    <string name="tuner_stopping">Stopping…</string>
+    <string name="tuner_unavailable">Listening unavailable</string>
+    <string name="tuner_pluck">Pluck one string</string>
+    <string name="tuner_uncertain">Uncertain · pluck one string again</string>
+    <string name="tuner_wrong_octave">Pluck the selected open string</string>
+    <string name="tuner_low">Low · raise the pitch</string>
+    <string name="tuner_high">High · lower the pitch</string>
+    <string name="tuner_settling">Hold steady…</string>
+    <string name="tuner_in_tune">In tune</string>
+    <string name="tuner_cents">%1$+.1f cents</string>
+    <string name="tuner_tolerance">In-tune tolerance</string>
+    <string name="tuner_tolerance_description">Choose how close the pitch must be. A steady reading for 300 ms earns In tune. This choice is saved on this phone.</string>
+    <plurals name="tuner_tolerance_option">
+        <item quantity="one">±%1$d cent</item>
+        <item quantity="other">±%1$d cents</item>
+    </plurals>
+    <string name="tuner_saving">Saving tolerance…</string>
+    <string name="tuner_reload">Reload saved tolerance</string>
+    <string name="tuner_app_settings">App settings</string>
+    <string name="tuner_privacy_settings">Microphone privacy settings</string>
+    <string name="tuner_permission_denied">Allow microphone access to tune. Tap Retry or allow it in app settings.</string>
+    <string name="tuner_permission_revoked">Microphone permission was removed. Allow access in app settings, then tap Retry.</string>
+    <string name="tuner_mic_blocked">The microphone is muted or blocked. Check microphone privacy or other recording apps, then tap Retry.</string>
+    <string name="tuner_input_failed">Microphone recording failed. Tap Retry to start again.</string>
+    <string name="tuner_no_input">The microphone stopped sending audio. Tap Retry to start again.</string>
+    <string name="tuner_shutdown_failed">The microphone could not close safely. Open app settings, tap Force stop, then reopen the app.</string>
+    <string name="tuner_metronome_stop_failed">Could not stop the metronome. Stop its playback, then tap Retry.</string>
+    <string name="tuner_settings_failed">Could not open system settings. Open them from your phone, then tap Retry.</string>
+    <string name="tuner_read_failed">Could not read the saved tolerance. The shown choice is still in use.</string>
+    <string name="tuner_save_failed">Could not save the tolerance. Your previous choice is still in use. Select a choice to try again.</string>
+    <string name="tuner_one_string_guidance">Pluck one open string at a time and mute the others. Quiet or overlapping sounds may give no reading; some overlapping sounds can resemble a single string.</string>
     <string name="note_placeholder" translatable="false">--</string>
-    <string name="note_a2" translatable="false">A2</string>
-    <string name="reference_frequency">Reference · 110 Hz</string>
     <string name="pitch_low" translatable="false">−50</string>
     <string name="pitch_center" translatable="false">0</string>
     <string name="pitch_high" translatable="false">+50</string>
-    <string name="reading_no_signal">No signal</string>
-    <string name="reading_flat">Flat</string>
-    <string name="reading_in_tune">In tune</string>
-    <string name="reading_sharp">Sharp</string>
-    <string name="guidance_no_signal">Choose a sample reading below.</string>
-    <string name="guidance_flat">Raise the pitch.</string>
-    <string name="guidance_in_tune">Pitch matches the target.</string>
-    <string name="guidance_sharp">Lower the pitch.</string>
-    <plurals name="cents_flat">
-        <item quantity="one">%1$d cent flat</item>
-        <item quantity="other">%1$d cents flat</item>
-    </plurals>
-    <plurals name="cents_sharp">
-        <item quantity="one">%1$d cent sharp</item>
-        <item quantity="other">%1$d cents sharp</item>
-    </plurals>
-    <string name="cents_center">0 cents · centered</string>
-    <string name="try_reading">Sample readings</string>
-    <string name="reading_description">Select a sample to see its pitch feedback.</string>
     <string name="tempo">Tempo</string>
     <string name="tempo_value">%1$d</string>
     <string name="beats_per_minute">beats per minute</string>

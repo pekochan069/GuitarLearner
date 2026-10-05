@@ -14,6 +14,13 @@ internal fun SemanticsNodeInteractionsProvider.openMetronome() {
     onNodeWithTag("feature_Metronome").performScrollTo().performClick()
 }
 
+internal fun SemanticsNodeInteractionsProvider.openTuner() {
+    if (onAllNodesWithTag("navigate_up").fetchSemanticsNodes().isNotEmpty()) {
+        onNodeWithTag("navigate_up").performClick()
+    }
+    onNodeWithTag("feature_Tuner").performScrollTo().performClick()
+}
+
 internal fun SemanticsNodeInteractionsProvider.openDevelopmentSample(sample: DevelopmentSample) {
     onNodeWithTag("settings").performClick()
     onNodeWithTag("sample_" + sample.name).performScrollTo().performClick()
