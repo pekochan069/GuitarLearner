@@ -1,0 +1,7 @@
+<resources>
+    <string name="progression_notification_channel">Chord progression playback</string>
+    <string name="progression_notification_title">Chord progression</string>
+    <string name="progression_notification_paused">Paused</string>
+    <string name="progression_notification_pause">Pause</string>
+    <string name="progression_notification_resume">Resume</string>
+</resources>
