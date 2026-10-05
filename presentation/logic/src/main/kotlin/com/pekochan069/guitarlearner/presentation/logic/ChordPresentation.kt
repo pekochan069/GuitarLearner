@@ -3,9 +3,11 @@ package com.pekochan069.guitarlearner.presentation.logic
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.pekochan069.guitarlearner.domain.ChordAnalysis
@@ -45,22 +47,24 @@ internal fun presentChords(chords: Chords): ChordPresentation {
     var tuningExpanded by rememberSaveable { mutableStateOf(false) }
     var root by rememberSaveable { mutableStateOf(0) }
     var quality by rememberSaveable { mutableStateOf(ChordQualityUi.Major.name) }
-    var rawCapo by rememberSaveable { mutableStateOf<String?>(null) }
-    var rawName by rememberSaveable { mutableStateOf<String?>(null) }
-    var rawNotes by rememberSaveable { mutableStateOf<List<String?>>(List(6) { null }) }
-    var rawOctaves by rememberSaveable { mutableStateOf<List<String?>>(List(6) { null }) }
-    var rawFrets by rememberSaveable { mutableStateOf<List<String?>>(List(6) { null }) }
+    val inputsSaver = remember(chords) { chordInputsSaver(chords.current.value.draft) }
+    var inputs by rememberSaveable(stateSaver = inputsSaver) { mutableStateOf(ChordInputs()) }
     var notice by remember { mutableStateOf<ChordNotice?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var commandGeneration by remember { mutableLongStateOf(0L) }
     val scope = rememberCoroutineScope()
 
     fun execute(command: ChordCommand, recordOperation: Boolean = false) {
         if (recordOperation && busy) return
         if (recordOperation) busy = true
+        val generation = ++commandGeneration
         notice = null
         scope.launch {
             try {
-                chords.execute(command).fold({ notice = it.toNotice() }, {})
+                chords.execute(command).fold(
+                    { if (generation == commandGeneration) notice = it.toNotice() },
+                    { if (generation == commandGeneration) notice = null },
+                )
             } finally {
                 if (recordOperation) busy = false
             }
@@ -68,16 +72,12 @@ internal fun presentChords(chords: Chords): ChordPresentation {
     }
 
     fun resetInputs() {
-        rawCapo = null
-        rawName = null
-        rawNotes = List(6) { null }
-        rawOctaves = List(6) { null }
-        rawFrets = List(6) { null }
+        inputs = ChordInputs()
     }
 
     fun setPitch(index: Int) {
         val pitch = chords.current.value.draft.context.tuning.pitches[index]
-        parseGuitarPitch(rawNotes[index] ?: pitch.note.symbol, rawOctaves[index] ?: pitch.octave.toString())?.let {
+        parseGuitarPitch(inputs.notes[index] ?: pitch.note.symbol, inputs.octaves[index] ?: pitch.octave.toString())?.let {
             execute(ChordCommand.SetStringPitch(index, it))
         }
     }
@@ -87,11 +87,11 @@ internal fun presentChords(chords: Chords): ChordPresentation {
     val draft = workspace.draft
     val analysis = workspace.analysis
     val selected = (analysis as? ChordAnalysis.Recognized)?.candidates?.firstOrNull { it.identity == draft.selected }
-    val capoInput = rawCapo ?: draft.context.capo.toString()
+    val capoInput = inputs.capo ?: draft.context.capo.toString()
     val capoError = capoInput.toIntOrNull()?.let { it !in 0..12 } ?: true
-    val name = rawName ?: draft.name
+    val name = inputs.name ?: draft.name
     val nameError = name.isNotEmpty() && name.trim().length !in 1..80
-    val strings = draft.strings(rawNotes, rawOctaves, rawFrets)
+    val strings = draft.strings(inputs.notes, inputs.octaves, inputs.frets)
     val ready = workspace.lookup as? ChordLookup.Ready
     val query = when (val lookup = workspace.lookup) {
         is ChordLookup.Searching -> lookup.query
@@ -136,7 +136,7 @@ internal fun presentChords(chords: Chords): ChordPresentation {
                 record.content.context.tuning.pitches.joinToString(" · ") { it.note.symbol + it.octave }, record.content.context.capo)
         },
         canSave = draft.shape.hasSound && name.trim().length in 1..80 && !capoError && strings.none { it.noteError || it.octaveError || it.fretError }
-            && !busy && workspace.readFailure == null,
+            && inputs.matches(draft) && !busy && workspace.readFailure == null,
         busy = busy, unsynced = workspace.persistence == DraftPersistence.Unsynced, readFailed = workspace.readFailure != null,
         notice = notice ?: workspace.actionFailure?.toNotice(),
     )
@@ -145,23 +145,25 @@ internal fun presentChords(chords: Chords): ChordPresentation {
             is ChordEvent.SetSection -> { section = event.value.name; if (event.value == ChordSection.Lookup && workspace.lookup == ChordLookup.Idle) search() }
             is ChordEvent.SetTuningExpanded -> tuningExpanded = event.value
             is ChordEvent.SetPreset -> {
-                rawNotes = List(6) { null }; rawOctaves = List(6) { null }
+                inputs = inputs.copy(notes = List(6) { null }, octaves = List(6) { null })
                 execute(ChordCommand.SetTuning(TuningPreset.valueOf(event.value.name).tuning))
             }
             is ChordEvent.SetCapo -> {
-                rawCapo = event.value
+                inputs = inputs.copy(capo = event.value)
                 event.value.toIntOrNull()?.takeIf { it in 0..12 }?.let { execute(ChordCommand.SetCapo(it)) }
             }
             is ChordEvent.SetNote -> if (event.index in 0..5) {
-                if (rawOctaves[event.index] == null) rawOctaves = rawOctaves.updated(event.index, draft.context.tuning.pitches[event.index].octave.toString())
-                rawNotes = rawNotes.updated(event.index, event.value); setPitch(event.index)
+                inputs = inputs.copy(notes = inputs.notes.updated(event.index, event.value),
+                    octaves = inputs.octaves.updated(event.index, inputs.octaves[event.index] ?: draft.context.tuning.pitches[event.index].octave.toString()))
+                setPitch(event.index)
             }
             is ChordEvent.SetOctave -> if (event.index in 0..5) {
-                if (rawNotes[event.index] == null) rawNotes = rawNotes.updated(event.index, draft.context.tuning.pitches[event.index].note.symbol)
-                rawOctaves = rawOctaves.updated(event.index, event.value); setPitch(event.index)
+                inputs = inputs.copy(octaves = inputs.octaves.updated(event.index, event.value),
+                    notes = inputs.notes.updated(event.index, inputs.notes[event.index] ?: draft.context.tuning.pitches[event.index].note.symbol))
+                setPitch(event.index)
             }
             is ChordEvent.SetStop -> if (event.index in 0..5) {
-                rawFrets = rawFrets.updated(event.index, null)
+                inputs = inputs.copy(frets = inputs.frets.updated(event.index, null))
                 val stop = when (event.value) {
                     ChordStopUi.Muted -> StringStop.Muted
                     ChordStopUi.Open -> StringStop.Open
@@ -170,12 +172,12 @@ internal fun presentChords(chords: Chords): ChordPresentation {
                 execute(ChordCommand.SetStop(event.index, stop))
             }
             is ChordEvent.SetFret -> if (event.index in 0..5) {
-                rawFrets = rawFrets.updated(event.index, event.value)
+                inputs = inputs.copy(frets = inputs.frets.updated(event.index, event.value))
                 event.value.toIntOrNull()?.takeIf { it in 0..12 }?.let { value ->
                     execute(ChordCommand.SetStop(event.index, if (value == 0) StringStop.Open else StringStop.Fretted(value)))
                 }
             }
-            is ChordEvent.SetName -> { rawName = event.value; execute(ChordCommand.SetName(event.value)) }
+            is ChordEvent.SetName -> { inputs = inputs.copy(name = event.value); execute(ChordCommand.SetName(event.value)) }
             is ChordEvent.SelectCandidate -> if (event.root in 0..11) {
                 execute(ChordCommand.SelectCandidate(ChordIdentity(PitchClass.entries[event.root], ChordQuality.valueOf(event.quality.name))))
             }
@@ -185,13 +187,65 @@ internal fun presentChords(chords: Chords): ChordPresentation {
             is ChordEvent.SelectRepresentative -> execute(ChordCommand.SelectRepresentative(event.index))
             ChordEvent.CopyRepresentative -> { resetInputs(); section = ChordSection.Edit.name; execute(ChordCommand.CopyRepresentative) }
             ChordEvent.NewDraft -> { resetInputs(); execute(ChordCommand.NewDraft) }
-            ChordEvent.Save -> execute(ChordCommand.SaveDraft, recordOperation = true)
+            ChordEvent.Save -> if (inputs.matches(chords.current.value.draft)) execute(ChordCommand.SaveDraft, recordOperation = true)
             is ChordEvent.Load -> if (!busy) { resetInputs(); section = ChordSection.Edit.name; execute(ChordCommand.LoadRecord(event.id), recordOperation = true) }
             is ChordEvent.Delete -> execute(ChordCommand.DeleteRecord(event.id), recordOperation = true)
             ChordEvent.RetryDraftWrite -> execute(ChordCommand.RetryDraftWrite)
             ChordEvent.RetryStorageRead -> execute(ChordCommand.RetryStorageRead)
         }
     }
+}
+
+private data class ChordInputs(
+    val capo: String? = null,
+    val name: String? = null,
+    val notes: List<String?> = List(6) { null },
+    val octaves: List<String?> = List(6) { null },
+    val frets: List<String?> = List(6) { null },
+) {
+    fun matches(draft: ChordDraft): Boolean =
+        (capo == null || capo.toIntOrNull() == draft.context.capo) &&
+            (name == null || name.trim() == draft.name.trim()) &&
+            draft.context.tuning.pitches.indices.all { index ->
+                pitch(index, draft) == draft.context.tuning.pitches[index] &&
+                    (frets[index] == null || frets[index]?.toStop() == draft.shape.stops[index])
+            }
+
+    fun reconcile(draft: ChordDraft): ChordInputs {
+        val validCapo = capo?.toIntOrNull()?.takeIf { it in 0..12 }
+        val changedPitches = draft.context.tuning.pitches.indices.filter { index ->
+            val restored = pitch(index, draft)
+            restored != null && restored != draft.context.tuning.pitches[index]
+        }
+        return copy(
+            capo = if (validCapo != null && validCapo != draft.context.capo) null else capo,
+            name = if (name != null && name.trim().length in 1..80 && name.trim() != draft.name.trim()) null else name,
+            notes = notes.mapIndexed { index, value -> if (index in changedPitches) null else value },
+            octaves = octaves.mapIndexed { index, value -> if (index in changedPitches) null else value },
+            frets = frets.mapIndexed { index, value ->
+                if (value?.toStop()?.let { it != draft.shape.stops[index] } == true) null else value
+            },
+        )
+    }
+
+    private fun pitch(index: Int, draft: ChordDraft): GuitarPitch? {
+        val accepted = draft.context.tuning.pitches[index]
+        return parseGuitarPitch(notes[index] ?: accepted.note.symbol, octaves[index] ?: accepted.octave.toString())
+    }
+}
+
+private fun chordInputsSaver(draft: ChordDraft): Saver<ChordInputs, Any> = Saver(
+    save = { listOf(it.capo, it.name) + it.notes + it.octaves + it.frets },
+    restore = { value ->
+        (value as? List<*>)?.takeIf { it.size == 20 && it.all { field -> field == null || field is String } }?.let { fields ->
+            val text = fields.map { it as? String }
+            ChordInputs(text[0], text[1], text.subList(2, 8), text.subList(8, 14), text.subList(14, 20)).reconcile(draft)
+        }
+    },
+)
+
+private fun String.toStop(): StringStop? = toIntOrNull()?.takeIf { it in 0..12 }?.let {
+    if (it == 0) StringStop.Open else StringStop.Fretted(it)
 }
 
 private fun <T> List<T>.updated(index: Int, value: T): List<T> = mapIndexed { current, previous -> if (current == index) value else previous }
