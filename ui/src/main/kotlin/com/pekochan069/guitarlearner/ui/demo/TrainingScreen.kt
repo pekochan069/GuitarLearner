@@ -115,9 +115,11 @@ private fun TrainingFormats(eventSink: (TrainingEvent) -> Unit) {
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer()
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val textWidth = with(density) { ((maxWidth - 12.dp) / 2 - 56.dp).roundToPx().coerceAtLeast(1) }
+        val horizontalTextWidth = with(density) { ((maxWidth - 12.dp) / 2 - 56.dp).roundToPx().coerceAtLeast(1) }
+        val stacked = titles.any { title -> title.split(' ').any { measurer.measure(it, style).size.width > horizontalTextWidth } }
+        val textWidth = if (stacked) with(density) { ((maxWidth - 12.dp) / 2 - 16.dp).roundToPx().coerceAtLeast(1) } else horizontalTextWidth
         val textHeight = titles.maxOf { measurer.measure(it, style, constraints = Constraints(maxWidth = textWidth)).size.height }
-        val cardHeight = with(density) { textHeight.toDp().coerceAtLeast(32.dp) + 16.dp }
+        val cardHeight = with(density) { if (stacked) textHeight.toDp() + 56.dp else textHeight.toDp().coerceAtLeast(32.dp) + 16.dp }
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             formats.chunked(2).forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -127,10 +129,17 @@ private fun TrainingFormats(eventSink: (TrainingEvent) -> Unit) {
                             shape = MaterialTheme.shapes.extraLarge,
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer)) {
-                            Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
-                                Icon(painterResource(format.icon), null, Modifier.size(32.dp))
-                                Text(titles[format.ordinal], Modifier.weight(1f), style = style)
+                            if (stacked) {
+                                Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(painterResource(format.icon), null, Modifier.size(32.dp))
+                                    Text(titles[format.ordinal], Modifier.fillMaxWidth().testTag("training_format_label_${format.name}"), style = style)
+                                }
+                            } else {
+                                Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(painterResource(format.icon), null, Modifier.size(32.dp))
+                                    Text(titles[format.ordinal], Modifier.weight(1f).testTag("training_format_label_${format.name}"), style = style)
+                                }
                             }
                         }
                     }

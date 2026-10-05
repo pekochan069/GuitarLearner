@@ -26,6 +26,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -67,6 +68,13 @@ class TrainingLayoutTest {
             assertEquals(cards[0].top, cards[1].top)
             assertEquals(cards[2].top, cards[3].top)
             assertTrue(cards[1].left > cards[0].right && cards[2].top > cards[0].bottom)
+            if (locale == "en") {
+                val layouts = mutableListOf<TextLayoutResult>()
+                compose.onNodeWithTag("training_format_label_Fretboard", useUnmergedTree = true)
+                    .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                val layout = layouts.single()
+                assertTrue("Fretboard must fit on one line at enlarged text size", layout.getLineEnd(0, visibleEnd = true) >= "Fretboard".length)
+            }
             for (format in TrainingRepresentationUi.entries) {
                 compose.runOnIdle { page.value = TrainingPageUi.Root }
                 val title = when (format) {
