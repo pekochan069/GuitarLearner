@@ -73,6 +73,7 @@ class MetronomeRestartTest {
     @After
     fun restoreProductionGraph(): Unit = runBlocking {
         if (::preferences.isInitialized) preferences.releaseCommit()
+        if (::outputs.isInitialized) outputs.created.forEach { it.acknowledgeStop = true }
         if (::host.isInitialized) {
             host.execute(MetronomeCommand.Stop).assertSuccess()
             awaitServiceRemoved()
@@ -386,7 +387,10 @@ class MetronomeRestartTest {
     }
 
     private suspend fun awaitServiceRemoved() {
-        withTimeout(5_000) { while (runningService() != null) delay(10) }
+        val notifications = application.getSystemService(NotificationManager::class.java)
+        withTimeout(5_000) {
+            while (runningService() != null || notifications.activeNotifications.any { it.id == 1 }) delay(10)
+        }
     }
 
     @Suppress("DEPRECATION")
