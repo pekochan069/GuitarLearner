@@ -2,24 +2,30 @@ package com.pekochan069.guitarlearner
 
 import android.content.Context
 import android.content.res.Configuration
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import android.view.ContextThemeWrapper
+import androidx.activity.ComponentActivity
+import androidx.core.content.edit
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -30,6 +36,7 @@ import com.pekochan069.guitarlearner.domain.AppearanceFailure
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
 import com.pekochan069.guitarlearner.domain.AppearanceSnapshot
 import com.pekochan069.guitarlearner.domain.ChordCommand
+import com.pekochan069.guitarlearner.domain.ChordFailure
 import com.pekochan069.guitarlearner.domain.ChordLookup
 import com.pekochan069.guitarlearner.domain.DraftPersistence
 import com.pekochan069.guitarlearner.domain.LanguagePreference
@@ -64,7 +71,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ChordPresentationUiTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val preferenceName = "chord-ui-test-${UUID.randomUUID()}"
     private lateinit var host: AndroidChordsHost
@@ -100,8 +107,10 @@ class ChordPresentationUiTest {
         compose.waitUntil(5_000) { host.current.value.records.size == 1 }
         val id = host.current.value.records.single().id
         val savedShape = host.current.value.draft.shape
+        click("chord_open_context")
         compose.onNodeWithTag("chord_capo").performScrollTo().performTextReplacement("2")
         compose.waitUntil(5_000) { host.current.value.draft.context.capo == 2 && host.current.value.persistence == DraftPersistence.Synced }
+        click("chord_close_context")
         compose.onNodeWithTag("chord_summary").assertTextEquals("D")
         compose.onNodeWithTag("chord_shape_summary").assertTextEquals("Shape name without capo · C")
         assertEquals(savedShape, host.current.value.draft.shape)
@@ -126,6 +135,24 @@ class ChordPresentationUiTest {
     @Test fun englishLightLargeTextKeepsInputCorrectionAndOmissionsAccessible() { largeTextInputCorrectionJourney(Locale.ENGLISH, false) }
     @Test fun koreanDarkLargeTextKeepsInputCorrectionAndOmissionsAccessible() { largeTextInputCorrectionJourney(Locale.KOREAN, true) }
 
+    @Test fun unreadableCollectionShowsRecoveryUntilStorageCanConfirmItIsEmpty() {
+        val preferences = context.getSharedPreferences(preferenceName, Context.MODE_PRIVATE)
+        preferences.edit(commit = true) { putString("document", "not json") }
+        host = AndroidChordsHost(preferences)
+        assertEquals(ChordFailure.ReadFailed, host.current.value.readFailure)
+        show(Locale.ENGLISH, dark = false, scale = 1f)
+        click("feature_Chords")
+        click("chord_section_Collection")
+        compose.onNodeWithTag("chord_read_error").assertExists()
+        compose.onNodeWithTag("chord_retry_read").assertIsEnabled()
+        compose.onNodeWithTag("chord_collection_empty").assertDoesNotExist()
+        preferences.edit(commit = true) { remove("document") }
+        click("chord_retry_read")
+        compose.waitUntil(5_000) { host.current.value.readFailure == null }
+        compose.onNodeWithTag("chord_read_error").assertDoesNotExist()
+        compose.onNodeWithTag("chord_collection_empty").assertExists()
+    }
+
     private fun largeTextInputCorrectionJourney(locale: Locale, dark: Boolean) {
         runBlocking {
             val stops = listOf(StringStop.Muted, StringStop.Fretted(3), StringStop.Fretted(2), StringStop.Fretted(3), StringStop.Fretted(1), StringStop.Open)
@@ -138,22 +165,33 @@ class ChordPresentationUiTest {
         compose.onNodeWithTag("chord_summary").assertTextEquals("C7")
         compose.onNodeWithTag("chord_candidate_0").assertTextEquals(if (locale == Locale.KOREAN) "C7 · 생략음 5" else "C7 · omitted 5")
         compose.onNodeWithTag("chord_save").performScrollTo().assertHeightIsAtLeast(48.dp).assertIsEnabled()
+        click("chord_open_context")
+        compose.onNodeWithTag("chord_context_sheet").assertIsDisplayed()
         compose.onNodeWithTag("chord_capo").performScrollTo().performTextReplacement("99")
         compose.onNodeWithTag("chord_capo").assertTextContains("99")
         val localized = context.createConfigurationContext(Configuration(context.resources.configuration).apply { setLocale(locale) })
         compose.onNodeWithText(localized.getString(UiR.string.chord_capo_error)).assertExists()
         compose.onNodeWithTag("chord_accepted_capo").assertTextEquals(
             if (locale == Locale.KOREAN) "현재 전체 카포 · 0프렛" else "Current full capo · fret 0")
+        click("chord_close_context")
+        compose.onNodeWithTag("chord_context_sheet").assertDoesNotExist()
+        compose.onNodeWithTag("chord_context_error").assertExists()
         compose.onNodeWithTag("chord_save").assertIsNotEnabled()
         compose.onNodeWithTag("chord_summary").assertTextEquals("C7")
+        click("chord_open_context")
         compose.onNodeWithTag("chord_capo").performScrollTo().performTextReplacement("0")
         click("chord_custom_tuning")
         compose.onNodeWithTag("chord_octave_0").performScrollTo().performTextReplacement("bad")
         compose.onNodeWithTag("chord_octave_0").assertTextContains("bad")
         compose.onNodeWithText(localized.getString(UiR.string.chord_octave_error)).assertExists()
         assertEquals(2, host.current.value.draft.context.tuning.pitches[0].octave)
+        click("chord_close_context")
+        compose.onNodeWithTag("chord_context_error").assertExists()
         compose.onNodeWithTag("chord_save").assertIsNotEnabled()
+        click("chord_open_context")
         compose.onNodeWithTag("chord_octave_0").performScrollTo().performTextReplacement("2")
+        click("chord_close_context")
+        compose.onNodeWithTag("chord_context_error").assertDoesNotExist()
         compose.onNodeWithTag("chord_save").performScrollTo().assertIsEnabled()
         compose.onNodeWithTag("chord_stop_5_Open").performScrollTo().assertHasClickAction().assertHeightIsAtLeast(48.dp)
         compose.onNodeWithTag("chord_editor_fretboard").assertExists()
@@ -162,17 +200,30 @@ class ChordPresentationUiTest {
     }
 
     private fun show(locale: Locale, dark: Boolean, scale: Float) {
-        val localized = context.createConfigurationContext(Configuration(context.resources.configuration).apply { setLocale(locale) })
         val circuit = Circuit.Builder().addPresenterFactory(FoundationPresenter.Factory(ChordUiAppearance(), metronome, host))
             .addUiFactory(FoundationUiFactory).build()
-        compose.setContent {
-            CompositionLocalProvider(LocalContext provides localized, LocalDensity provides Density(LocalDensity.current.density, scale)) {
-                GuitarLearnerTheme(dark) { CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) } }
+        compose.runOnUiThread {
+            val localized = ContextThemeWrapper(compose.activity, compose.activity.theme).apply {
+                applyOverrideConfiguration(Configuration(compose.activity.resources.configuration).apply {
+                    setLocale(locale)
+                    fontScale = scale
+                })
             }
+            compose.activity.setContentView(ComposeView(localized).apply {
+                setContent { GuitarLearnerTheme(dark) { CircuitCompositionLocals(circuit) { CircuitContent(FoundationScreen) } } }
+            })
         }
     }
 
-    private fun click(tag: String) { compose.onNodeWithTag(tag).performScrollTo().performClick() }
+    private fun click(tag: String) {
+        if (tag.startsWith("chord_section_")) {
+            compose.onNodeWithTag("feature_scroll").performScrollToNode(
+                hasScrollAction() and hasAnyDescendant(hasTestTag(tag)))
+            compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick().assertIsSelected()
+        } else {
+            compose.onNodeWithTag(tag).performScrollTo().performClick()
+        }
+    }
     private fun setFret(index: Int, fret: Int) {
         click("chord_stop_${index}_Fretted")
         compose.waitUntil(5_000) { host.current.value.draft.shape.stops[index] is StringStop.Fretted }

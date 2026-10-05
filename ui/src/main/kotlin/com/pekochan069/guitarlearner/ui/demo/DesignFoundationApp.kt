@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -95,6 +97,8 @@ fun DesignFoundationApp(
 ): Unit {
     val destination = state.destination
     val metronome = destination == FoundationDestination.Feature(FeatureId.Metronome)
+    val chords = destination == FoundationDestination.Feature(FeatureId.Chords)
+    val contentSpacing = when { metronome -> 12.dp; chords -> 16.dp; else -> 24.dp }
     val homeScroll = rememberScrollState()
     val preferencesEnabled = state.settingsStatus != SettingsStatus.Saving
 
@@ -102,7 +106,11 @@ fun DesignFoundationApp(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium) },
+                title = {
+                    Text(stringResource(if (chords) R.string.chord_title else R.string.app_name),
+                        modifier = if (chords) Modifier.testTag("destination_title").semantics { heading() } else Modifier,
+                        style = MaterialTheme.typography.titleMedium)
+                },
                 navigationIcon = {
                     if (destination != FoundationDestination.Home) {
                         IconButton(onClick = { state.eventSink(FoundationEvent.NavigateBack) },
@@ -120,16 +128,19 @@ fun DesignFoundationApp(
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+        Box(
+            Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
+            contentAlignment = Alignment.TopCenter,
+        ) {
             key(destination) {
                 Column(
                     Modifier.widthIn(max = 680.dp).fillMaxWidth()
                         .verticalScroll(if (destination == FoundationDestination.Home) homeScroll else rememberScrollState())
                         .testTag(if (destination == FoundationDestination.Home) "home_scroll" else "feature_scroll")
-                        .padding(if (metronome) 12.dp else 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (metronome) 12.dp else 24.dp),
+                        .padding(contentSpacing),
+                    verticalArrangement = Arrangement.spacedBy(contentSpacing),
                 ) {
-                    destination.title?.let { title ->
+                    destination.title?.takeUnless { chords }?.let { title ->
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
                                 stringResource(title),
@@ -323,10 +334,10 @@ private fun HomeCatalog(state: FoundationState) {
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer),
                             ) {
-                                Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically) {
                                     Icon(painterResource(R.drawable.ic_chords), null, Modifier.size(32.dp))
-                                    Text(stringResource(R.string.chord_title), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                                    Text(stringResource(R.string.chord_title), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                                 }
                             }
                             FeatureId.Metronome -> Card(
@@ -336,12 +347,10 @@ private fun HomeCatalog(state: FoundationState) {
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
                             ) {
-                                Row(Modifier.fillMaxWidth().padding(16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically) {
                                     Icon(painterResource(R.drawable.ic_tempo), null, Modifier.size(32.dp))
-                                    Text(stringResource(R.string.metronome_title), Modifier.weight(1f),
-                                        style = MaterialTheme.typography.titleLarge)
+                                    Text(stringResource(R.string.metronome_title), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
                                 }
                             }
                         }
