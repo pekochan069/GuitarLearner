@@ -11,7 +11,7 @@ internal class ControlledProgressions : Progressions {
     override val current = MutableStateFlow(ProgressionWorkspace())
     val commands = mutableListOf<ProgressionCommand>()
     var result: Either<ProgressionFailure, Unit> = Either.Right(Unit)
-    var onCommand: ((ProgressionCommand) -> Unit)? = null
+    var onCommand: (suspend (ProgressionCommand) -> Unit)? = null
     override suspend fun execute(command: ProgressionCommand): Either<ProgressionFailure, Unit> {
         commands += command
         onCommand?.invoke(command)

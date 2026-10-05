@@ -52,7 +52,7 @@ internal fun ProgressionSheets(state: ProgressionUiState, eventSink: (Progressio
                         ProgressionSheetUi.None -> R.string.progression_title
                     }), Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
                     IconButton(onClick = { eventSink(ProgressionEvent.CloseSheet) }, modifier = Modifier.size(48.dp).testTag("progression_close_sheet")) {
-                        Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close))
+                        Icon(painterResource(R.drawable.ic_close), stringResource(R.string.progression_close))
                     }
                 }
                 Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).testTag("progression_sheet_scroll")

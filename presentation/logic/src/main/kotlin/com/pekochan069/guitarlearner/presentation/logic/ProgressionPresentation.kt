@@ -17,6 +17,7 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
     val workspace by progressions.current.collectAsState()
     val chordWorkspace by chords.current.collectAsState()
     var sheetName by rememberSaveable { mutableStateOf(ProgressionSheetUi.None.name) }
+    var sheetGeneration by remember { mutableIntStateOf(0) }
     var sourceName by rememberSaveable { mutableStateOf(ProgressionChordSourceUi.Named.name) }
     var root by rememberSaveable { mutableStateOf(0) }
     var qualityName by rememberSaveable { mutableStateOf(ChordQualityUi.Major.name) }
@@ -82,9 +83,20 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             lookup = ChordLookup.Ready(query, shapes)
         }
     }
+    fun closeSheet(request: Int = sheetGeneration) {
+        if (request != sheetGeneration) return
+        sheetGeneration++
+        sheetName = ProgressionSheetUi.None.name
+        replacementNew = false; replacementId = null
+    }
+    fun openSheet(value: ProgressionSheetUi) {
+        sheetGeneration++
+        sheetName = value.name
+        replacementNew = false; replacementId = null
+    }
     val ready = (lookup as? ChordLookup.Ready)?.takeIf { it.query == query && lookupContext == content.context }
     val namedShape = ready?.shapes?.getOrNull(ready.selectedIndex)
-    val manualShape = ChordShape(stops.map { when (it) { -1 -> StringStop.Muted; 0 -> StringStop.Open; else -> StringStop.Fretted(it) } })
+    val manualShape = stops.chordShape()
     val editorShape = if (source == ProgressionChordSourceUi.Named && sheet == ProgressionSheetUi.Chord) namedShape ?: ChordShape() else manualShape
     val selectedIdentity = query?.identity?.let { it.copy(root = it.root.transpose(content.context.capo)) }
     val editorDraft = ChordTheory.normalize(ChordDraft(editorName, content.context, editorShape, selectedIdentity))
@@ -117,9 +129,8 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
         else -> null
     }
     fun replaceDraft(command: ProgressionCommand) {
-        replacementNew = false; replacementId = null
+        closeSheet()
         resetContextInputs()
-        sheetName = ProgressionSheetUi.None.name
         editingIndex = null
         execute(record = true) { command }
     }
@@ -158,10 +169,11 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
     return ProgressionPresentation(state) { event ->
         when (event) {
             is ProgressionEvent.Select -> send(ProgressionCommand.Select(event.index))
-            is ProgressionEvent.OpenStep -> if (event.index in content.steps.indices) execute(after = { sheetName = ProgressionSheetUi.Step.name }) {
-                ProgressionCommand.Select(event.index)
+            is ProgressionEvent.OpenStep -> if (event.index in content.steps.indices) {
+                val request = ++sheetGeneration
+                execute(after = { if (sheetGeneration == request) sheetName = ProgressionSheetUi.Step.name }) { ProgressionCommand.Select(event.index) }
             }
-            is ProgressionEvent.OpenSheet -> sheetName = event.value.name
+            is ProgressionEvent.OpenSheet -> openSheet(event.value)
             is ProgressionEvent.OpenEditor -> {
                 val index = event.index
                 if (index != null && content.steps.getOrNull(index) !is ProgressionStep.Chord) return@ProgressionPresentation
@@ -171,20 +183,31 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
                 if (chord != null) copyShape(chord.name, chord.shape)
                 else { editorName = ""; root = 0; qualityName = ChordQualityUi.Major.name; sourceName = ProgressionChordSourceUi.Named.name }
                 lookupGeneration++
-                sheetName = ProgressionSheetUi.Chord.name
+                openSheet(ProgressionSheetUi.Chord)
             }
-            ProgressionEvent.CloseSheet -> sheetName = ProgressionSheetUi.None.name
+            ProgressionEvent.CloseSheet -> closeSheet()
             is ProgressionEvent.SetChordSource -> {
                 sourceName = event.value.name
                 if (event.value == ProgressionChordSourceUi.Named && editingIndex == null) editorName = ""
             }
-            ProgressionEvent.CommitEditor -> if (sheet == ProgressionSheetUi.Chord && source != ProgressionChordSourceUi.Saved && editor.canSave && !invalidSettings &&
-                (source != ProgressionChordSourceUi.Named || (namedShape != null &&
-                    (lookup as? ChordLookup.Ready)?.query == ChordQuery(progressions.current.value.draft.content.context.copy(capo = 0),
-                        ChordIdentity(PitchClass.entries[root], ChordQuality.valueOf(qualityName))) &&
-                    lookupContext == progressions.current.value.draft.content.context))) execute(record = true, after = { sheetName = ProgressionSheetUi.None.name }) {
-                editingIndex?.let { ProgressionCommand.ReplaceChord(it, editorName, editorShape) }
-                    ?: ProgressionCommand.Insert(ProgressionStep.Chord(editorName, editorShape))
+            ProgressionEvent.CommitEditor -> {
+                val currentContext = progressions.current.value.draft.content.context
+                val currentReady = (lookup as? ChordLookup.Ready)?.takeIf {
+                    it.query == ChordQuery(currentContext.copy(capo = 0), ChordIdentity(PitchClass.entries[root], ChordQuality.valueOf(qualityName))) &&
+                        lookupContext == currentContext
+                }
+                val accepted = when (ProgressionChordSourceUi.valueOf(sourceName)) {
+                    ProgressionChordSourceUi.Named -> currentReady?.shapes?.getOrNull(currentReady.selectedIndex)
+                    ProgressionChordSourceUi.Manual -> stops.chordShape()
+                    ProgressionChordSourceUi.Saved -> null
+                }
+                if (sheetName == ProgressionSheetUi.Chord.name && accepted != null && editor.canSave && !invalidSettings) {
+                    val request = sheetGeneration
+                    execute(record = true, after = { closeSheet(request) }) {
+                        editingIndex?.let { ProgressionCommand.ReplaceChord(it, editorName, accepted) }
+                            ?: ProgressionCommand.Insert(ProgressionStep.Chord(editorName, accepted))
+                    }
+                }
             }
             ProgressionEvent.CopyCurrentChord -> copyShape(chordWorkspace.draft.name, chordWorkspace.draft.shape)
             is ProgressionEvent.CopyCustomChord -> chordWorkspace.records.firstOrNull { it.id == event.id }?.let { copyShape(it.content.name, it.content.shape) }
@@ -222,7 +245,10 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             is ProgressionEvent.SetDuration -> send(ProgressionCommand.SetDuration(event.index, NoteDuration(NoteValue.valueOf(event.value.name), event.dotted)))
             is ProgressionEvent.SetTie -> send(ProgressionCommand.SetTie(event.index, event.value))
             is ProgressionEvent.Move -> send(ProgressionCommand.Move(event.index, event.index + event.delta))
-            is ProgressionEvent.Remove -> execute(after = { sheetName = ProgressionSheetUi.None.name }) { ProgressionCommand.Remove(event.index) }
+            is ProgressionEvent.Remove -> {
+                val request = sheetGeneration
+                execute(after = { closeSheet(request) }) { ProgressionCommand.Remove(event.index) }
+            }
             is ProgressionEvent.SetName -> send(ProgressionCommand.SetName(event.value))
             is ProgressionEvent.SetTempo -> { tempo = event.value; event.value.toIntOrNull()?.takeIf { it in 40..240 }?.let { send(ProgressionCommand.SetTempo(it)) } }
             is ProgressionEvent.SetNumerator -> { numerator = event.value; event.value.toIntOrNull()?.takeIf { it in 1..16 }?.let { value -> execute {
@@ -231,7 +257,9 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             is ProgressionEvent.SetDenominator -> execute { ProgressionCommand.SetSignature(BeatUnit.valueOf(event.value.name), progressions.current.value.draft.content.timing.numerator) }
             is ProgressionEvent.SetMetronome -> send(ProgressionCommand.SetMetronome(event.value))
             is ProgressionEvent.SetLoop -> send(ProgressionCommand.SetLoop(event.value))
-            is ProgressionEvent.Play -> if (state.canPlay) scope.launch {
+            is ProgressionEvent.Play -> if (state.canPlay) {
+                val request = sheetGeneration
+                scope.launch {
                 if (event.selected) {
                     val stopped = progressions.execute(ProgressionCommand.Stop).fold(
                         { notice = ProgressionNotice.valueOf(it.name); false }, { true })
@@ -240,27 +268,33 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
                 progressions.execute(ProgressionCommand.Play(if (event.selected) workspace.selectedIndex else 0))
                     .fold({ notice = ProgressionNotice.valueOf(it.name) }, {
                         notice = null
-                        if (event.selected) sheetName = ProgressionSheetUi.None.name
+                        if (event.selected) closeSheet(request)
                     })
+                }
             }
             ProgressionEvent.Pause -> transport(ProgressionCommand.Pause)
             ProgressionEvent.Resume -> if (state.canPlay) transport(ProgressionCommand.Resume)
             ProgressionEvent.Stop -> transport(ProgressionCommand.Stop)
             ProgressionEvent.NewDraft -> if (!busy && !state.readFailed) {
-                if (hasUnsavedChanges) { replacementNew = true; replacementId = null }
+                if (hasUnsavedChanges) { sheetGeneration++; replacementNew = true; replacementId = null }
                 else replaceDraft(ProgressionCommand.NewDraft)
             }
-            ProgressionEvent.ConfirmReplacement -> if (!busy) when (val pending = replacement) {
-                ProgressionReplacementUi.NewDraft -> replaceDraft(ProgressionCommand.NewDraft)
-                is ProgressionReplacementUi.Load -> replaceDraft(ProgressionCommand.Load(pending.id))
-                null -> Unit
+            ProgressionEvent.ConfirmReplacement -> if (!busy) {
+                val id = replacementId
+                when {
+                    replacementNew -> replaceDraft(ProgressionCommand.NewDraft)
+                    id != null -> replaceDraft(ProgressionCommand.Load(id))
+                }
             }
             ProgressionEvent.CancelReplacement -> { replacementNew = false; replacementId = null }
-            ProgressionEvent.Save -> if (state.canSave) execute(record = true, after = { sheetName = ProgressionSheetUi.None.name }) { ProgressionCommand.Save }
+            ProgressionEvent.Save -> if (state.canSave) {
+                val request = sheetGeneration
+                execute(record = true, after = { closeSheet(request) }) { ProgressionCommand.Save }
+            }
             is ProgressionEvent.Load -> if (!busy && !state.readFailed) {
                 val record = workspace.records.firstOrNull { it.id == event.id }
                 if (record == null) notice = ProgressionNotice.RecordMissing
-                else if (hasUnsavedChanges) { replacementNew = false; replacementId = record.id }
+                else if (hasUnsavedChanges) { sheetGeneration++; replacementNew = false; replacementId = record.id }
                 else replaceDraft(ProgressionCommand.Load(record.id))
             }
             is ProgressionEvent.Delete -> execute(record = true) { ProgressionCommand.Delete(event.id) }
@@ -271,6 +305,9 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
 }
 
 private fun <T> List<T>.updated(index: Int, value: T): List<T> = mapIndexed { i, old -> if (i == index) value else old }
+private fun List<Int>.chordShape(): ChordShape = ChordShape(map { when (it) {
+    -1 -> StringStop.Muted; 0 -> StringStop.Open; else -> StringStop.Fretted(it)
+} })
 internal fun progressionChordUi(draft: ChordDraft, records: List<SavedChord>, notes: List<String?> = List(6) { null },
     octaves: List<String?> = List(6) { null }, frets: List<String?> = List(6) { null }, capo: String? = null,
     expanded: Boolean = false): ChordUiState {

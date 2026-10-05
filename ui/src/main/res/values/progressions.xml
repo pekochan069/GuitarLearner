@@ -2,6 +2,7 @@
     <string name="progression_title">Chord progressions</string>
     <string name="progression_name">Progression name</string>
     <string name="progression_actions">Progression actions</string>
+    <string name="progression_close">Close</string>
     <string name="progression_settings">Playback and tuning</string>
     <string name="progression_settings_error">Check settings</string>
     <string name="progression_settings_invalid">Correct the tempo, time signature, tuning or capo in settings to save or play.</string>
