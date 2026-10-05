@@ -126,7 +126,9 @@ object TrainingRules {
 sealed interface TrainingStage {
     data object Setup : TrainingStage
     data class Active(val session: TrainingSession) : TrainingStage
-    data class Results(val settings: TrainingSettings, val responses: List<TrainingResponse>) : TrainingStage {
+    class Results(val settings: TrainingSettings, responses: List<TrainingResponse>) : TrainingStage {
+        val responses: List<TrainingResponse> = Collections.unmodifiableList(responses.toList())
+        init { require(this.responses.size == TrainingSession.QUESTION_COUNT) }
         val correctCount: Int get() = responses.count { it.correct }
     }
 }

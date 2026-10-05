@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class TrainingTest {
@@ -84,6 +85,16 @@ class TrainingTest {
         repeat(10) { assertTrue(TrainingRules.question(settings) { bound -> bound - 1 }.answer ==
             TrainingAnswer.Interval(TrainingInterval.PerfectFifth)) }
         assertTrue(TrainingSession.start(1, TrainingSettings(intervals = emptySet())) { 0 }.isRight())
+    }
+
+    @Test fun completedResultsSnapshotExactlyTenResponses() {
+        val question = TrainingQuestion.Note(TrainingPosition(0, 0))
+        val responses = MutableList(10) { TrainingResponse(question, question.answer) }
+        val results = TrainingStage.Results(TrainingSettings(), responses)
+        responses.clear()
+        assertEquals(10, results.responses.size)
+        assertEquals(10, results.correctCount)
+        assertThrows(IllegalArgumentException::class.java) { TrainingStage.Results(TrainingSettings(), emptyList()) }
     }
 
     private fun session(): TrainingSession = requireNotNull(TrainingSession.start(1, TrainingSettings()) { 0 }.getOrNull())

@@ -11,7 +11,7 @@ interface MetronomeOutput {
     val routedDeviceId: Int?
     val diagnostics: MetronomeAudioDiagnostics
     fun start(scope: CoroutineScope)
-    fun stop()
+    fun stop(): Boolean
     fun setTempo(bpm: Int)
     fun setPattern(denominator: BeatUnit, beats: List<BeatAccent>)
     fun load(config: MetronomeConfig)
