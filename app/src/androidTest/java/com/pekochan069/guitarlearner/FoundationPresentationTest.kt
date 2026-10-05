@@ -687,7 +687,7 @@ class FoundationPresentationTest {
 
 private fun testCircuit(settings: AppearanceSettings, metronome: Metronome, developmentSamplesEnabled: Boolean = true,
     tuner: Tuner = FakeTuner()): Circuit = Circuit.Builder()
-    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome, tuner, FakeChords(), developmentSamplesEnabled))
+    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome, tuner, FakeChords(), FakeProgressions(), developmentSamplesEnabled))
     .addUiFactory(FoundationUiFactory)
     .build()
 

@@ -60,6 +60,7 @@ private val FoundationDestination.title: Int? get() = when (this) {
     FoundationDestination.Home -> null
     is FoundationDestination.Feature -> when (id) {
         FeatureId.Metronome -> R.string.metronome_title
+        FeatureId.Progressions -> R.string.progression_title
         FeatureId.Chords -> R.string.chord_title
         FeatureId.Tuner -> R.string.tuner_title
     }
@@ -180,6 +181,7 @@ fun DesignFoundationApp(
                                 state = state.metronome,
                                 eventSink = state.eventSink,
                             )
+                            FeatureId.Progressions -> ProgressionTool(state.progressions) { state.eventSink(FoundationEvent.Progression(it)) }
                             FeatureId.Chords -> ChordTool(state.chords) { state.eventSink(FoundationEvent.Chord(it)) }
                             FeatureId.Tuner -> TunerScreen(state.tuner, state.eventSink)
                         }
@@ -339,12 +341,14 @@ private fun HomeCatalog(state: FoundationState) {
                                 Icon(painterResource(when (feature) {
                                     FeatureId.Metronome -> R.drawable.ic_tempo
                                     FeatureId.Tuner -> R.drawable.ic_tuner
+                                    FeatureId.Progressions -> R.drawable.ic_chords
                                     FeatureId.Chords -> R.drawable.ic_chords
                                 }), null, Modifier.size(32.dp))
                                 Text(stringResource(when (feature) {
                                     FeatureId.Metronome -> R.string.metronome_title
                                     FeatureId.Tuner -> R.string.tuner_title
-                                    FeatureId.Chords -> R.string.chord_title
+                                    FeatureId.Progressions -> R.string.progression_title
+        FeatureId.Chords -> R.string.chord_title
                                 }), Modifier.weight(1f),
                                     style = MaterialTheme.typography.titleMedium)
                             }

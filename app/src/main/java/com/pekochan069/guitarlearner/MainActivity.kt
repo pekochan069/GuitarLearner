@@ -41,7 +41,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private val graph: AppGraph get() = (application as GuitarLearnerApplication).graph
-    private val metronomeLaunchInput = MetronomeLaunchInput()
+    private val metronomeLaunchInput = PlaybackLaunchInput()
     private val tunerOwner: TunerSessionOwner by lazy {
         ViewModelProvider(this, TunerSessionOwner.Factory(graph.tunerHostFactory))[TunerSessionOwner::class.java]
     }

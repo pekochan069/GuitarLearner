@@ -136,7 +136,7 @@ fun ChordTool(state: ChordUiState, eventSink: (ChordEvent) -> Unit) {
 }
 
 @Composable
-private fun ChordContextControls(state: ChordUiState, eventSink: (ChordEvent) -> Unit) {
+internal fun ChordContextControls(state: ChordUiState, eventSink: (ChordEvent) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         ChordDropdown(stringResource(R.string.chord_tuning),
             state.preset?.let { stringResource(it.label) } ?: stringResource(R.string.chord_custom_tuning),
@@ -288,7 +288,7 @@ private fun ChordEditor(state: ChordUiState, eventSink: (ChordEvent) -> Unit, op
 }
 
 @Composable
-private fun ChordStringControls(string: ChordStringUi, eventSink: (ChordEvent) -> Unit) {
+internal fun ChordStringControls(string: ChordStringUi, eventSink: (ChordEvent) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.chord_string_tuning, 6 - string.index, string.tuning), style = MaterialTheme.typography.titleSmall)
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -341,7 +341,7 @@ private fun ChordCollection(state: ChordUiState, eventSink: (ChordEvent) -> Unit
 }
 
 @Composable
-private fun ChordSummary(analysis: ChordAnalysisUi, sounding: String?, shape: String?, notes: String) {
+internal fun ChordSummary(analysis: ChordAnalysisUi, sounding: String?, shape: String?, notes: String) {
     Text(sounding ?: stringResource(analysis.label), Modifier.testTag("chord_summary").semantics { liveRegion = LiveRegionMode.Polite },
         style = MaterialTheme.typography.headlineSmall)
     if (analysis == ChordAnalysisUi.Unrecognized) Text(stringResource(R.string.chord_unrecognized_help), style = MaterialTheme.typography.bodyMedium)
@@ -350,7 +350,7 @@ private fun ChordSummary(analysis: ChordAnalysisUi, sounding: String?, shape: St
 }
 
 @Composable
-private fun ChordFretboard(strings: List<ChordStringUi>, tag: String, capo: Int,
+internal fun ChordFretboard(strings: List<ChordStringUi>, tag: String, capo: Int,
     eventSink: ((ChordEvent) -> Unit)? = null) {
     val colors = MaterialTheme.colorScheme
     val focusManager = LocalFocusManager.current
@@ -474,7 +474,7 @@ private fun ChordFretboard(strings: List<ChordStringUi>, tag: String, capo: Int,
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChordDropdown(label: String, value: String, options: List<String>, tag: String,
+internal fun ChordDropdown(label: String, value: String, options: List<String>, tag: String,
     modifier: Modifier = Modifier, onSelect: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = modifier) {
@@ -507,5 +507,5 @@ private fun ChordPanel(content: @Composable ColumnScope.() -> Unit) {
 private val ChordSection.label: Int get() = when (this) { ChordSection.Lookup -> R.string.chord_lookup; ChordSection.Edit -> R.string.chord_edit; ChordSection.Collection -> R.string.chord_collection }
 private val ChordStopUi.label: Int get() = when (this) { ChordStopUi.Muted -> R.string.chord_muted; ChordStopUi.Open -> R.string.chord_open; ChordStopUi.Fretted -> R.string.chord_fretted }
 private val ChordAnalysisUi.label: Int get() = when (this) { ChordAnalysisUi.Empty -> R.string.chord_empty; ChordAnalysisUi.Note -> R.string.chord_single_note; ChordAnalysisUi.Recognized -> R.string.chord_candidates; ChordAnalysisUi.Unrecognized -> R.string.chord_unrecognized }
-private val TuningPresetUi.label: Int get() = when (this) { TuningPresetUi.Standard -> R.string.chord_standard; TuningPresetUi.DropD -> R.string.chord_drop_d; TuningPresetUi.Dadgad -> R.string.chord_dadgad; TuningPresetUi.OpenG -> R.string.chord_open_g; TuningPresetUi.OpenD -> R.string.chord_open_d }
+internal val TuningPresetUi.label: Int get() = when (this) { TuningPresetUi.Standard -> R.string.chord_standard; TuningPresetUi.DropD -> R.string.chord_drop_d; TuningPresetUi.Dadgad -> R.string.chord_dadgad; TuningPresetUi.OpenG -> R.string.chord_open_g; TuningPresetUi.OpenD -> R.string.chord_open_d }
 private val ChordNotice.label: Int get() = when (this) { ChordNotice.InvalidInput -> R.string.chord_invalid_input; ChordNotice.InvalidName -> R.string.chord_name_error; ChordNotice.EmptyShape -> R.string.chord_empty; ChordNotice.CandidateMissing -> R.string.chord_candidate_missing; ChordNotice.RecordMissing -> R.string.chord_record_missing; ChordNotice.ReadFailed -> R.string.chord_read_failed; ChordNotice.WriteFailed -> R.string.chord_write_failed }

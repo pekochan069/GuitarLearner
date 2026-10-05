@@ -250,7 +250,7 @@ private fun String.toStop(): StringStop? = toIntOrNull()?.takeIf { it in 0..12 }
 
 private fun <T> List<T>.updated(index: Int, value: T): List<T> = mapIndexed { current, previous -> if (current == index) value else previous }
 
-private fun ChordDraft.strings(
+internal fun ChordDraft.strings(
     rawNotes: List<String?> = List(6) { null }, rawOctaves: List<String?> = List(6) { null }, rawFrets: List<String?> = List(6) { null },
 ): List<ChordStringUi> {
     val tones = ChordTheory.tones(context, shape)

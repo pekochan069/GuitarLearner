@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.pekochan069.guitarlearner.adapters.AndroidMetronomeHost
+import com.pekochan069.guitarlearner.adapters.AndroidProgressionsHost
 import com.pekochan069.guitarlearner.presentation.contract.FeatureId
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import org.junit.Assert.assertEquals
@@ -18,7 +19,7 @@ class MetronomeLaunchInputTest {
     @Test
     fun consumedColdNotificationIsSanitizedAndCannotReplayAfterRecreation(): Unit {
         val intent = notificationIntent()
-        val input = MetronomeLaunchInput()
+        val input = PlaybackLaunchInput()
         val events = mutableListOf<FoundationEvent>()
         input.restore(null, intent)
         assertTrue(input.pending)
@@ -27,7 +28,7 @@ class MetronomeLaunchInputTest {
         val saved = Bundle()
         input.save(saved)
         assertTrue(saved.isEmpty)
-        val recreated = MetronomeLaunchInput()
+        val recreated = PlaybackLaunchInput()
         recreated.restore(saved, intent)
         recreated.dispatch(events::add)
         assertFalse(recreated.pending)
@@ -36,12 +37,12 @@ class MetronomeLaunchInputTest {
 
     @Test
     fun undeliveredNotificationSurvivesSavedStateAndDispatchesOnce(): Unit {
-        val input = MetronomeLaunchInput()
+        val input = PlaybackLaunchInput()
         input.restore(null, notificationIntent())
         val saved = Bundle()
         input.save(saved)
         assertFalse(saved.isEmpty)
-        val restored = MetronomeLaunchInput()
+        val restored = PlaybackLaunchInput()
         restored.restore(saved, notificationIntent())
         val events = mutableListOf<FoundationEvent>()
         restored.dispatch(events::add)
@@ -55,7 +56,7 @@ class MetronomeLaunchInputTest {
 
     @Test
     fun restoredTaskIgnoresItsOriginalNotificationWithoutAHistoryFlagAndAcceptsANewDelivery(): Unit {
-        val restored = MetronomeLaunchInput()
+        val restored = PlaybackLaunchInput()
         val original = notificationIntent()
         restored.restore(Bundle(), original)
         assertNull(original.action)
@@ -75,12 +76,34 @@ class MetronomeLaunchInputTest {
 
     @Test
     fun unrelatedExternalActionsCannotSelectDevelopmentSamples(): Unit {
-        val input = MetronomeLaunchInput()
+        val input = PlaybackLaunchInput()
         input.restore(null, Intent("sample:tuner"))
         val events = mutableListOf<FoundationEvent>()
         input.dispatch(events::add)
         assertFalse(input.pending)
         assertTrue(events.isEmpty())
+    }
+    @Test
+    fun progressionNotificationRestoresItsTargetOnceAndHistoryDoesNotReplayIt(): Unit {
+        val input = PlaybackLaunchInput()
+        val intent = Intent(AndroidProgressionsHost.ACTION_OPEN_PROGRESSION)
+        input.restore(null, intent)
+        assertNull(intent.action)
+        val saved = Bundle()
+        input.save(saved)
+        val restored = PlaybackLaunchInput()
+        restored.restore(saved, Intent(AndroidProgressionsHost.ACTION_OPEN_PROGRESSION))
+        val events = mutableListOf<FoundationEvent>()
+        restored.dispatch(events::add)
+        restored.dispatch(events::add)
+        assertEquals(listOf(FoundationEvent.OpenFeature(FeatureId.Progressions)), events)
+        val history = Intent(AndroidProgressionsHost.ACTION_OPEN_PROGRESSION).addFlags(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY)
+        restored.receive(history)
+        assertNull(history.action)
+        assertFalse(restored.pending)
+        val consumed = Bundle()
+        restored.save(consumed)
+        assertTrue(consumed.isEmpty)
     }
 }
 
