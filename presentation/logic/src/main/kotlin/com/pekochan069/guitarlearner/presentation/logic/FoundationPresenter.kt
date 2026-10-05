@@ -15,6 +15,8 @@ import com.pekochan069.guitarlearner.domain.AppearanceChange
 import com.pekochan069.guitarlearner.domain.AppearanceFailure
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
 import com.pekochan069.guitarlearner.domain.Chords
+import com.pekochan069.guitarlearner.domain.Training
+import com.pekochan069.guitarlearner.domain.TrainingRequest
 import com.pekochan069.guitarlearner.domain.LanguagePreference
 import com.pekochan069.guitarlearner.domain.BeatAccent
 import com.pekochan069.guitarlearner.domain.BeatUnit
@@ -63,6 +65,7 @@ class FoundationPresenter(
     private val metronome: Metronome,
     private val tuner: Tuner,
     private val chords: Chords,
+    private val training: Training,
     private val developmentSamplesEnabled: Boolean = false,
 ) : Presenter<FoundationState> {
     @Composable
@@ -76,6 +79,7 @@ class FoundationPresenter(
         val metronomeSnapshot by metronome.current.collectAsState()
         val chordPresentation = presentChords(chords)
         val tunerSnapshot by tuner.current.collectAsState()
+        val trainingSnapshot by training.current.collectAsState()
         var presetName by rememberSaveable { mutableStateOf("") }
         var savingPreset by remember { mutableStateOf(false) }
         var metronomeNotice by remember { mutableStateOf<MetronomeNotice?>(null) }
@@ -91,6 +95,9 @@ class FoundationPresenter(
         }
 
         fun navigate(next: FoundationDestination) {
+            if (destinationId == "feature:training" && next != FoundationDestination.Feature(FeatureId.Training)) {
+                training.submit(TrainingRequest.Exit)
+            }
             if (destinationId == "feature:tuner" && next != FoundationDestination.Feature(FeatureId.Tuner)) {
                 tuner.submit(TunerRequest.Stop)
             }
@@ -217,12 +224,16 @@ class FoundationPresenter(
             ),
             gallerySelected = gallerySelected,
             chords = chordPresentation.state,
+            training = trainingSnapshot.toUi(),
             settingsOpen = visibleOverlay == Overlay.Settings,
             theme = snapshot.theme.toOption(),
             language = snapshot.language?.toOption(),
             settingsStatus = settingsStatus,
             eventSink = { event ->
                 when (event) {
+                    is FoundationEvent.Training -> if (destinationId == "feature:training") {
+                        training.submit(event.value.toRequest())
+                    }
                     is FoundationEvent.Chord -> chordPresentation.eventSink(event.value)
                     is FoundationEvent.OpenFeature -> if (featureCatalog.any { event.id in it.features }) {
                         navigate(FoundationDestination.Feature(event.id))
@@ -299,16 +310,20 @@ class FoundationPresenter(
         private val metronome: Metronome,
         private val tuner: Tuner,
         private val chords: Chords,
+        private val training: Training,
         private val developmentSamplesEnabled: Boolean = false,
     ) : Presenter.Factory {
-        fun create(): FoundationPresenter = FoundationPresenter(appearance, metronome, tuner, chords, developmentSamplesEnabled)
+        fun create(): FoundationPresenter = FoundationPresenter(appearance, metronome, tuner, chords, training, developmentSamplesEnabled)
 
         override fun create(screen: Screen, navigator: Navigator, context: CircuitContext): Presenter<*>? =
             if (screen == FoundationScreen) create() else null
     }
 }
 
-private val featureCatalog = listOf(FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome, FeatureId.Tuner, FeatureId.Chords)))
+private val featureCatalog = listOf(
+    FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome, FeatureId.Tuner, FeatureId.Chords)),
+    FeatureGroup(FeatureCategory.Training, listOf(FeatureId.Training)),
+)
 
 private fun FoundationDestination.savedId(): String = when (this) {
     FoundationDestination.Home -> "home"
