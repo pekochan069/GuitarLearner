@@ -91,13 +91,13 @@ class ProgressionPresentationTest {
             state.progression(ProgressionEvent.OpenEditor())
             state = stateWhere { it.progressions.sheet == ProgressionSheetUi.Chord }
             state.progression(ProgressionEvent.CopyCurrentChord)
-            state = stateWhere { it.progressions.editor.name == "Viewer C" }
+            state = stateWhere { it.progressions.editor.name == "Viewer C" && it.progressions.chordSource == ProgressionChordSourceUi.Manual }
             assertEquals("D", state.progressions.editor.soundingSymbol)
             assertEquals("C", state.progressions.editor.shapeSymbol)
             state.progression(ProgressionEvent.ChordInput(ChordEvent.SetFret(5, "3")))
             state = stateWhere { it.progressions.editor.strings[5].fret == 3 }
             state.progression(ProgressionEvent.CommitEditor)
-            stateWhere { it.progressions.sheet == ProgressionSheetUi.None && !it.progressions.busy }
+            stateWhere { it.progressions.sheet == ProgressionSheetUi.None && it.progressions.editor.lookup == ChordLookupUi.Idle && !it.progressions.busy }
             val inserted = (port.commands.single() as ProgressionCommand.Insert).step as ProgressionStep.Chord
             assertEquals("Viewer C", inserted.name)
             assertEquals(StringStop.Fretted(3), inserted.shape.stops[5])
@@ -175,7 +175,7 @@ class ProgressionPresentationTest {
             assertEquals("D", state.progressions.editor.lookupSymbol)
             assertEquals("", state.progressions.editor.name)
             state.progression(ProgressionEvent.CommitEditor)
-            stateWhere { it.progressions.sheet == ProgressionSheetUi.None && !it.progressions.busy }
+            stateWhere { it.progressions.sheet == ProgressionSheetUi.None && it.progressions.editor.lookup == ChordLookupUi.Idle && !it.progressions.busy }
             val inserted = (port.commands.single() as ProgressionCommand.Insert).step as ProgressionStep.Chord
             assertEquals("", inserted.name)
             assertEquals(NoteDuration(NoteValue.Quarter), inserted.duration)
@@ -220,7 +220,7 @@ class ProgressionPresentationTest {
             assertFalse(state.progressions.editor.canSave)
             state.progression(ProgressionEvent.CommitEditor)
             state.progression(ProgressionEvent.CloseSheet)
-            runCurrent()
+            stateWhere { it.progressions.sheet == ProgressionSheetUi.None && it.progressions.editor.lookup == ChordLookupUi.Idle && !it.progressions.busy }
             assertTrue(port.commands.isEmpty())
         }
     }
@@ -359,6 +359,32 @@ class ProgressionPresentationTest {
             assertTrue(port.current.value.draft.content.steps.isEmpty())
             assertTrue(port.commands.none { it is ProgressionCommand.Insert })
             assertEquals(TuningPreset.OpenD.tuning, port.current.value.draft.content.context.tuning)
+        }
+    }
+    @Test fun aQueuedInsertKeepsItsNameAndKindWhenAnotherEditorOpensBeforeAcknowledgment() = runTest {
+        val port = ControlledProgressions()
+        port.current.value = ProgressionWorkspace(draft = ProgressionDraft(content = ProgressionContent(steps = listOf(ProgressionStep.Chord("Stored", shape)))))
+        val writing = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        port.onCommand = { if (it is ProgressionCommand.SetName) { writing.complete(Unit); release.await() } }
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+            var state = awaitItem()
+            state.progression(ProgressionEvent.OpenEditor())
+            state = stateWhere { it.progressions.editor.lookup == ChordLookupUi.Ready }
+            state.progression(ProgressionEvent.SetName("Practice"))
+            writing.await()
+            state.progression(ProgressionEvent.CommitEditor)
+            state.progression(ProgressionEvent.CloseSheet)
+            state.progression(ProgressionEvent.OpenEditor(0))
+            state = stateWhere { it.progressions.sheet == ProgressionSheetUi.Chord && it.progressions.editingIndex == 0 && it.progressions.editor.name == "Stored" }
+            release.complete(Unit)
+            state = stateWhere { !it.progressions.busy }
+            assertEquals(ProgressionSheetUi.Chord, state.progressions.sheet)
+            assertEquals("Stored", state.progressions.editor.name)
+            val inserted = port.commands.filterIsInstance<ProgressionCommand.Insert>().single().step as ProgressionStep.Chord
+            assertEquals("", inserted.name)
+            assertTrue(port.commands.none { it is ProgressionCommand.ReplaceChord })
+            assertEquals(ChordTheory.representatives(ChordQuery(GuitarContext(), ChordIdentity(PitchClass.C, ChordQuality.Major))).first(), inserted.shape)
         }
     }
 }

@@ -34,10 +34,11 @@ fun ProgressionTool(state: ProgressionUiState, eventSink: (ProgressionEvent) -> 
                 Text(stringResource(R.string.progression_empty), Modifier.testTag("progression_empty"), style = MaterialTheme.typography.bodyMedium)
             }
             items(state.steps) { step ->
-                val playing = step.index == state.playingIndex
+                val highlighted = step.index == state.playingIndex
+                val playing = highlighted && state.transport == ProgressionTransportUi.Playing
                 val playingDescription = stringResource(R.string.progression_playing)
                 Surface(onClick = { eventSink(ProgressionEvent.OpenStep(step.index)) }, shape = MaterialTheme.shapes.large,
-                    color = if (playing) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = if (highlighted) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
                     modifier = Modifier.fillMaxWidth().testTag("progression_step_${step.index}").semantics {
                         selected = step.index == state.selectedIndex
                         if (playing) stateDescription = playingDescription
@@ -87,12 +88,14 @@ internal fun ProgressionAppBarActions(state: ProgressionUiState, eventSink: (Pro
 @Composable
 internal fun ProgressionTransportBar(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit) {
     Column {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         when {
             state.transport == ProgressionTransportUi.Paused -> ProgressionStatus(stringResource(R.string.progression_paused), "progression_paused")
             state.countInBeat != null -> ProgressionStatus(stringResource(R.string.progression_count_in, (state.countInBeat ?: 0) + 1, state.numerator), "progression_count_in")
             state.transport == ProgressionTransportUi.Preparing -> ProgressionStatus(stringResource(R.string.progression_preparing), "progression_preparing")
         }
         if (state.pendingChange) ProgressionStatus(stringResource(R.string.progression_pending), "progression_pending")
+        }
         BottomAppBar(modifier = Modifier.testTag("progression_transport"), contentPadding = PaddingValues(horizontal = 16.dp)) {
             TextButton(onClick = { eventSink(ProgressionEvent.OpenSheet(ProgressionSheetUi.Settings)) },
                 modifier = Modifier.weight(1f).testTag("progression_settings")) {

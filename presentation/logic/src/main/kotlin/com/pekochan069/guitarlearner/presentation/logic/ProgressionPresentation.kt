@@ -75,9 +75,8 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
     val query = if (sheet == ProgressionSheetUi.Chord && source == ProgressionChordSourceUi.Named)
         ChordQuery(content.context.copy(capo = 0), ChordIdentity(PitchClass.entries[root], ChordQuality.valueOf(quality.name))) else null
     LaunchedEffect(query, content.context, lookupGeneration) {
-        lookup = ChordLookup.Idle
-        lookupContext = null
         if (query != null) {
+            lookupContext = null
             lookup = ChordLookup.Searching(query)
             val context = content.context
             val shapes = withContext(Dispatchers.Default) { ChordTheory.representatives(query) }
@@ -88,6 +87,7 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
     fun closeSheet(request: Int = sheetGeneration) {
         if (request != sheetGeneration) return
         sheetGeneration++
+        lookup = ChordLookup.Idle; lookupContext = null
         sheetName = ProgressionSheetUi.None.name
         replacementNew = false; replacementId = null
     }
@@ -189,6 +189,7 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             }
             ProgressionEvent.CloseSheet -> closeSheet()
             is ProgressionEvent.SetChordSource -> {
+                lookup = ChordLookup.Idle; lookupContext = null
                 sourceName = event.value.name
                 if (event.value == ProgressionChordSourceUi.Named && editingIndex == null) editorName = ""
             }
@@ -206,12 +207,14 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
                 if (sheetName == ProgressionSheetUi.Chord.name && accepted != null && editor.canSave && !invalidSettings) {
                     val request = sheetGeneration
                     val named = sourceName == ProgressionChordSourceUi.Named.name
+                    val index = editingIndex
+                    val name = editorName
                     execute(record = true, after = { closeSheet(request) }, validate = {
                         if (named && (currentReady?.query?.context != progressions.current.value.draft.content.context.copy(capo = 0) ||
                             currentContext != progressions.current.value.draft.content.context)) ProgressionNotice.ShapeChanged else null
                     }) {
-                        editingIndex?.let { ProgressionCommand.ReplaceChord(it, editorName, accepted) }
-                            ?: ProgressionCommand.Insert(ProgressionStep.Chord(editorName, accepted))
+                        index?.let { ProgressionCommand.ReplaceChord(it, name, accepted) }
+                            ?: ProgressionCommand.Insert(ProgressionStep.Chord(name, accepted))
                     }
                 }
             }
