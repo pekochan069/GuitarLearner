@@ -85,6 +85,18 @@ A possible chord-symbol interpretation of the notes produced by a chord shape.
 **Custom chord**:
 A user-created chord shape that can be saved under a personal name and recalled for later use.
 
+**Chord progression**:
+An ordered sequence of chords and rests with musical durations.
+
+**Progression step**:
+One occurrence of a chord or rest in a progression, with a musical duration. A chord step also carries its guitar shape. The same chord may occur in multiple steps.
+
+**Progression rest**:
+A duration in a chord progression during which the chord accompaniment is silent. The progression's timing continues through the rest.
+
+**Tied chord**:
+Consecutive occurrences of the same sounding chord shape joined into one sustained duration without another strum at the join.
+
 **Chord draft**:
 The current unfinished chord edit and its tuning, capo, and chosen interpretation. It is distinct from a saved custom chord until the user saves it.
 
