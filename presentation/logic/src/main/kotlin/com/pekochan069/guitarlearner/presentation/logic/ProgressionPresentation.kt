@@ -40,13 +40,15 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
     var notice by remember { mutableStateOf<ProgressionNotice?>(null) }
     val commands = remember { Mutex() }
     val scope = rememberCoroutineScope()
-    fun execute(record: Boolean = false, after: () -> Unit = {}, command: () -> ProgressionCommand) {
+    fun execute(record: Boolean = false, after: () -> Unit = {}, validate: () -> ProgressionNotice? = { null }, command: () -> ProgressionCommand) {
         if (record && busy) return
         if (record) busy = true
         scope.launch {
             try {
                 commands.withLock {
-                    progressions.execute(command()).fold(
+                    val rejected = validate()
+                    if (rejected != null) notice = rejected
+                    else progressions.execute(command()).fold(
                         { notice = ProgressionNotice.valueOf(it.name) }, { notice = null; after() })
                 }
             } finally { if (record) busy = false }
@@ -203,7 +205,11 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
                 }
                 if (sheetName == ProgressionSheetUi.Chord.name && accepted != null && editor.canSave && !invalidSettings) {
                     val request = sheetGeneration
-                    execute(record = true, after = { closeSheet(request) }) {
+                    val named = sourceName == ProgressionChordSourceUi.Named.name
+                    execute(record = true, after = { closeSheet(request) }, validate = {
+                        if (named && (currentReady?.query?.context != progressions.current.value.draft.content.context.copy(capo = 0) ||
+                            currentContext != progressions.current.value.draft.content.context)) ProgressionNotice.ShapeChanged else null
+                    }) {
                         editingIndex?.let { ProgressionCommand.ReplaceChord(it, editorName, accepted) }
                             ?: ProgressionCommand.Insert(ProgressionStep.Chord(editorName, accepted))
                     }

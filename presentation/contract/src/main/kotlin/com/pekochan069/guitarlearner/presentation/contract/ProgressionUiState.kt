@@ -2,7 +2,7 @@ package com.pekochan069.guitarlearner.presentation.contract
 
 enum class NoteValueUi(val denominator: Int) { Whole(1), Half(2), Quarter(4), Eighth(8), Sixteenth(16), ThirtySecond(32) }
 enum class ProgressionNotice { InvalidInput, InvalidName, EmptyShape, InvalidTie, EmptyProgression, RecordMissing,
-    ReadFailed, WriteFailed, FocusDenied, ServiceUnavailable, AudioUnavailable }
+    ReadFailed, WriteFailed, FocusDenied, ServiceUnavailable, AudioUnavailable, ShapeChanged }
 enum class ProgressionTransportUi { Stopped, Preparing, Playing, Paused, Failed }
 enum class ProgressionSheetUi { None, Step, Chord, Settings, Save, Collection }
 enum class ProgressionChordSourceUi { Named, Saved, Manual }

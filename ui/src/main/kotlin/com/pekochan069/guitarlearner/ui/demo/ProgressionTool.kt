@@ -167,4 +167,5 @@ internal val ProgressionNotice.label: Int get() = when (this) {
     ProgressionNotice.ReadFailed -> R.string.progression_read_failed; ProgressionNotice.WriteFailed -> R.string.progression_write_failed
     ProgressionNotice.FocusDenied -> R.string.progression_focus_denied; ProgressionNotice.ServiceUnavailable -> R.string.progression_service_failed
     ProgressionNotice.AudioUnavailable -> R.string.progression_audio_failed
+    ProgressionNotice.ShapeChanged -> R.string.progression_shape_changed
 }

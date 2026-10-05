@@ -333,6 +333,34 @@ class ProgressionPresentationTest {
             assertEquals(ProgressionSheetUi.Settings, state.progressions.sheet)
         }
     }
+    @Test fun aQueuedContextChangeRejectsTheEarlierNamedPreviewAtCommit() = runTest {
+        val port = ControlledProgressions()
+        val writing = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        port.onCommand = { when (it) {
+            is ProgressionCommand.SetName -> { writing.complete(Unit); release.await() }
+            is ProgressionCommand.SetContext -> port.current.value = port.current.value.copy(
+                draft = port.current.value.draft.copy(content = port.current.value.draft.content.copy(context = it.context)))
+            else -> Unit
+        } }
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+            var state = awaitItem()
+            state.progression(ProgressionEvent.OpenEditor())
+            state = stateWhere { it.progressions.editor.lookup == ChordLookupUi.Ready }
+            state.progression(ProgressionEvent.SetName("Practice"))
+            writing.await()
+            state.progression(ProgressionEvent.ChordInput(ChordEvent.SetPreset(TuningPresetUi.OpenD)))
+            state.progression(ProgressionEvent.CommitEditor)
+            runCurrent()
+            release.complete(Unit)
+            state = stateWhere { it.progressions.notice == ProgressionNotice.ShapeChanged && !it.progressions.busy }
+            assertEquals(ProgressionSheetUi.Chord, state.progressions.sheet)
+            assertEquals(TuningPresetUi.OpenD, state.progressions.editor.preset)
+            assertTrue(port.current.value.draft.content.steps.isEmpty())
+            assertTrue(port.commands.none { it is ProgressionCommand.Insert })
+            assertEquals(TuningPreset.OpenD.tuning, port.current.value.draft.content.context.tuning)
+        }
+    }
 }
 private fun FoundationState.progression(event: ProgressionEvent) { eventSink(FoundationEvent.Progression(event)) }
 private suspend fun CircuitReceiveTurbine<FoundationState>.stateWhere(predicate: (FoundationState) -> Boolean): FoundationState {
