@@ -44,16 +44,14 @@ class DesignFoundationTest {
         compose.waitForIdle()
         compose.onNodeWithTag("close_settings").performScrollTo().performClick()
 
-        compose.openDevelopmentSample(DevelopmentSample.Tuner)
-        listOf(
-            "NoSignal" to "No signal",
-            "Flat" to "Flat",
-            "InTune" to "In tune",
-            "Sharp" to "Sharp",
-        ).forEach { (reading, label) ->
-            compose.onNodeWithTag("reading_" + reading).performScrollTo().performClick()
-            compose.onNodeWithTag("tuner_status").assertTextEquals(label)
+        compose.openTuner()
+        compose.onNodeWithTag("tuner_string_E4").performScrollTo().performClick()
+        compose.onNodeWithTag("tuner_tolerance_3").performScrollTo().performClick()
+        compose.waitUntil(5_000) {
+            compose.onNodeWithTag("tuner_tolerance_3").fetchSemanticsNode().config[SemanticsProperties.Selected]
         }
+        compose.onNodeWithTag("tuner_status").assertTextEquals("Stopped")
+        compose.onNodeWithTag("tuner_cents").assertDoesNotExist()
 
         compose.openMetronome()
         compose.onNodeWithTag("tempo_slider").performScrollTo().performSemanticsAction(SemanticsActions.SetProgress) { it(91f) }
@@ -83,8 +81,10 @@ class DesignFoundationTest {
         compose.waitForIdle()
         compose.onNodeWithText(compose.activity.getString(UiR.string.gallery_title)).assertExists()
         compose.onNodeWithTag("gallery_selection").performScrollTo().assertIsOff()
-        compose.openDevelopmentSample(DevelopmentSample.Tuner)
-        compose.onNodeWithTag("tuner_status").assertTextEquals("높음")
+        compose.openTuner()
+        compose.onNodeWithTag("tuner_status").assertTextEquals("정지됨")
+        compose.onNodeWithTag("tuner_string_E4").performScrollTo().assertIsSelected()
+        compose.onNodeWithTag("tuner_tolerance_3").performScrollTo().assertIsSelected()
         compose.openMetronome()
         compose.onNodeWithTag("bpm_value").assertTextEquals("92")
         compose.onNodeWithTag("metronome_status").assertDoesNotExist()

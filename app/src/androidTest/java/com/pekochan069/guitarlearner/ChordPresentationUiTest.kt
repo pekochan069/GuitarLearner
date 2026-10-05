@@ -200,7 +200,7 @@ class ChordPresentationUiTest {
     }
 
     private fun show(locale: Locale, dark: Boolean, scale: Float) {
-        val circuit = Circuit.Builder().addPresenterFactory(FoundationPresenter.Factory(ChordUiAppearance(), metronome, host))
+        val circuit = Circuit.Builder().addPresenterFactory(FoundationPresenter.Factory(ChordUiAppearance(), metronome, FakeTuner(), host))
             .addUiFactory(FoundationUiFactory).build()
         compose.runOnUiThread {
             val localized = ContextThemeWrapper(compose.activity, compose.activity.theme).apply {

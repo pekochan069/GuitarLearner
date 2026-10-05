@@ -9,8 +9,8 @@ import kotlinx.parcelize.Parcelize
 data object FoundationScreen : Screen
 
 enum class FeatureCategory { Tools, Training, Learning }
-enum class FeatureId(val savedId: String) { Metronome("metronome"), Chords("chords") }
-enum class DevelopmentSample(val savedId: String) { Tuner("tuner"), Gallery("gallery") }
+enum class FeatureId(val savedId: String) { Metronome("metronome"), Tuner("tuner"), Chords("chords") }
+enum class DevelopmentSample(val savedId: String) { Gallery("gallery") }
 
 sealed interface FoundationDestination {
     data object Home : FoundationDestination
@@ -19,7 +19,6 @@ sealed interface FoundationDestination {
 }
 
 data class FeatureGroup(val category: FeatureCategory, val features: List<FeatureId>)
-enum class Reading { NoSignal, Flat, InTune, Sharp }
 enum class ThemeOption { System, Light, Dark }
 enum class LanguageOption { System, Korean, English }
 enum class AppearanceNotice { ReadFailed, SaveFailed, ApplyFailed }
@@ -35,7 +34,7 @@ data class FoundationState(
     val featureGroups: List<FeatureGroup>,
     val developmentSamples: List<DevelopmentSample>,
     val canNavigateBack: Boolean,
-    val reading: Reading,
+    val tuner: TunerUiState,
     val metronome: MetronomeUiState,
     val chords: ChordUiState,
     val gallerySelected: Boolean,
@@ -54,7 +53,12 @@ sealed interface FoundationEvent : CircuitUiEvent {
     data class OpenFeature(val id: FeatureId) : FoundationEvent
     data class OpenSample(val id: DevelopmentSample) : FoundationEvent
     data object NavigateBack : FoundationEvent
-    data class SetReading(val value: Reading) : FoundationEvent
+    data object StartTuner : FoundationEvent
+    data object StopTuner : FoundationEvent
+    data class SelectTunerTarget(val value: TunerTargetUi) : FoundationEvent
+    data class SelectTunerTolerance(val value: ToleranceUi) : FoundationEvent
+    data object ReloadTunerTolerance : FoundationEvent
+    data class OpenTunerSettings(val action: TunerActionUi) : FoundationEvent
     data class SetBpm(val value: Int) : FoundationEvent
     data class AdjustBpm(val delta: Int) : FoundationEvent
     data class SetRunning(val value: Boolean) : FoundationEvent

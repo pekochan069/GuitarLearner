@@ -4,9 +4,10 @@ import android.app.Application
 import com.pekochan069.guitarlearner.adapters.AndroidAppearanceHost
 import com.pekochan069.guitarlearner.adapters.AndroidChordsHost
 import com.pekochan069.guitarlearner.adapters.AndroidMetronomeHost
-import com.pekochan069.guitarlearner.domain.AppearanceSettings
+import com.pekochan069.guitarlearner.adapters.AndroidTunerHost
 import com.pekochan069.guitarlearner.domain.Chords
 import com.pekochan069.guitarlearner.domain.Metronome
+import com.pekochan069.guitarlearner.domain.Tuner
 import com.pekochan069.guitarlearner.presentation.logic.FoundationPresenter
 import com.pekochan069.guitarlearner.ui.FoundationUiFactory
 import com.slack.circuit.foundation.Circuit
@@ -32,16 +33,21 @@ private abstract class AppScope
 interface AppGraph {
     val appearanceHost: AndroidAppearanceHost
     val metronomeHost: AndroidMetronomeHost
-    val presenterFactory: FoundationPresenter.Factory
-    val circuit: Circuit
+    val tunerHostFactory: AndroidTunerHost.Factory
+    val chords: Chords
+
+    fun createPresenterFactory(tuner: Tuner): FoundationPresenter.Factory =
+        FoundationPresenter.Factory(appearanceHost, metronomeHost, tuner, chords, developmentSamplesEnabled = BuildConfig.DEBUG)
+
+    fun createCircuit(factory: FoundationPresenter.Factory): Circuit = Circuit.Builder()
+        .addPresenterFactory(factory)
+        .addUiFactory(FoundationUiFactory)
+        .build()
 
     @Provides
     @SingleIn(AppScope::class)
     fun provideAppearance(application: Application): AndroidAppearanceHost =
         AndroidAppearanceHost(application.getSharedPreferences("appearance", Application.MODE_PRIVATE))
-
-    @Provides
-    fun provideSettings(host: AndroidAppearanceHost): AppearanceSettings = host
 
     @Provides
     fun provideMetronomeCapability(host: AndroidMetronomeHost): Metronome = host
@@ -52,15 +58,9 @@ interface AppGraph {
         AndroidChordsHost(application.getSharedPreferences("chords", Application.MODE_PRIVATE))
 
     @Provides
-    fun providePresenterFactory(settings: AppearanceSettings, metronome: Metronome, chords: Chords): FoundationPresenter.Factory =
-        FoundationPresenter.Factory(settings, metronome, chords, developmentSamplesEnabled = BuildConfig.DEBUG)
-
-    @Provides
     @SingleIn(AppScope::class)
-    fun provideCircuit(factory: FoundationPresenter.Factory): Circuit = Circuit.Builder()
-        .addPresenterFactory(factory)
-        .addUiFactory(FoundationUiFactory)
-        .build()
+    fun provideTunerFactory(application: Application, metronome: Metronome): AndroidTunerHost.Factory =
+        AndroidTunerHost.Factory(application, application.getSharedPreferences("tuner", Application.MODE_PRIVATE), metronome)
 
     @DependencyGraph.Factory
     fun interface Factory {

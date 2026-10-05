@@ -43,7 +43,10 @@ import com.pekochan069.guitarlearner.presentation.contract.MetronomePlaybackUi
 import com.pekochan069.guitarlearner.presentation.contract.MetronomePresetUi
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeStopUi
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeUiState
-import com.pekochan069.guitarlearner.presentation.contract.Reading
+import com.pekochan069.guitarlearner.domain.Tuner
+import com.pekochan069.guitarlearner.domain.TunerRequest
+import com.pekochan069.guitarlearner.domain.TunerSettingsPage
+import com.pekochan069.guitarlearner.presentation.contract.TunerActionUi
 import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
 import com.slack.circuit.runtime.CircuitContext
@@ -57,19 +60,20 @@ import kotlinx.coroutines.sync.withLock
 class FoundationPresenter(
     private val appearance: AppearanceSettings,
     private val metronome: Metronome,
+    private val tuner: Tuner,
     private val chords: Chords,
     private val developmentSamplesEnabled: Boolean = false,
 ) : Presenter<FoundationState> {
     @Composable
     override fun present(): FoundationState {
         var destinationId by rememberSaveable { mutableStateOf("home") }
-        var readingName by rememberSaveable { mutableStateOf(Reading.NoSignal.name) }
         var gallerySelected by rememberSaveable { mutableStateOf(true) }
         var overlay by rememberSaveable(stateSaver = OverlaySaver) { mutableStateOf<Overlay>(Overlay.None) }
         var settingsStatus by remember { mutableStateOf<SettingsStatus>(SettingsStatus.Idle) }
         val snapshot by appearance.current.collectAsState()
         val metronomeSnapshot by metronome.current.collectAsState()
         val chordPresentation = presentChords(chords)
+        val tunerSnapshot by tuner.current.collectAsState()
         var presetName by rememberSaveable { mutableStateOf("") }
         var savingPreset by remember { mutableStateOf(false) }
         var metronomeNotice by remember { mutableStateOf<MetronomeNotice?>(null) }
@@ -84,9 +88,12 @@ class FoundationPresenter(
             else -> Overlay.None
         }
 
-        fun navigate(destination: FoundationDestination) {
+        fun navigate(next: FoundationDestination) {
+            if (destinationId == "feature:tuner" && next != FoundationDestination.Feature(FeatureId.Tuner)) {
+                tuner.submit(TunerRequest.Stop)
+            }
             overlay = Overlay.None
-            destinationId = destination.savedId()
+            destinationId = next.savedId()
         }
 
         fun navigateBack() {
@@ -94,7 +101,7 @@ class FoundationPresenter(
                 is Overlay.Overwrite -> Overlay.Presets
                 Overlay.Settings, Overlay.Presets -> Overlay.None
                 Overlay.None -> {
-                    destinationId = "home"
+                    navigate(FoundationDestination.Home)
                     Overlay.None
                 }
             }
@@ -191,7 +198,7 @@ class FoundationPresenter(
             featureGroups = featureCatalog.filter { it.features.isNotEmpty() },
             developmentSamples = samples,
             canNavigateBack = destination != FoundationDestination.Home || visibleOverlay != Overlay.None,
-            reading = Reading.entries.firstOrNull { it.name == readingName } ?: Reading.NoSignal,
+            tuner = tunerSnapshot.toUi(),
             metronome = MetronomeUiState(
                 config = metronomeSnapshot.selected.toUi(),
                 playback = metronomeSnapshot.playback.toUi(),
@@ -222,7 +229,18 @@ class FoundationPresenter(
                         navigate(FoundationDestination.Sample(event.id))
                     }
                     FoundationEvent.NavigateBack -> navigateBack()
-                    is FoundationEvent.SetReading -> if (developmentSamplesEnabled) readingName = event.value.name
+                    FoundationEvent.StartTuner -> if (destinationId == "feature:tuner") tuner.submit(TunerRequest.Start)
+                    FoundationEvent.StopTuner -> tuner.submit(TunerRequest.Stop)
+                    is FoundationEvent.SelectTunerTarget -> if (destinationId == "feature:tuner") tuner.submit(TunerRequest.SelectTarget(event.value.toDomain()))
+                    is FoundationEvent.SelectTunerTolerance -> if (destinationId == "feature:tuner") tuner.submit(TunerRequest.SelectTolerance(event.value.toDomain()))
+                    FoundationEvent.ReloadTunerTolerance -> tuner.submit(TunerRequest.ReloadTolerance)
+                    is FoundationEvent.OpenTunerSettings -> if (destinationId == "feature:tuner") {
+                        when (event.action) {
+                            TunerActionUi.Retry -> tuner.submit(TunerRequest.Start)
+                            TunerActionUi.AppSettings -> tuner.submit(TunerRequest.OpenSettings(TunerSettingsPage.AppPermission))
+                            TunerActionUi.PrivacySettings -> tuner.submit(TunerRequest.OpenSettings(TunerSettingsPage.MicrophonePrivacy))
+                        }
+                    }
                     is FoundationEvent.SetBpm -> execute { MetronomeCommand.SetTempo(event.value.coerceIn(40, 240)) }
                     is FoundationEvent.AdjustBpm -> execute {
                         MetronomeCommand.SetTempo((metronome.current.value.selected.bpm + event.delta).coerceIn(40, 240))
@@ -276,17 +294,18 @@ class FoundationPresenter(
     class Factory(
         private val appearance: AppearanceSettings,
         private val metronome: Metronome,
+        private val tuner: Tuner,
         private val chords: Chords,
         private val developmentSamplesEnabled: Boolean = false,
     ) : Presenter.Factory {
-        fun create(): FoundationPresenter = FoundationPresenter(appearance, metronome, chords, developmentSamplesEnabled)
+        fun create(): FoundationPresenter = FoundationPresenter(appearance, metronome, tuner, chords, developmentSamplesEnabled)
 
         override fun create(screen: Screen, navigator: Navigator, context: CircuitContext): Presenter<*>? =
             if (screen == FoundationScreen) create() else null
     }
 }
 
-private val featureCatalog = listOf(FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome, FeatureId.Chords)))
+private val featureCatalog = listOf(FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome, FeatureId.Tuner, FeatureId.Chords)))
 
 private fun FoundationDestination.savedId(): String = when (this) {
     FoundationDestination.Home -> "home"

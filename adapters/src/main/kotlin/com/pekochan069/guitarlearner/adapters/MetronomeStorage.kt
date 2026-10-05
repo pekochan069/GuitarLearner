@@ -1,7 +1,6 @@
 package com.pekochan069.guitarlearner.adapters
 
 import android.content.SharedPreferences
-import android.annotation.SuppressLint
 import android.util.Log
 import arrow.core.Either
 import arrow.core.left
@@ -68,13 +67,7 @@ internal class MetronomeStorage(
         }
     }
 
-    // The KTX edit helper returns Unit and cannot acknowledge a checked durable write.
-    @SuppressLint("UseKtx")
-    private fun commitSource(source: String?): Boolean {
-        val editor = preferences.edit()
-        if (source == null) editor.remove(KEY) else editor.putString(KEY, source)
-        return editor.commit()
-    }
+    private fun commitSource(source: String?): Boolean = preferences.commitString(KEY, source)
 
     companion object { const val KEY: String = "document" }
 }
