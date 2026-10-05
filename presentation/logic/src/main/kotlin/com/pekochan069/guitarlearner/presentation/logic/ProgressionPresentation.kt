@@ -51,6 +51,10 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
         stops = shape.stops.map { when (it) { StringStop.Muted -> -1; StringStop.Open -> 0; is StringStop.Fretted -> it.fret } }
         rawFrets = List(6) { null }
     }
+    fun resetContextInputs() {
+        tempo = null; numerator = null; capo = null
+        notes = List(6) { null }; octaves = List(6) { null }
+    }
     val content = workspace.draft.content
     val editorShape = ChordShape(stops.map { when (it) { -1 -> StringStop.Muted; 0 -> StringStop.Open; else -> StringStop.Fretted(it) } })
     val editorDraft = ChordTheory.normalize(ChordDraft(editorName, content.context, editorShape))
@@ -84,16 +88,17 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
         val accepted = content.context.tuning.pitches[index]
         if (parseGuitarPitch(notes[index] ?: accepted.note.symbol, octaves[index] ?: accepted.octave.toString()) == null) return
         execute {
-        val current = progressions.current.value.draft.content.context
-        val accepted = current.tuning.pitches[index]
-        ProgressionCommand.SetContext(current.copy(tuning = current.tuning.withString(index,
-            parseGuitarPitch(notes[index] ?: accepted.note.symbol, octaves[index] ?: accepted.octave.toString()) ?: accepted)))
+            val current = progressions.current.value.draft.content.context
+            val accepted = current.tuning.pitches[index]
+            ProgressionCommand.SetContext(current.copy(tuning = current.tuning.withString(index,
+                parseGuitarPitch(notes[index] ?: accepted.note.symbol, octaves[index] ?: accepted.octave.toString()) ?: accepted)))
         }
     }
     return ProgressionPresentation(state) { event ->
         when (event) {
             is ProgressionEvent.Select -> send(ProgressionCommand.Select(event.index))
             is ProgressionEvent.OpenEditor -> {
+                if (event.index != null) transport(ProgressionCommand.Stop)
                 editingIndex = event.index
                 val chord = content.steps.getOrNull(event.index ?: -1) as? ProgressionStep.Chord
                 if (chord != null) copyShape(chord.name, chord.shape)
@@ -157,9 +162,9 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             ProgressionEvent.Pause -> transport(ProgressionCommand.Pause)
             ProgressionEvent.Resume -> transport(ProgressionCommand.Resume)
             ProgressionEvent.Stop -> transport(ProgressionCommand.Stop)
-            ProgressionEvent.NewDraft -> execute(after = { tempo = null; numerator = null; capo = null; notes = List(6) { null }; octaves = List(6) { null } }) { ProgressionCommand.NewDraft }
+            ProgressionEvent.NewDraft -> { resetContextInputs(); send(ProgressionCommand.NewDraft) }
             ProgressionEvent.Save -> execute(record = true) { ProgressionCommand.Save }
-            is ProgressionEvent.Load -> execute(record = true, after = { tempo = null; numerator = null; capo = null; notes = List(6) { null }; octaves = List(6) { null } }) { ProgressionCommand.Load(event.id) }
+            is ProgressionEvent.Load -> { resetContextInputs(); execute(record = true) { ProgressionCommand.Load(event.id) } }
             is ProgressionEvent.Delete -> execute(record = true) { ProgressionCommand.Delete(event.id) }
             ProgressionEvent.RetryDraftWrite -> execute(record = true) { ProgressionCommand.RetryDraftWrite }
             ProgressionEvent.RetryStorageRead -> execute(record = true) { ProgressionCommand.RetryStorageRead }

@@ -33,4 +33,3 @@ class ProgressionPlaybackService : Service(), LifecycleOwner {
 
     override fun onBind(intent: Intent?): IBinder? = null
 }
-

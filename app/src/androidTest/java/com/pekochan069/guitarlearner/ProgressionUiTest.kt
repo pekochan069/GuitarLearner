@@ -10,8 +10,8 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
-import android.graphics.Bitmap
 import android.util.Log
+import android.os.ParcelFileDescriptor
 import arrow.core.Either
 import com.pekochan069.guitarlearner.adapters.AndroidChordsHost
 import com.pekochan069.guitarlearner.adapters.AndroidProgressionsHost
@@ -25,7 +25,6 @@ import com.slack.circuit.foundation.CircuitCompositionLocals
 import com.slack.circuit.foundation.CircuitContent
 import java.util.Locale
 import java.util.UUID
-import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
@@ -58,14 +57,12 @@ class ProgressionUiTest {
         repeat(2) {
             click("progression_add_chord")
             click("progression_copy_${source.id}")
-            compose.onNodeWithTag("progression_editor_fret_5_0").performScrollTo().assertIsOn()
-                .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+            fret("progression_editor_fret_5_0").assertIsOn()
             click("progression_commit_chord")
             compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == it + 1 }
         }
         click("progression_step_0")
         click("progression_duration_0")
-        diagnostic("after_duration_anchor")
         click("progression_duration_0_option_0")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps[0].duration.value == NoteValue.Whole }
         click("progression_dot_0")
@@ -112,11 +109,7 @@ class ProgressionUiTest {
         click("feature_Progressions")
         click("progression_add_chord")
         click("progression_copy_current")
-        compose.onNodeWithTag("progression_editor_fret_5_3").performScrollTo().assertIsDisplayed().assertHasClickAction()
-            .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
-        diagnostic("before_fret")
-        compose.onNodeWithTag("progression_editor_fret_5_3").performClick()
-        diagnostic("after_fret")
+        fret("progression_editor_fret_5_3").performClick()
         click("progression_commit_chord")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.isNotEmpty() }
         click("progression_context")
@@ -144,13 +137,22 @@ class ProgressionUiTest {
         try { compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick() }
         catch (failure: AssertionError) { diagnostic("failed_$tag"); throw failure }
     }
+    private fun fret(tag: String): SemanticsNodeInteraction {
+        try {
+            compose.onNodeWithTag("progression_sheet_scroll").performScrollToNode(hasTestTag(tag))
+            return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertHasClickAction()
+                .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+        } catch (failure: AssertionError) { diagnostic("failed_$tag"); throw failure }
+    }
     private fun diagnostic(label: String) {
+        Log.d("ProgressionUiDiagnostic", "$label merged tree")
+        compose.onAllNodes(isRoot()).printToLog("ProgressionUiDiagnostic", maxDepth = 8)
+        Log.d("ProgressionUiDiagnostic", "$label unmerged tree")
         compose.onAllNodes(isRoot(), useUnmergedTree = true).printToLog("ProgressionUiDiagnostic", maxDepth = 8)
-        InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap ->
-            val file = File(compose.activity.getExternalFilesDir(null), "progression_$label.png")
-            file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            Log.d("ProgressionUiDiagnostic", "$label screenshot: ${file.absolutePath}")
-        }
+        val path = "/sdcard/Download/progression_$label.png"
+        ParcelFileDescriptor.AutoCloseInputStream(InstrumentationRegistry.getInstrumentation().uiAutomation
+            .executeShellCommand("screencap -p $path")).bufferedReader().use { Log.d("ProgressionUiDiagnostic", it.readText()) }
+        Log.d("ProgressionUiDiagnostic", "$label screenshot: $path")
     }
     private fun show(locale: Locale, dark: Boolean, scale: Float) {
         val circuit = Circuit.Builder().addPresenterFactory(FoundationPresenter.Factory(ProgressionUiAppearance(),

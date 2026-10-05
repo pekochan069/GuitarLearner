@@ -97,12 +97,16 @@ fun ProgressionTool(state: ProgressionUiState, eventSink: (ProgressionEvent) -> 
         }
         if (state.steps.isEmpty()) Text(stringResource(R.string.progression_empty), Modifier.testTag("progression_empty"), style = MaterialTheme.typography.bodyMedium)
         state.steps.forEach { step ->
-            Card(onClick = { eventSink(ProgressionEvent.Select(step.index)) }, modifier = Modifier.fillMaxWidth().testTag("progression_step_${step.index}"),
+            Card(modifier = Modifier.fillMaxWidth().testTag("progression_card_${step.index}"),
                 shape = MaterialTheme.shapes.extraLarge, colors = CardDefaults.cardColors(containerColor =
                     if (step.index == state.playingIndex) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerLow)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.progression_step_title, step.index + 1,
-                        if (step.rest) stringResource(R.string.progression_rest) else step.name.ifBlank { step.sounding ?: stringResource(R.string.chord_unrecognized) }), style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = { eventSink(ProgressionEvent.Select(step.index)) },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("progression_step_${step.index}")) {
+                        Text(stringResource(R.string.progression_step_title, step.index + 1,
+                            if (step.rest) stringResource(R.string.progression_rest) else step.name.ifBlank { step.sounding ?: stringResource(R.string.chord_unrecognized) }),
+                            style = MaterialTheme.typography.titleMedium)
+                    }
                     if (!step.rest && step.name.isNotBlank()) step.sounding?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                     step.shape?.let { Text(stringResource(R.string.chord_shape_symbol, it), style = MaterialTheme.typography.bodySmall) }
                     Text("1/${step.duration.denominator}" + if (step.dotted) " ·" else "", style = MaterialTheme.typography.labelLarge)
@@ -142,7 +146,7 @@ fun ProgressionTool(state: ProgressionUiState, eventSink: (ProgressionEvent) -> 
     if (state.editorOpen || state.contextOpen) {
         ModalBottomSheet(onDismissRequest = { if (state.editorOpen) eventSink(ProgressionEvent.CloseEditor) else eventSink(ProgressionEvent.SetContextOpen(false)) },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), modifier = Modifier.testTag("progression_sheet")) {
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).testTag("progression_sheet_scroll").padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (state.contextOpen) ChordContextControls(state.editor) { eventSink(ProgressionEvent.ChordInput(it)) }
                 else {
                     SectionHeading(R.string.progression_chord_editor)

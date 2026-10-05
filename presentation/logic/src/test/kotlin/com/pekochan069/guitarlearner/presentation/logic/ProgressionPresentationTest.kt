@@ -15,6 +15,68 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProgressionPresentationTest {
     private val shape = ChordShape(listOf(StringStop.Muted, StringStop.Fretted(3), StringStop.Fretted(2), StringStop.Open, StringStop.Fretted(1), StringStop.Open))
+    @Test fun openingAnExistingChordEditorStopsBeforeLocalShapeChanges() = runTest {
+        val port = ControlledProgressions()
+        val original = ProgressionDraft("Practice", ProgressionContent(steps = listOf(ProgressionStep.Chord("C", shape))))
+        port.current.value = ProgressionWorkspace(draft = original, playback = ProgressionPlayback.Playing(ProgressionPosition(0)))
+        port.onCommand = { if (it == ProgressionCommand.Stop) port.current.value = port.current.value.copy(playback = ProgressionPlayback.Stopped()) }
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+            var state = awaitItem()
+            state.progression(ProgressionEvent.OpenEditor(0))
+            state = stateWhere { it.progressions.editorOpen && it.progressions.transport == ProgressionTransportUi.Stopped }
+            state.progression(ProgressionEvent.ChordInput(ChordEvent.SetFret(5, "3")))
+            stateWhere { it.progressions.editor.strings[5].fret == 3 }
+            assertEquals(listOf(ProgressionCommand.Stop), port.commands)
+            assertEquals(original, port.current.value.draft)
+        }
+    }
+    @Test fun failedLoadAndNewShowPublishedContentInsteadOfOldValidRawInputs() = runTest {
+        val port = ControlledProgressions()
+        val old = ProgressionContent(context = GuitarContext(capo = 5), timing = MetronomeConfig(bpm = 140), steps = listOf(ProgressionStep.Rest()))
+        val loaded = ProgressionContent(context = GuitarContext(TuningPreset.DropD.tuning, 2),
+            timing = MetronomeConfig(80, BeatUnit.Eighth, List(6) { BeatAccent.Normal }), steps = listOf(ProgressionStep.Rest()))
+        val record = SavedProgression("saved", "Loaded", loaded)
+        port.current.value = ProgressionWorkspace(draft = ProgressionDraft("Old", old), records = listOf(record))
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+            var state = awaitItem()
+            state.progression(ProgressionEvent.SetTempo("0140"))
+            state = stateWhere { it.progressions.bpmInput == "0140" }
+            state.progression(ProgressionEvent.SetNumerator("04"))
+            state = stateWhere { it.progressions.numeratorInput == "04" }
+            state.progression(ProgressionEvent.ChordInput(ChordEvent.SetCapo("05")))
+            state = stateWhere { it.progressions.editor.capoInput == "05" }
+            state.progression(ProgressionEvent.ChordInput(ChordEvent.SetNote(0, "e")))
+            state = stateWhere { it.progressions.editor.strings[0].noteInput == "e" }
+            state.progression(ProgressionEvent.ChordInput(ChordEvent.SetOctave(0, "02")))
+            state = stateWhere { it.progressions.editor.strings[0].octaveInput == "02" }
+            port.result = Either.Left(ProgressionFailure.WriteFailed)
+            port.onCommand = { command ->
+                if (command is ProgressionCommand.Load) port.current.value = port.current.value.copy(
+                    draft = ProgressionDraft(record.name, record.content, record.id), persistence = DraftPersistence.Unsynced)
+                if (command == ProgressionCommand.NewDraft) port.current.value = port.current.value.copy(
+                    draft = ProgressionDraft(content = ProgressionContent(context = loaded.context)), persistence = DraftPersistence.Unsynced)
+            }
+            state.progression(ProgressionEvent.Load(record.id))
+            state = stateWhere { it.progressions.name == "Loaded" && !it.progressions.busy }
+            assertEquals("80", state.progressions.bpmInput)
+            assertEquals("6", state.progressions.numeratorInput)
+            assertEquals("2", state.progressions.editor.capoInput)
+            assertEquals("D", state.progressions.editor.strings[0].noteInput)
+            assertEquals("2", state.progressions.editor.strings[0].octaveInput)
+            assertTrue(state.progressions.canSave)
+            assertTrue(state.progressions.unsynced)
+            assertEquals(ProgressionNotice.WriteFailed, state.progressions.notice)
+            state.progression(ProgressionEvent.SetTempo("0080"))
+            state = stateWhere { it.progressions.bpmInput == "0080" }
+            state.progression(ProgressionEvent.NewDraft)
+            state = stateWhere { it.progressions.steps.isEmpty() }
+            assertEquals("90", state.progressions.bpmInput)
+            assertEquals("4", state.progressions.numeratorInput)
+            assertEquals("2", state.progressions.editor.capoInput)
+            assertFalse(state.progressions.canSave)
+            assertTrue(state.progressions.unsynced)
+        }
+    }
     @Test fun copiedShapesUseProgressionContextAndNeverMutateTheChordViewer() = runTest {
         val port = ControlledProgressions()
         port.current.value = ProgressionWorkspace(draft = ProgressionDraft(content = ProgressionContent(context = GuitarContext(capo = 2))))
