@@ -92,6 +92,7 @@ class ProgressionUiTest {
         closeSheet()
         click("progression_open_save")
         compose.onNodeWithTag("progression_name").performScrollTo().performTextReplacement("Practice")
+        compose.onNodeWithTag("progression_name").performImeAction()
         compose.waitUntil(5_000) { host.current.value.draft.name == "Practice" && host.current.value.persistence == DraftPersistence.Synced }
         click("progression_save")
         compose.waitUntil(5_000) { host.current.value.records.size == 1 }
@@ -137,6 +138,7 @@ class ProgressionUiTest {
         closeSheet()
         click("progression_open_save")
         compose.onNodeWithTag("progression_name").performScrollTo().performTextReplacement("연습")
+        compose.onNodeWithTag("progression_name").performImeAction()
         compose.waitUntil(5_000) { host.current.value.draft.name == "연습" && host.current.value.persistence == DraftPersistence.Synced }
         preferences.failNext = true
         click("progression_save")

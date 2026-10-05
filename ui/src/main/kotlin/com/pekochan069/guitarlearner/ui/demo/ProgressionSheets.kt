@@ -16,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.pekochan069.guitarlearner.presentation.contract.*
 import com.pekochan069.guitarlearner.ui.R
@@ -64,7 +65,8 @@ internal fun ProgressionSheets(state: ProgressionUiState, eventSink: (Progressio
                         ProgressionSheetUi.Settings -> ProgressionSettings(state, eventSink)
                         ProgressionSheetUi.Save -> OutlinedTextField(state.name, { eventSink(ProgressionEvent.SetName(it)) },
                             modifier = Modifier.fillMaxWidth().testTag("progression_name"), enabled = !state.busy,
-                            label = { Text(stringResource(R.string.progression_name)) }, singleLine = true, isError = state.name.trim().length > 80)
+                            label = { Text(stringResource(R.string.progression_name)) }, singleLine = true, isError = state.name.trim().length > 80,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done))
                         ProgressionSheetUi.Collection -> {
                             if (state.records.isEmpty()) Text(stringResource(R.string.progression_collection_empty))
                             state.records.forEach { record ->

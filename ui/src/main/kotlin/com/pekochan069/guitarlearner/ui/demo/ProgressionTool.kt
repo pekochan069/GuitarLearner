@@ -1,6 +1,7 @@
 package com.pekochan069.guitarlearner.ui.demo
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -37,18 +38,19 @@ fun ProgressionTool(state: ProgressionUiState, eventSink: (ProgressionEvent) -> 
                 val highlighted = step.index == state.playingIndex
                 val playing = highlighted && state.transport == ProgressionTransportUi.Playing
                 val playingDescription = stringResource(R.string.progression_playing)
-                Surface(onClick = { eventSink(ProgressionEvent.OpenStep(step.index)) }, shape = MaterialTheme.shapes.large,
-                    color = if (highlighted) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth().testTag("progression_step_${step.index}").semantics {
-                        selected = step.index == state.selectedIndex
-                        if (playing) stateDescription = playingDescription
-                    }) {
+                Surface(shape = MaterialTheme.shapes.large,
+                    color = if (highlighted) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
                     ListItem(headlineContent = { Text(step.title()) },
                         supportingContent = { Text(listOfNotNull(step.name.takeIf { it.isNotBlank() },
                             step.sounding?.takeIf { it != step.shape }?.let { stringResource(R.string.progression_sounding, it) },
                             step.durationLabel(state.denominator), if (step.tied) stringResource(R.string.progression_tie) else null).joinToString(" · ")) },
                         leadingContent = { Text((step.index + 1).toString(), style = MaterialTheme.typography.labelLarge) },
                         trailingContent = { Icon(painterResource(R.drawable.ic_arrow_forward), null) },
+                        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { eventSink(ProgressionEvent.OpenStep(step.index)) }
+                            .testTag("progression_step_${step.index}").semantics {
+                                selected = step.index == state.selectedIndex
+                                if (playing) stateDescription = playingDescription
+                            },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent))
                 }
             }
