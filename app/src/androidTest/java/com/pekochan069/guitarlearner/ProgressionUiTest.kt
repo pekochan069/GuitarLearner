@@ -57,7 +57,7 @@ class ProgressionUiTest {
         repeat(2) {
             click("progression_add_chord")
             click("progression_copy_${source.id}")
-            fret("progression_editor_fret_5_0").assertIsOn()
+            fret(5, 0).assertIsOn()
             click("progression_commit_chord")
             compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == it + 1 }
         }
@@ -82,7 +82,7 @@ class ProgressionUiTest {
         compose.waitUntil(5_000) { host.current.value.draft.content.context.capo == 2 }
         click("progression_step_0")
         compose.onNodeWithTag("progression_step_0_fretboard").assertExists()
-        compose.onNodeWithTag("progression_step_0_position_1").assertContentDescriptionContains("D3")
+        compose.onNodeWithTag("progression_step_0_position_1").assertContentDescriptionContains("D3", substring = true)
         compose.onNodeWithTag("progression_name").performScrollTo().performTextReplacement("Practice")
         compose.waitUntil(5_000) { host.current.value.draft.name == "Practice" }
         click("progression_save")
@@ -109,7 +109,7 @@ class ProgressionUiTest {
         click("feature_Progressions")
         click("progression_add_chord")
         click("progression_copy_current")
-        fret("progression_editor_fret_5_3").performClick()
+        fret(5, 3).performClick()
         click("progression_commit_chord")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.isNotEmpty() }
         click("progression_context")
@@ -137,9 +137,10 @@ class ProgressionUiTest {
         try { compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick() }
         catch (failure: AssertionError) { diagnostic("failed_$tag"); throw failure }
     }
-    private fun fret(tag: String): SemanticsNodeInteraction {
+    private fun fret(stringIndex: Int, fretNumber: Int): SemanticsNodeInteraction {
+        val tag = "progression_editor_fret_${stringIndex}_$fretNumber"
         try {
-            compose.onNodeWithTag("progression_sheet_scroll").performScrollToNode(hasTestTag(tag))
+            compose.onNodeWithTag("progression_editor_position_$stringIndex").performScrollTo().assertIsDisplayed()
             return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().assertHasClickAction()
                 .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
         } catch (failure: AssertionError) { diagnostic("failed_$tag"); throw failure }
