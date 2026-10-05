@@ -17,6 +17,28 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TunerCaptureWorkerTest {
+    @Test fun successfulOpenStartsTheNoInputDeadlineAfterAcquisitionCompletes() = runTest {
+        val time = AtomicLong(1_000_000_000)
+        val entered = CountDownLatch(1)
+        val finishOpen = CountDownLatch(1)
+        val input = FakeInput(blockRead = true)
+        val worker = TunerCaptureWorker(TunerInputFactory {
+            entered.countDown()
+            check(finishOpen.await(5, TimeUnit.SECONDS))
+            input.right()
+        }, { MonotonicNanos(time.get()) })
+        worker.begin(backgroundScope, MeasurementEpoch(1, MonotonicNanos(time.get())))
+        await(entered)
+        time.set(2_200_000_000)
+        finishOpen.countDown()
+        assertEquals(Unit.right(), worker.ready.await())
+        await(input.readEntered)
+        assertEquals(MonotonicNanos(2_200_000_000), worker.lastReadProgress)
+        assertNull(worker.failure)
+        worker.requestStop()
+        assertEquals(Unit.right(), worker.closed.await())
+    }
+
     @Test fun cancellationWhileAcquiringInputStillInterruptsAndReleasesTheReturnedResourceOnce() = runTest {
         val entered = CountDownLatch(1)
         val returnInput = CountDownLatch(1)

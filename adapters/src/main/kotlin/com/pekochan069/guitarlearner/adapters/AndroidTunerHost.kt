@@ -223,15 +223,17 @@ class AndroidTunerHost internal constructor(
         memory = TuningMemory()
         revision++
         val active = session
+        val reportedFailure = if (shutdownBlocked || active?.failure == TunerFailure.ShutdownFailed) {
+            TunerFailure.ShutdownFailed
+        } else failure
         if (active != null) {
-            active.failure = failure ?: active.failure
+            active.failure = reportedFailure ?: active.failure
             active.capture.requestStop()
             active.stopRequested.complete(Unit)
         }
         snapshot.value = snapshot.value.copy(listening = when {
-            failure != null -> TunerListening.Failed(failure)
+            reportedFailure != null -> TunerListening.Failed(reportedFailure)
             active != null -> TunerListening.Stopping
-            shutdownBlocked -> TunerListening.Failed(TunerFailure.ShutdownFailed)
             else -> TunerListening.Stopped
         })
     }
@@ -310,10 +312,12 @@ class AndroidTunerHost internal constructor(
         val stopRequested: CompletableDeferred<Unit> = CompletableDeferred(), var failure: TunerFailure? = null)
 
     class Factory(private val application: Application, private val preferences: SharedPreferences, private val metronome: Metronome) {
+        private val inputFactory = ExclusiveTunerInputFactory(AndroidTunerInputFactory(application))
+
         fun create(ownedScope: CoroutineScope): AndroidTunerHost {
             val clock = { MonotonicNanos(System.nanoTime()) }
             return AndroidTunerHost(ownedScope, metronome,
-                TunerCaptureFactory { TunerCaptureWorker(AndroidTunerInputFactory(application), clock) },
+                TunerCaptureFactory { TunerCaptureWorker(inputFactory, clock) },
                 TunerToleranceStorage(preferences),
                 { application.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED },
                 ::launchSettings, YinHarmonicDetector(), clock)

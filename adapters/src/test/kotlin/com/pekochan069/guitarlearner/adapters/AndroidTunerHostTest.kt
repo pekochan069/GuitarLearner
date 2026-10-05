@@ -234,6 +234,9 @@ class AndroidTunerHostTest {
         advanceTimeBy(1500)
         runCurrent()
         assertEquals(TunerListening.Failed(TunerFailure.ShutdownFailed), rig.host.current.value.listening)
+        rig.settingsResult = TunerFailure.SettingsUnavailable.left()
+        rig.host.submit(TunerRequest.OpenSettings(TunerSettingsPage.AppPermission))
+        assertEquals(TunerListening.Failed(TunerFailure.ShutdownFailed), rig.host.current.value.listening)
         rig.start()
         assertEquals(1, rig.captures.size)
         rig.captures.single().closed.complete(Unit.right())
@@ -244,7 +247,7 @@ class AndroidTunerHostTest {
         assertEquals(2, rig.captures.size)
     }
 
-    @Test fun shutdownFailureIsFailedClosedAndSettingsFailureUsesCanonicalSnapshot() = runTest {
+    @Test fun shutdownFailureIsFailedClosedEvenWhenSettingsCannotOpen() = runTest {
         val rig = Rig(this)
         rig.start()
         val capture = rig.captures.single()
@@ -254,6 +257,16 @@ class AndroidTunerHostTest {
         assertEquals(TunerListening.Failed(TunerFailure.ShutdownFailed), rig.host.current.value.listening)
         rig.start()
         assertEquals(1, rig.captures.size)
+        rig.settingsResult = TunerFailure.SettingsUnavailable.left()
+        rig.host.submit(TunerRequest.OpenSettings(TunerSettingsPage.AppPermission))
+        assertEquals(TunerListening.Failed(TunerFailure.ShutdownFailed), rig.host.current.value.listening)
+        assertEquals(listOf(TunerSettingsPage.AppPermission), rig.openedSettings)
+        rig.start()
+        assertEquals(1, rig.captures.size)
+    }
+
+    @Test fun settingsFailureWithoutBlockedShutdownUsesTheCanonicalSnapshot() = runTest {
+        val rig = Rig(this)
         rig.settingsResult = TunerFailure.SettingsUnavailable.left()
         rig.host.submit(TunerRequest.OpenSettings(TunerSettingsPage.AppPermission))
         assertEquals(TunerListening.Failed(TunerFailure.SettingsUnavailable), rig.host.current.value.listening)
