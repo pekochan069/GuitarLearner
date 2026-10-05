@@ -157,6 +157,7 @@ class ProgressionUiTest {
         compose.onNodeWithTag("progression_name").performScrollTo().performTextReplacement("연습")
         compose.onNodeWithTag("progression_name").performImeAction()
         compose.waitUntil(5_000) { host.current.value.draft.name == "연습" && host.current.value.persistence == DraftPersistence.Synced }
+        compose.waitUntil(5_000) { compose.onNodeWithTag("progression_save").isDisplayed() }
         preferences.failNext = true
         click("progression_save")
         compose.waitUntil(5_000) { host.current.value.actionFailure == ProgressionFailure.WriteFailed }
