@@ -53,6 +53,7 @@ import kotlin.math.roundToInt
 fun TunerScreen(state: TunerUiState, eventSink: (FoundationEvent) -> Unit) {
     val active = state.listening == TunerListeningUi.Starting || state.listening is TunerListeningUi.Listening
     val failure = state.listening as? TunerListeningUi.Failed
+    TunerReading(state)
     if (failure == null || TunerActionUi.Retry in failure.actions) {
         Button(
             onClick = { eventSink(if (active) FoundationEvent.StopTuner else FoundationEvent.StartTuner) },
@@ -67,7 +68,6 @@ fun TunerScreen(state: TunerUiState, eventSink: (FoundationEvent) -> Unit) {
             }))
         }
     }
-    TunerReading(state)
     if (failure != null) {
         Text(stringResource(failure.notice.label), Modifier.testTag("tuner_failure"),
             style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
