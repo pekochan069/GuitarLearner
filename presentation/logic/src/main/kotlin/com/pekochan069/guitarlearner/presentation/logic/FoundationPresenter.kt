@@ -17,6 +17,9 @@ import com.pekochan069.guitarlearner.domain.AppearanceSettings
 import com.pekochan069.guitarlearner.domain.Chords
 import com.pekochan069.guitarlearner.domain.Training
 import com.pekochan069.guitarlearner.domain.TrainingRequest
+import com.pekochan069.guitarlearner.domain.TrainingStage
+import com.pekochan069.guitarlearner.domain.TrainingStorageStatus
+import com.pekochan069.guitarlearner.domain.TrainingFailure
 import com.pekochan069.guitarlearner.domain.LanguagePreference
 import com.pekochan069.guitarlearner.domain.BeatAccent
 import com.pekochan069.guitarlearner.domain.BeatUnit
@@ -52,6 +55,8 @@ import com.pekochan069.guitarlearner.domain.TunerSettingsPage
 import com.pekochan069.guitarlearner.presentation.contract.TunerActionUi
 import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
+import com.pekochan069.guitarlearner.presentation.contract.TrainingStageUi
+import com.pekochan069.guitarlearner.presentation.contract.TrainingEvent
 import com.slack.circuit.runtime.CircuitContext
 import com.slack.circuit.runtime.Navigator
 import com.slack.circuit.runtime.presenter.Presenter
@@ -71,6 +76,7 @@ class FoundationPresenter(
     @Composable
     override fun present(): FoundationState {
         var destinationId by rememberSaveable { mutableStateOf("home") }
+        var trainingSetupOpen by rememberSaveable { mutableStateOf(false) }
         var headstockLayout by rememberSaveable { mutableStateOf(HeadstockLayoutUi.ThreePlusThree) }
         var gallerySelected by rememberSaveable { mutableStateOf(true) }
         var overlay by rememberSaveable(stateSaver = OverlaySaver) { mutableStateOf<Overlay>(Overlay.None) }
@@ -97,6 +103,7 @@ class FoundationPresenter(
         fun navigate(next: FoundationDestination) {
             if (destinationId == "feature:training" && next != FoundationDestination.Feature(FeatureId.Training)) {
                 training.submit(TrainingRequest.Exit)
+                trainingSetupOpen = false
             }
             if (destinationId == "feature:tuner" && next != FoundationDestination.Feature(FeatureId.Tuner)) {
                 tuner.submit(TunerRequest.Stop)
@@ -110,7 +117,13 @@ class FoundationPresenter(
                 is Overlay.Overwrite -> Overlay.Presets
                 Overlay.Settings, Overlay.Presets -> Overlay.None
                 Overlay.None -> {
-                    navigate(FoundationDestination.Home)
+                    if (destinationId == "feature:training") {
+                        if (training.current.value.stage != TrainingStage.Setup) {
+                            training.submit(TrainingRequest.Exit)
+                            trainingSetupOpen = true
+                        } else if (trainingSetupOpen) trainingSetupOpen = false
+                        else navigate(FoundationDestination.Home)
+                    } else navigate(FoundationDestination.Home)
                     Overlay.None
                 }
             }
@@ -224,7 +237,9 @@ class FoundationPresenter(
             ),
             gallerySelected = gallerySelected,
             chords = chordPresentation.state,
-            training = trainingSnapshot.toUi(),
+            training = trainingSnapshot.toUi().let { ui ->
+                if (ui.stage == TrainingStageUi.Setup && !trainingSetupOpen) ui.copy(stage = TrainingStageUi.Menu) else ui
+            },
             settingsOpen = visibleOverlay == Overlay.Settings,
             theme = snapshot.theme.toOption(),
             language = snapshot.language?.toOption(),
@@ -232,7 +247,28 @@ class FoundationPresenter(
             eventSink = { event ->
                 when (event) {
                     is FoundationEvent.Training -> if (destinationId == "feature:training") {
-                        training.submit(event.value.toRequest())
+                        val live = training.current.value
+                        val setup = live.stage == TrainingStage.Setup
+                        when (val request = event.value) {
+                            is TrainingEvent.OpenExercise -> if (setup && !trainingSetupOpen && live.storage !is TrainingStorageStatus.Saving &&
+                                (live.storage as? TrainingStorageStatus.Failed)?.failure != TrainingFailure.SettingsReadFailed) {
+                                trainingSetupOpen = true
+                                training.submit(request.toRequest())
+                            }
+                            TrainingEvent.Start -> if (setup && trainingSetupOpen && live.storage == TrainingStorageStatus.Ready) {
+                                training.submit(request.toRequest())
+                            }
+                            is TrainingEvent.SetSettings -> if (setup && trainingSetupOpen &&
+                                request.settings.subject == live.toUi().settings.subject) training.submit(request.toRequest())
+                            TrainingEvent.Exit -> if (!setup) {
+                                training.submit(TrainingRequest.Exit)
+                                trainingSetupOpen = true
+                            }
+                            TrainingEvent.RetrySettings -> training.submit(request.toRequest())
+                            is TrainingEvent.Answer, is TrainingEvent.Next, is TrainingEvent.Replay -> if (live.stage is TrainingStage.Active) {
+                                training.submit(request.toRequest())
+                            }
+                        }
                     }
                     is FoundationEvent.Chord -> chordPresentation.eventSink(event.value)
                     is FoundationEvent.OpenFeature -> if (featureCatalog.any { event.id in it.features }) {

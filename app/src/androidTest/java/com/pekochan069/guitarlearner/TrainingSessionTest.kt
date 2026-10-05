@@ -3,6 +3,7 @@ package com.pekochan069.guitarlearner
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -14,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import com.pekochan069.guitarlearner.adapters.AndroidTrainingHost
 import com.pekochan069.guitarlearner.domain.*
 import com.pekochan069.guitarlearner.presentation.contract.TrainingNoteUi
+import com.pekochan069.guitarlearner.ui.R as UiR
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -154,16 +156,56 @@ class TrainingSessionTest {
         assertTrue(graph.metronomeHost.current.value.playback is PlaybackState.Stopped)
     }
 
-    private fun openTraining() {
-        if (compose.onAllNodesWithTag("navigate_up").fetchSemanticsNodes().isNotEmpty()) compose.onNodeWithTag("navigate_up").performClick()
+    @Test fun exerciseMenuFormatDropdownAndBackKeepPagesSeparate() {
+        openTrainingMenu()
+        compose.onNodeWithTag("training_start").assertDoesNotExist()
+        compose.onNodeWithTag("training_exercise_Note").assertExists()
+        compose.onNodeWithTag("training_exercise_Interval").performClick()
+        awaitSettings()
+        compose.onNodeWithTag("training_exercise_title").assertTextEquals(compose.activity.getString(UiR.string.training_interval_exercise))
+        compose.onNodeWithTag("training_subject_Note").assertDoesNotExist()
+        compose.onNodeWithTag("training_format").performClick()
+        compose.onNodeWithTag("training_format_Staff").performClick()
+        awaitSettings()
+        assertEquals(TrainingRepresentation.Staff, host.current.value.settings.representation)
+        compose.activityRule.scenario.recreate()
+        compose.waitForIdle()
+        compose.onNodeWithTag("training_exercise_title").assertTextEquals(compose.activity.getString(UiR.string.training_interval_exercise))
+        compose.onNodeWithTag("training_start").performScrollTo().performClick()
+        assertEquals(TrainingSubject.Interval, session().settings.subject)
+        assertEquals(TrainingRepresentation.Staff, session().settings.representation)
+        compose.onNodeWithTag("navigate_up").performClick()
+        compose.onNodeWithTag("training_format").assertExists()
+        assertEquals(TrainingStage.Setup, host.current.value.stage)
+        compose.onNodeWithTag("navigate_up").performClick()
+        compose.onNodeWithTag("training_exercise_Interval").assertExists()
+        compose.onNodeWithTag("training_start").assertDoesNotExist()
+        compose.onNodeWithTag("navigate_up").performClick()
+        compose.onNodeWithTag("feature_Training").performScrollTo().assertIsDisplayed()
+    }
+
+    private fun openTrainingMenu() {
+        repeat(3) {
+            if (compose.onAllNodesWithTag("navigate_up").fetchSemanticsNodes().isNotEmpty()) compose.onNodeWithTag("navigate_up").performClick()
+        }
         compose.onNodeWithTag("feature_Training").performScrollTo().performClick()
+    }
+
+    private fun openTraining() {
+        openTrainingMenu()
+        compose.onNodeWithTag("training_exercise_${host.current.value.settings.subject.name}").performScrollTo().performClick()
+        awaitSettings()
     }
 
     private fun configure(settings: TrainingSettings) {
         compose.runOnIdle { host.submit(TrainingRequest.SetSettings(settings)) }
+        awaitSettings()
+        assertEquals(settings, host.current.value.settings)
+    }
+
+    private fun awaitSettings() {
         runBlocking { withTimeout(5_000) { host.current.first { it.storage !is TrainingStorageStatus.Saving } } }
         assertEquals(TrainingStorageStatus.Ready, host.current.value.storage)
-        assertEquals(settings, host.current.value.settings)
         compose.waitForIdle()
     }
 

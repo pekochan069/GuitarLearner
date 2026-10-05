@@ -4,7 +4,11 @@ import com.pekochan069.guitarlearner.domain.*
 import com.pekochan069.guitarlearner.presentation.contract.*
 
 internal fun TrainingSnapshot.toUi(): TrainingUiState = TrainingUiState(
-    settings = settings.toUi(),
+    settings = when (val storage = storage) {
+        TrainingStorageStatus.Ready -> settings
+        is TrainingStorageStatus.Saving -> storage.requested
+        is TrainingStorageStatus.Failed -> storage.requested ?: settings
+    }.toUi(),
     stage = when (val stage = stage) {
         TrainingStage.Setup -> TrainingStageUi.Setup
         is TrainingStage.Active -> stage.session.let { session -> TrainingStageUi.Question(
@@ -30,6 +34,7 @@ internal fun TrainingSnapshot.toUi(): TrainingUiState = TrainingUiState(
 )
 
 internal fun TrainingEvent.toRequest(): TrainingRequest = when (this) {
+    is TrainingEvent.OpenExercise -> TrainingRequest.SetSettings(settings.toDomain())
     is TrainingEvent.SetSettings -> TrainingRequest.SetSettings(settings.toDomain())
     TrainingEvent.RetrySettings -> TrainingRequest.RetrySettings
     TrainingEvent.Start -> TrainingRequest.Start

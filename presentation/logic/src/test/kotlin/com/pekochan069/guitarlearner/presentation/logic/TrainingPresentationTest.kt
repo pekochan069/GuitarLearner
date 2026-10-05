@@ -58,11 +58,12 @@ class TrainingPresentationTest {
             TrainingEvent.Replay(key, TrainingSoundUi.Comparison).toRequest())
         val changed = TrainingSettingsUi(TrainingSubjectUi.Interval, TrainingRepresentationUi.Tab,
             IntervalPresentationUi.Descending, setOf(TrainingIntervalUi.Unison))
+        assertEquals(TrainingEvent.SetSettings(changed).toRequest(), TrainingEvent.OpenExercise(changed).toRequest())
         assertEquals(TrainingSettings(TrainingSubject.Interval, TrainingRepresentation.Tab, IntervalPresentation.Descending,
             setOf(TrainingInterval.Unison)), (TrainingEvent.SetSettings(changed).toRequest() as TrainingRequest.SetSettings).settings)
     }
 
-    @Test fun trainingCatalogAndNavigationUseOneCapabilityAndSettingsDismissalPreservesIt() = runTest {
+    @Test fun trainingMenuBackAndLiveStageGuardsKeepExercisePagesSeparate() = runTest {
         val training = ControlledTraining()
         FoundationPresenter(TrainingAppearance(), TrainingMetronome(), ControlledTuner(), TrainingChords(), training).test {
             var state = awaitItem()
@@ -72,17 +73,59 @@ class TrainingPresentationTest {
             assertTrue(training.requests.isEmpty())
             state.eventSink(FoundationEvent.OpenFeature(FeatureId.Training))
             state = awaitItem()
+            assertEquals(TrainingStageUi.Menu, state.training.stage)
+            val menuSink = state.eventSink
+            menuSink(FoundationEvent.Training(TrainingEvent.Start))
             assertTrue(training.requests.isEmpty())
+            menuSink(FoundationEvent.Training(TrainingEvent.OpenExercise(state.training.settings)))
+            state = awaitItem()
+            assertEquals(TrainingStageUi.Setup, state.training.stage)
+            val staleSetupSink = state.eventSink
+            state.eventSink(FoundationEvent.NavigateBack)
+            staleSetupSink(FoundationEvent.Training(TrainingEvent.Start))
+            state = awaitItem()
+            assertEquals(TrainingStageUi.Menu, state.training.stage)
+            assertFalse(training.requests.contains(TrainingRequest.Start))
+            state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(state.training.settings.copy(subject = TrainingSubjectUi.Interval))))
+            runCurrent()
+            state = expectMostRecentItem()
+            assertEquals(TrainingSubjectUi.Interval, state.training.settings.subject)
+            val requested = training.current.value.settings.copy(representation = TrainingRepresentation.Staff)
+            training.current.value = training.current.value.copy(storage = TrainingStorageStatus.Failed(TrainingFailure.SettingsWriteFailed, requested))
+            state = awaitItem()
+            assertEquals(TrainingRepresentationUi.Staff, state.training.settings.representation)
             state.eventSink(FoundationEvent.Training(TrainingEvent.Start))
             runCurrent()
             expectNoEvents()
-            assertEquals(listOf(TrainingRequest.Start), training.requests)
+            assertFalse(training.requests.contains(TrainingRequest.Start))
+            training.current.value = training.current.value.copy(settings = requested, storage = TrainingStorageStatus.Ready)
+            state = awaitItem()
+            state.eventSink(FoundationEvent.Training(TrainingEvent.Start))
+            state = awaitItem()
+            assertTrue(state.training.stage is TrainingStageUi.Question)
+            val activeRequestCount = training.requests.size
+            menuSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingSettingsUi())))
+            staleSetupSink(FoundationEvent.Training(TrainingEvent.SetSettings(TrainingSettingsUi())))
+            assertEquals(activeRequestCount, training.requests.size)
             state.eventSink(FoundationEvent.SetSettingsOpen(true))
             state = awaitItem()
             state.eventSink(FoundationEvent.NavigateBack)
             state = awaitItem()
             assertEquals(FoundationDestination.Feature(FeatureId.Training), state.destination)
             assertFalse(training.requests.contains(TrainingRequest.Exit))
+            assertTrue(state.training.stage is TrainingStageUi.Question)
+            state.eventSink(FoundationEvent.NavigateBack)
+            state = awaitItem()
+            assertEquals(TrainingStageUi.Setup, state.training.stage)
+            state.eventSink(FoundationEvent.NavigateBack)
+            state = awaitItem()
+            assertEquals(TrainingStageUi.Menu, state.training.stage)
+            state.eventSink(FoundationEvent.NavigateBack)
+            state = awaitItem()
+            assertEquals(FoundationDestination.Home, state.destination)
+            state.eventSink(FoundationEvent.OpenFeature(FeatureId.Training))
+            state = awaitItem()
+            assertEquals(TrainingStageUi.Menu, state.training.stage)
             state.eventSink(FoundationEvent.OpenFeature(FeatureId.Metronome))
             val countAfterNavigation = training.requests.size
             state.eventSink(FoundationEvent.Training(TrainingEvent.Start))
@@ -99,7 +142,16 @@ class TrainingPresentationTest {
 internal class ControlledTraining : Training {
     override val current = MutableStateFlow(TrainingSnapshot())
     val requests = mutableListOf<TrainingRequest>()
-    override fun submit(request: TrainingRequest) { requests.add(request) }
+    override fun submit(request: TrainingRequest) {
+        requests.add(request)
+        when (request) {
+            is TrainingRequest.SetSettings -> current.value = current.value.copy(settings = request.settings)
+            TrainingRequest.Start -> current.value = current.value.copy(stage = TrainingStage.Active(
+                requireNotNull(TrainingSession.start(1, current.value.settings) { 0 }.getOrNull())))
+            TrainingRequest.Exit -> current.value = current.value.copy(stage = TrainingStage.Setup)
+            else -> Unit
+        }
+    }
 }
 private class TrainingAppearance : AppearanceSettings {
     override val current = MutableStateFlow(AppearanceSnapshot(ThemePreference.Light, LanguagePreference.System))

@@ -1,6 +1,8 @@
 <resources>
     <string name="training_title">Training</string>
-    <string name="training_subject">Identify</string>
+    <string name="training_back">Back</string>
+    <string name="training_note_exercise">Note identification</string>
+    <string name="training_interval_exercise">Interval identification</string>
     <string name="training_notes">Notes</string>
     <string name="training_intervals">Intervals</string>
     <string name="training_representation">Question format</string>

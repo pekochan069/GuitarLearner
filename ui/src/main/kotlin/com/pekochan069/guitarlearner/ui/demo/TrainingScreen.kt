@@ -17,19 +17,27 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -69,6 +77,7 @@ fun TrainingScreen(state: TrainingUiState, eventSink: (TrainingEvent) -> Unit) {
         }
         state.notice?.let { TrainingNotice(it, "training_notice") }
         when (val stage = state.stage) {
+            TrainingStageUi.Menu -> TrainingMenu(state, eventSink)
             TrainingStageUi.Setup -> TrainingSetup(state, eventSink)
             is TrainingStageUi.Question -> TrainingQuestion(stage, state.audio, eventSink)
             is TrainingStageUi.Results -> {
@@ -94,26 +103,37 @@ fun TrainingScreen(state: TrainingUiState, eventSink: (TrainingEvent) -> Unit) {
     }
 }
 
+@Composable
+private fun TrainingMenu(state: TrainingUiState, eventSink: (TrainingEvent) -> Unit) {
+    TrainingSubjectUi.entries.forEach { subject ->
+        Card(onClick = { eventSink(TrainingEvent.OpenExercise(state.settings.copy(subject = subject))) },
+            enabled = !state.settingsSaving && state.settingsNotice != TrainingNoticeUi.SettingsReadFailed,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).testTag("training_exercise_${subject.name}"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+            Text(stringResource(subject.exerciseTitle), Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TrainingSetup(state: TrainingUiState, eventSink: (TrainingEvent) -> Unit) {
     val settings = state.settings
     val enabled = !state.settingsSaving && state.settingsNotice != TrainingNoticeUi.SettingsReadFailed
-    Text(stringResource(R.string.training_subject), style = MaterialTheme.typography.titleMedium)
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        TrainingSubjectUi.entries.forEach { subject ->
-            SegmentedButton(selected = settings.subject == subject, onClick = { eventSink(TrainingEvent.SetSettings(settings.copy(subject = subject))) },
-                enabled = enabled, shape = SegmentedButtonDefaults.itemShape(subject.ordinal, TrainingSubjectUi.entries.size),
-                modifier = Modifier.testTag("training_subject_${subject.name}")) { Text(stringResource(subject.label)) }
-        }
-    }
-    Text(stringResource(R.string.training_representation), style = MaterialTheme.typography.titleMedium)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        TrainingRepresentationUi.entries.forEach { representation ->
-            FilterChip(selected = settings.representation == representation,
-                onClick = { eventSink(TrainingEvent.SetSettings(settings.copy(representation = representation))) }, enabled = enabled,
-                modifier = Modifier.heightIn(min = 48.dp).testTag("training_representation_${representation.name}"),
-                label = { Text(stringResource(representation.label)) })
+    var formatOpen by remember { mutableStateOf(false) }
+    Text(stringResource(settings.subject.exerciseTitle), Modifier.testTag("training_exercise_title").semantics { heading() },
+        style = MaterialTheme.typography.headlineMedium)
+    ExposedDropdownMenuBox(expanded = formatOpen, onExpandedChange = { if (enabled) formatOpen = it }) {
+        OutlinedTextField(value = stringResource(settings.representation.label), onValueChange = {}, readOnly = true, enabled = enabled, singleLine = true,
+            label = { Text(stringResource(R.string.training_representation)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(formatOpen) },
+            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled).fillMaxWidth().testTag("training_format"))
+        ExposedDropdownMenu(expanded = formatOpen, onDismissRequest = { formatOpen = false }) {
+            TrainingRepresentationUi.entries.forEach { representation ->
+                DropdownMenuItem(text = { Text(stringResource(representation.label)) }, enabled = enabled,
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("training_format_${representation.name}"),
+                    onClick = { formatOpen = false; eventSink(TrainingEvent.SetSettings(settings.copy(representation = representation))) })
+            }
         }
     }
     if (settings.subject == TrainingSubjectUi.Interval) {
@@ -140,7 +160,7 @@ private fun TrainingSetup(state: TrainingUiState, eventSink: (TrainingEvent) -> 
             }
         }
     }
-    Button(onClick = { eventSink(TrainingEvent.Start) }, enabled = !state.settingsSaving &&
+    Button(onClick = { eventSink(TrainingEvent.Start) }, enabled = !state.settingsSaving && state.settingsNotice == null &&
         (settings.subject != TrainingSubjectUi.Interval || settings.intervals.isNotEmpty()),
         modifier = Modifier.fillMaxWidth().testTag("training_start")) { Text(stringResource(R.string.training_start)) }
 }
@@ -354,6 +374,10 @@ private val TrainingAnswerUi.tag: String get() = when (this) {
 private val TrainingSubjectUi.label: Int get() = when (this) {
     TrainingSubjectUi.Note -> R.string.training_notes
     TrainingSubjectUi.Interval -> R.string.training_intervals
+}
+private val TrainingSubjectUi.exerciseTitle: Int get() = when (this) {
+    TrainingSubjectUi.Note -> R.string.training_note_exercise
+    TrainingSubjectUi.Interval -> R.string.training_interval_exercise
 }
 private val TrainingRepresentationUi.label: Int get() = when (this) {
     TrainingRepresentationUi.Listening -> R.string.training_listening

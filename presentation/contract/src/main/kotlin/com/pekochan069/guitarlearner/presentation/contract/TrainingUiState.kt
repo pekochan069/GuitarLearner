@@ -29,6 +29,7 @@ sealed interface TrainingAnswerUi {
 data class TrainingFeedbackUi(val chosen: TrainingAnswerUi, val answer: TrainingAnswerUi, val correct: Boolean)
 data class TrainingResultUi(val number: Int, val feedback: TrainingFeedbackUi)
 sealed interface TrainingStageUi {
+    data object Menu : TrainingStageUi
     data object Setup : TrainingStageUi
     data class Question(val key: TrainingQuestionKeyUi, val number: Int, val settings: TrainingSettingsUi,
         val positions: List<TrainingPositionUi>, val staff: List<TrainingStaffNoteUi>,
@@ -43,13 +44,14 @@ sealed interface TrainingAudioUi {
 }
 data class TrainingUiState(
     val settings: TrainingSettingsUi = TrainingSettingsUi(),
-    val stage: TrainingStageUi = TrainingStageUi.Setup,
+    val stage: TrainingStageUi = TrainingStageUi.Menu,
     val audio: TrainingAudioUi = TrainingAudioUi.Idle,
     val settingsSaving: Boolean = false,
     val settingsNotice: TrainingNoticeUi? = null,
     val notice: TrainingNoticeUi? = null,
 )
 sealed interface TrainingEvent {
+    data class OpenExercise(val settings: TrainingSettingsUi) : TrainingEvent
     data class SetSettings(val settings: TrainingSettingsUi) : TrainingEvent
     data object RetrySettings : TrainingEvent
     data object Start : TrainingEvent

@@ -104,7 +104,8 @@ fun DesignFoundationApp(
     val homeScroll = rememberScrollState()
     val preferencesEnabled = state.settingsStatus != SettingsStatus.Saving
     val trainingPage = if (destination == FoundationDestination.Feature(FeatureId.Training)) when (val stage = state.training.stage) {
-        TrainingStageUi.Setup -> "setup"
+        TrainingStageUi.Menu -> "menu"
+        TrainingStageUi.Setup -> state.training.settings.subject
         is TrainingStageUi.Question -> stage.key
         is TrainingStageUi.Results -> "results"
     } else null
@@ -122,7 +123,9 @@ fun DesignFoundationApp(
                     if (destination != FoundationDestination.Home) {
                         IconButton(onClick = { state.eventSink(FoundationEvent.NavigateBack) },
                             modifier = Modifier.testTag("navigate_up")) {
-                            Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back_to_home))
+                            Icon(painterResource(R.drawable.ic_arrow_back), stringResource(if (
+                                destination == FoundationDestination.Feature(FeatureId.Training) && state.training.stage != TrainingStageUi.Menu
+                            ) R.string.training_back else R.string.back_to_home))
                         }
                     }
                 },

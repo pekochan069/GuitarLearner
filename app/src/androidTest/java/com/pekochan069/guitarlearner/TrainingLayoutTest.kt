@@ -14,8 +14,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -32,11 +35,50 @@ import com.pekochan069.guitarlearner.ui.demo.TrainingScreen
 import com.pekochan069.guitarlearner.ui.theme.GuitarLearnerTheme
 import java.util.Locale
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
 class TrainingLayoutTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun enlargedEnglishAndKoreanMenusKeepBothExercisesAccessible() {
+        val language = mutableStateOf("en")
+        val dark = mutableStateOf(false)
+        val settings = TrainingSettingsUi(representation = TrainingRepresentationUi.Staff)
+        val events = mutableListOf<TrainingEvent>()
+        compose.setContent { CompositionLocalProvider(LocalContext provides localizedContext(language.value),
+            LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+            GuitarLearnerTheme(dark.value) {
+                Column(Modifier.width(320.dp).verticalScroll(rememberScrollState())) {
+                    TrainingScreen(TrainingUiState(settings = settings), events::add)
+                }
+            }
+        } }
+        for (locale in listOf("en", "ko")) for (theme in listOf(false, true)) {
+            compose.runOnIdle { language.value = locale; dark.value = theme }
+            val context = localizedContext(locale)
+            for (subject in TrainingSubjectUi.entries) {
+                val title = if (subject == TrainingSubjectUi.Note) UiR.string.training_note_exercise else UiR.string.training_interval_exercise
+                compose.onNodeWithTag("training_exercise_${subject.name}").performScrollTo().assertIsDisplayed()
+                    .assertHasClickAction().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+                    .assertTextEquals(context.getString(title)).performClick()
+                assertEquals(TrainingEvent.OpenExercise(settings.copy(subject = subject)), events.last())
+            }
+            compose.onNodeWithTag("training_start").assertDoesNotExist()
+            compose.onNodeWithTag("training_format").assertDoesNotExist()
+        }
+    }
+
+    @Test fun failedExerciseSettingsKeepStartDisabledAndRetryAvailable() {
+        val state = TrainingUiState(settings = TrainingSettingsUi(subject = TrainingSubjectUi.Interval), stage = TrainingStageUi.Setup,
+            settingsNotice = TrainingNoticeUi.SettingsWriteFailed)
+        compose.setContent { GuitarLearnerTheme(false) {
+            Column(Modifier.width(320.dp).verticalScroll(rememberScrollState())) { TrainingScreen(state) {} }
+        } }
+        compose.onNodeWithTag("training_start").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("training_settings_retry").performScrollTo().assertHasClickAction()
+    }
 
     @Test fun lowestStaffPitchDescribesBelowTheStaffWithoutNamingTheAnswer() {
         val context = localizedContext("en")

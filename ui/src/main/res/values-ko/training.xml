@@ -1,6 +1,8 @@
 <resources>
     <string name="training_title">훈련</string>
-    <string name="training_subject">식별 대상</string>
+    <string name="training_back">뒤로</string>
+    <string name="training_note_exercise">음 이름 맞히기</string>
+    <string name="training_interval_exercise">음정 맞히기</string>
     <string name="training_notes">음이름</string>
     <string name="training_intervals">음정</string>
     <string name="training_representation">문제 형식</string>
