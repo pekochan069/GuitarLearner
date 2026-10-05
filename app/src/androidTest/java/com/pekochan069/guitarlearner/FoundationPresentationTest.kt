@@ -42,6 +42,10 @@ import com.pekochan069.guitarlearner.domain.AppearanceChange
 import com.pekochan069.guitarlearner.domain.AppearanceFailure
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
 import com.pekochan069.guitarlearner.domain.AppearanceSnapshot
+import com.pekochan069.guitarlearner.domain.ChordCommand
+import com.pekochan069.guitarlearner.domain.ChordFailure
+import com.pekochan069.guitarlearner.domain.ChordWorkspace
+import com.pekochan069.guitarlearner.domain.Chords
 import com.pekochan069.guitarlearner.domain.BeatAccent
 import com.pekochan069.guitarlearner.domain.LanguagePreference
 import com.pekochan069.guitarlearner.domain.Metronome
@@ -103,10 +107,13 @@ class FoundationPresentationTest {
         compose.onNodeWithTag("category_Tools").assertExists()
         compose.onNodeWithTag("feature_Metronome").assertHasClickAction().assertIsDisplayed()
         compose.onNodeWithTag("feature_Tuner").assertHasClickAction().assertIsDisplayed()
+        compose.onNodeWithTag("feature_Chords").assertHasClickAction().assertIsDisplayed()
         val category = compose.onNodeWithTag("category_Tools").getUnclippedBoundsInRoot()
         val tile = compose.onNodeWithTag("feature_Metronome").getUnclippedBoundsInRoot()
         assertEquals((category.width.value - 12f) / 2, tile.width.value, 1f)
         assertEquals(category.left.value, tile.left.value, 1f)
+        assertEquals(tile.width.value,
+            compose.onNodeWithTag("feature_Chords").getUnclippedBoundsInRoot().width.value, 1f)
         compose.onNodeWithTag("category_Training").assertDoesNotExist()
         compose.onNodeWithTag("category_Learning").assertDoesNotExist()
         compose.onNodeWithTag("sample_Tuner").assertDoesNotExist()
@@ -680,7 +687,7 @@ class FoundationPresentationTest {
 
 private fun testCircuit(settings: AppearanceSettings, metronome: Metronome, developmentSamplesEnabled: Boolean = true,
     tuner: Tuner = FakeTuner()): Circuit = Circuit.Builder()
-    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome, tuner, developmentSamplesEnabled))
+    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome, tuner, FakeChords(), developmentSamplesEnabled))
     .addUiFactory(FoundationUiFactory)
     .build()
 
@@ -720,7 +727,12 @@ private class FakeMetronome : Metronome {
     }
 }
 
-private class FakeTuner : Tuner {
+private class FakeChords : Chords {
+    override val current = MutableStateFlow(ChordWorkspace()).asStateFlow()
+    override suspend fun execute(command: ChordCommand): Either<ChordFailure, Unit> = Either.Right(Unit)
+}
+
+internal class FakeTuner : Tuner {
     val snapshot = MutableStateFlow(TunerSnapshot())
     override val current: StateFlow<TunerSnapshot> = snapshot.asStateFlow()
     val requests = mutableListOf<TunerRequest>()

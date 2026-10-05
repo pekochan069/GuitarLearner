@@ -37,6 +37,57 @@ A practice tool that listens to a guitar and indicates whether its pitch is belo
 **Standard tuning**:
 The six-string guitar tuning E₂–A₂–D₃–G₃–B₃–E₄, listed from string 6 to string 1.
 
+**Guitar tuning**:
+The pitch assigned to each open guitar string before applying a capo. Six-string tunings are listed from string 6 to string 1.
+
+**Alternative tuning**:
+A guitar tuning that differs from standard tuning.
+
+**Tuning preset**:
+A predefined, named guitar tuning.
+
+**Capo**:
+A device that holds guitar strings against a fret, raising the open pitches of the strings it covers.
+
+**Full capo**:
+A capo that covers all six strings at the same fret.
+
+**Fretboard**:
+The part of a guitar neck where pressing a string against a fret determines its sounding pitch.
+
+**Chord symbol**:
+A musical label identifying a chord's root and quality, with extensions and a non-root bass note where applicable. It is distinct from a personal name given to a saved chord.
+
+**Sounding chord symbol**:
+A chord symbol interpreting the notes that a chord shape produces with the selected guitar tuning and capo.
+
+**Shape chord symbol**:
+A chord symbol interpreting the same capo-relative shape in the selected guitar tuning with the capo removed.
+
+**Capo-relative fret**:
+A fret position counted from the capo, or from the nut when no capo is used. Position zero is the open string at that boundary.
+
+**Chord shape**:
+A choice of an open string, a fretted position, or a muted string for each guitar string.
+
+**Muted string**:
+A string excluded from the sounding notes of a chord shape, shown as X.
+
+**Chord root**:
+The note on which a chord's interval relationships and symbol are based. It need not be the lowest sounding note.
+
+**Chord degree**:
+A note's interval role relative to the selected chord candidate's root, such as 1, ♭3, 5, or ♭7.
+
+**Chord candidate**:
+A possible chord-symbol interpretation of the notes produced by a chord shape.
+
+**Custom chord**:
+A user-created chord shape that can be saved under a personal name and recalled for later use.
+
+**Chord draft**:
+The current unfinished chord edit and its tuning, capo, and chosen interpretation. It is distinct from a saved custom chord until the user saves it.
+
 **Reference pitch**:
 The frequency assigned to A₄ that determines the tuning's target pitches. GuitarLearner uses A₄ = 440 Hz.
 

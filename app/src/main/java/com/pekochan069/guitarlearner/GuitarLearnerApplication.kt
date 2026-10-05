@@ -2,8 +2,10 @@ package com.pekochan069.guitarlearner
 
 import android.app.Application
 import com.pekochan069.guitarlearner.adapters.AndroidAppearanceHost
+import com.pekochan069.guitarlearner.adapters.AndroidChordsHost
 import com.pekochan069.guitarlearner.adapters.AndroidMetronomeHost
 import com.pekochan069.guitarlearner.adapters.AndroidTunerHost
+import com.pekochan069.guitarlearner.domain.Chords
 import com.pekochan069.guitarlearner.domain.Metronome
 import com.pekochan069.guitarlearner.domain.Tuner
 import com.pekochan069.guitarlearner.presentation.logic.FoundationPresenter
@@ -32,9 +34,10 @@ interface AppGraph {
     val appearanceHost: AndroidAppearanceHost
     val metronomeHost: AndroidMetronomeHost
     val tunerHostFactory: AndroidTunerHost.Factory
+    val chords: Chords
 
     fun createPresenterFactory(tuner: Tuner): FoundationPresenter.Factory =
-        FoundationPresenter.Factory(appearanceHost, metronomeHost, tuner, developmentSamplesEnabled = BuildConfig.DEBUG)
+        FoundationPresenter.Factory(appearanceHost, metronomeHost, tuner, chords, developmentSamplesEnabled = BuildConfig.DEBUG)
 
     fun createCircuit(factory: FoundationPresenter.Factory): Circuit = Circuit.Builder()
         .addPresenterFactory(factory)
@@ -48,6 +51,11 @@ interface AppGraph {
 
     @Provides
     fun provideMetronomeCapability(host: AndroidMetronomeHost): Metronome = host
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideChords(application: Application): Chords =
+        AndroidChordsHost(application.getSharedPreferences("chords", Application.MODE_PRIVATE))
 
     @Provides
     @SingleIn(AppScope::class)

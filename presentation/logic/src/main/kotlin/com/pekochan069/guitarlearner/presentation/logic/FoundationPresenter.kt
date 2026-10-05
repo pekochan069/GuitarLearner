@@ -14,6 +14,7 @@ import arrow.core.raise.ensure
 import com.pekochan069.guitarlearner.domain.AppearanceChange
 import com.pekochan069.guitarlearner.domain.AppearanceFailure
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
+import com.pekochan069.guitarlearner.domain.Chords
 import com.pekochan069.guitarlearner.domain.LanguagePreference
 import com.pekochan069.guitarlearner.domain.BeatAccent
 import com.pekochan069.guitarlearner.domain.BeatUnit
@@ -61,6 +62,7 @@ class FoundationPresenter(
     private val appearance: AppearanceSettings,
     private val metronome: Metronome,
     private val tuner: Tuner,
+    private val chords: Chords,
     private val developmentSamplesEnabled: Boolean = false,
 ) : Presenter<FoundationState> {
     @Composable
@@ -72,6 +74,7 @@ class FoundationPresenter(
         var settingsStatus by remember { mutableStateOf<SettingsStatus>(SettingsStatus.Idle) }
         val snapshot by appearance.current.collectAsState()
         val metronomeSnapshot by metronome.current.collectAsState()
+        val chordPresentation = presentChords(chords)
         val tunerSnapshot by tuner.current.collectAsState()
         var presetName by rememberSaveable { mutableStateOf("") }
         var savingPreset by remember { mutableStateOf(false) }
@@ -213,12 +216,14 @@ class FoundationPresenter(
                     ?.takeUnless { it == dismissedReadFailure }?.toNotice(),
             ),
             gallerySelected = gallerySelected,
+            chords = chordPresentation.state,
             settingsOpen = visibleOverlay == Overlay.Settings,
             theme = snapshot.theme.toOption(),
             language = snapshot.language?.toOption(),
             settingsStatus = settingsStatus,
             eventSink = { event ->
                 when (event) {
+                    is FoundationEvent.Chord -> chordPresentation.eventSink(event.value)
                     is FoundationEvent.OpenFeature -> if (featureCatalog.any { event.id in it.features }) {
                         navigate(FoundationDestination.Feature(event.id))
                     }
@@ -293,16 +298,17 @@ class FoundationPresenter(
         private val appearance: AppearanceSettings,
         private val metronome: Metronome,
         private val tuner: Tuner,
+        private val chords: Chords,
         private val developmentSamplesEnabled: Boolean = false,
     ) : Presenter.Factory {
-        fun create(): FoundationPresenter = FoundationPresenter(appearance, metronome, tuner, developmentSamplesEnabled)
+        fun create(): FoundationPresenter = FoundationPresenter(appearance, metronome, tuner, chords, developmentSamplesEnabled)
 
         override fun create(screen: Screen, navigator: Navigator, context: CircuitContext): Presenter<*>? =
             if (screen == FoundationScreen) create() else null
     }
 }
 
-private val featureCatalog = listOf(FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome, FeatureId.Tuner)))
+private val featureCatalog = listOf(FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome, FeatureId.Tuner, FeatureId.Chords)))
 
 private fun FoundationDestination.savedId(): String = when (this) {
     FoundationDestination.Home -> "home"

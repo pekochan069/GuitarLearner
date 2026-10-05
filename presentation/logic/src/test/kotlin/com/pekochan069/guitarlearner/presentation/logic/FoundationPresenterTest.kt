@@ -11,6 +11,10 @@ import com.pekochan069.guitarlearner.domain.AppearanceChange
 import com.pekochan069.guitarlearner.domain.AppearanceFailure
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
 import com.pekochan069.guitarlearner.domain.AppearanceSnapshot
+import com.pekochan069.guitarlearner.domain.ChordCommand
+import com.pekochan069.guitarlearner.domain.ChordFailure
+import com.pekochan069.guitarlearner.domain.ChordWorkspace
+import com.pekochan069.guitarlearner.domain.Chords
 import com.pekochan069.guitarlearner.domain.BeatAccent
 import com.pekochan069.guitarlearner.domain.BeatUnit
 import com.pekochan069.guitarlearner.domain.LanguagePreference
@@ -78,11 +82,11 @@ class FoundationPresenterTest {
     @Test
     fun homeCatalogOpensOnlyUsableFeaturesAndBackDismissesSettingsBeforeReturningHome(): Unit = runTest {
         val metronome = ControlledMetronome()
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             var state = awaitItem()
             assertEquals(FoundationDestination.Home, state.destination)
             assertEquals(listOf(FeatureCategory.Tools), state.featureGroups.map { it.category })
-            assertEquals(listOf(FeatureId.Metronome, FeatureId.Tuner), state.featureGroups.single().features)
+            assertEquals(listOf(FeatureId.Metronome, FeatureId.Tuner, FeatureId.Chords), state.featureGroups.single().features)
             assertTrue(state.developmentSamples.isEmpty())
             assertFalse(state.canNavigateBack)
             state.eventSink(FoundationEvent.OpenFeature(FeatureId.Metronome))
@@ -105,7 +109,7 @@ class FoundationPresenterTest {
     @Test
     fun productionPresenterRejectsSampleNavigationAndSampleEdits(): Unit = runTest {
         val metronome = ControlledMetronome()
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             val state = awaitItem()
             state.eventSink(FoundationEvent.OpenSample(DevelopmentSample.Gallery))
             state.eventSink(FoundationEvent.SetGallerySelected(false))
@@ -140,7 +144,7 @@ class FoundationPresenterTest {
                 }
             }
             val registry = SaveableStateRegistry(restored) { true }
-            val presenter = FoundationPresenter(ControlledAppearance(), ControlledMetronome(), ControlledTuner())
+            val presenter = FoundationPresenter(ControlledAppearance(), ControlledMetronome(), ControlledTuner(), ControlledChords())
             presenterTestOf({ presenter.presentWithRegistry(registry) }) {
                 val state = awaitItem()
                 assertEquals(FoundationDestination.Home, state.destination)
@@ -156,7 +160,7 @@ class FoundationPresenterTest {
     fun overlaysReplaceEachOtherAndStaleDismissalsCannotCloseTheNewOverlay(): Unit = runTest {
         val metronome = ControlledMetronome()
         metronome.snapshot.value = MetronomeSnapshot(presets = listOf(MetronomePreset("Practice", MetronomeConfig())))
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             var state = enterMetronome()
             state.eventSink(FoundationEvent.SetPresetsOpen(true))
             state = awaitItem()
@@ -201,7 +205,7 @@ class FoundationPresenterTest {
         val audible = MetronomeConfig(90, BeatUnit.Eighth, List(7) { BeatAccent.Normal })
         metronome.snapshot.value = MetronomeSnapshot(selected = MetronomeConfig(140), playback = PlaybackState.Playing(audible, 3))
         metronome.stopFailure = MetronomeFailure.ServiceUnavailable
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             var state = awaitItem()
             assertEquals(90, (state.metronome.playback as MetronomePlaybackUi.Playing).config.bpm)
             assertTrue(state.metronome.pendingChange)
@@ -230,7 +234,7 @@ class FoundationPresenterTest {
     fun dismissedPendingPresetWriteKeepsItsDraftAndCannotReopenADialogOnHome(): Unit = runTest {
         val metronome = ControlledMetronome()
         metronome.result = CompletableDeferred()
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             var state = enterMetronome()
             state.eventSink(FoundationEvent.SetPresetsOpen(true))
             state = awaitItem()
@@ -258,7 +262,7 @@ class FoundationPresenterTest {
     @Test
     fun failedSettingRetainsCommittedSelectionAndRejectsASecondTap(): Unit = runTest {
         val settings = ControlledAppearance()
-        FoundationPresenter(settings, ControlledMetronome(), ControlledTuner()).test {
+        FoundationPresenter(settings, ControlledMetronome(), ControlledTuner(), ControlledChords()).test {
             val initial = awaitItem()
             assertEquals(ThemeOption.Light, initial.theme)
             initial.eventSink(FoundationEvent.SelectTheme(ThemeOption.Dark))
@@ -279,7 +283,7 @@ class FoundationPresenterTest {
     fun samplesStayLocalAndSharedCapabilitiesAreObserved(): Unit = runTest {
         val settings = ControlledAppearance()
         val metronome = ControlledMetronome()
-        FoundationPresenter(settings, metronome, ControlledTuner(), developmentSamplesEnabled = true).test {
+        FoundationPresenter(settings, metronome, ControlledTuner(), ControlledChords(), developmentSamplesEnabled = true).test {
             var state = awaitItem()
             assertEquals(90, state.bpm)
             assertFalse(state.running)
@@ -317,7 +321,7 @@ class FoundationPresenterTest {
     @Test
     fun tunerUsesTheCanonicalSnapshotAndEveryDepartureStopsWithoutStartingOnEntry(): Unit = runTest {
         val tuner = ControlledTuner()
-        FoundationPresenter(ControlledAppearance(), ControlledMetronome(), tuner, developmentSamplesEnabled = true).test {
+        FoundationPresenter(ControlledAppearance(), ControlledMetronome(), tuner, ControlledChords(), developmentSamplesEnabled = true).test {
             var state = awaitItem()
             state.eventSink(FoundationEvent.StartTuner)
             assertTrue(tuner.requests.isEmpty())
@@ -360,7 +364,7 @@ class FoundationPresenterTest {
             assertEquals(FoundationDestination.Feature(FeatureId.Tuner), state.destination)
             assertFalse(tuner.requests.contains(TunerRequest.Stop))
             for (departure in listOf(FoundationEvent.NavigateBack,
-                FoundationEvent.OpenFeature(FeatureId.Metronome), FoundationEvent.OpenSample(DevelopmentSample.Gallery))) {
+                FoundationEvent.OpenFeature(FeatureId.Metronome), FoundationEvent.OpenFeature(FeatureId.Chords), FoundationEvent.OpenSample(DevelopmentSample.Gallery))) {
                 val stopCount = tuner.requests.count { it == TunerRequest.Stop }
                 state.eventSink(departure)
                 assertEquals(stopCount + 1, tuner.requests.count { it == TunerRequest.Stop })
@@ -379,7 +383,7 @@ class FoundationPresenterTest {
     @Test
     fun tunerPermissionAndPreferenceFailuresAreObservedWithoutInventingAcceptedChoices(): Unit = runTest {
         val tuner = ControlledTuner()
-        FoundationPresenter(ControlledAppearance(), ControlledMetronome(), tuner).test {
+        FoundationPresenter(ControlledAppearance(), ControlledMetronome(), tuner, ControlledChords()).test {
             awaitItem().eventSink(FoundationEvent.OpenFeature(FeatureId.Tuner))
             var state = awaitItem()
             tuner.snapshot.value = TunerSnapshot(target = TunerTarget.Manual(StandardString.E4), tolerance = TuningTolerance.Strict,
@@ -404,7 +408,7 @@ class FoundationPresenterTest {
     @Test
     fun tempoAndQueuedPatternEditsUseTheLatestSharedSelection(): Unit = runTest {
         val metronome = ControlledMetronome()
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             var state = enterMetronome()
             state.eventSink(FoundationEvent.SetBpm(999))
             state = awaitItem()
@@ -433,7 +437,7 @@ class FoundationPresenterTest {
     fun burstStepButtonsKeepEveryAdjustmentWhileTheFirstWriteIsPending(): Unit = runTest {
         val metronome = ControlledMetronome()
         metronome.result = CompletableDeferred()
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             var state = enterMetronome()
             state.eventSink(FoundationEvent.AdjustBpm(1))
             state.eventSink(FoundationEvent.AdjustBpm(1))
@@ -457,7 +461,7 @@ class FoundationPresenterTest {
         val metronome = ControlledMetronome()
         metronome.snapshot.value = MetronomeSnapshot(playback = PlaybackState.Playing(MetronomeConfig(), 0))
         metronome.result = CompletableDeferred()
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             var state = enterMetronome()
             assertTrue(state.running)
             state.eventSink(FoundationEvent.SetBpm(91))
@@ -480,7 +484,7 @@ class FoundationPresenterTest {
     fun burstAccentCyclesUseTheCommittedAccentAfterThePendingWrite(): Unit = runTest {
         val metronome = ControlledMetronome()
         metronome.result = CompletableDeferred()
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             var state = enterMetronome()
             state.eventSink(FoundationEvent.CycleBeatAccent(0))
             state.eventSink(FoundationEvent.CycleBeatAccent(0))
@@ -501,7 +505,7 @@ class FoundationPresenterTest {
     fun queuedResizeRejectsAccentEditsForRemovedBeatsWithoutAnotherWrite(): Unit = runTest {
         val metronome = ControlledMetronome()
         metronome.result = CompletableDeferred()
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             var state = enterMetronome()
             state.eventSink(FoundationEvent.SetBeatCount(1))
             state.eventSink(FoundationEvent.CycleBeatAccent(3))
@@ -521,7 +525,7 @@ class FoundationPresenterTest {
     fun startDoesNotInventRunningAndTypedFailureRemainsRecoverable(): Unit = runTest {
         val metronome = ControlledMetronome()
         metronome.result = CompletableDeferred()
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             val initial = enterMetronome()
             initial.eventSink(FoundationEvent.SetRunning(true))
             runCurrent()
@@ -544,7 +548,7 @@ class FoundationPresenterTest {
         val saved = MetronomePreset("Practice", MetronomeConfig(140))
         metronome.snapshot.value = MetronomeSnapshot(presets = listOf(saved))
         metronome.result = CompletableDeferred()
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             var state = enterMetronome()
             state.eventSink(FoundationEvent.SetPresetsOpen(true))
             state = awaitItem()
@@ -578,7 +582,7 @@ class FoundationPresenterTest {
     fun startupReadFailureAndLoadDeleteOutcomesAreReported(): Unit = runTest {
         val metronome = ControlledMetronome()
         metronome.snapshot.value = MetronomeSnapshot(readFailure = MetronomeFailure.ReadFailed)
-        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner()).test {
+        FoundationPresenter(ControlledAppearance(), metronome, ControlledTuner(), ControlledChords()).test {
             var state = enterMetronome()
             assertEquals(MetronomeNotice.ReadFailed, state.metronome.notice)
             state.eventSink(FoundationEvent.DismissMetronomeNotice)
@@ -607,7 +611,7 @@ private suspend fun CircuitReceiveTurbine<FoundationState>.enterMetronome(): Fou
 
 private suspend fun captureSavedState(): Map<String, List<Any?>> {
     val registry = SaveableStateRegistry(null) { true }
-    val presenter = FoundationPresenter(ControlledAppearance(), ControlledMetronome(), ControlledTuner())
+    val presenter = FoundationPresenter(ControlledAppearance(), ControlledMetronome(), ControlledTuner(), ControlledChords())
     var saved: Map<String, List<Any?>> = emptyMap()
     presenterTestOf({ presenter.presentWithRegistry(registry) }) {
         awaitItem()
@@ -662,7 +666,12 @@ private class ControlledMetronome : Metronome {
     }
 }
 
-private class ControlledTuner : Tuner {
+private class ControlledChords : Chords {
+    override val current = MutableStateFlow(ChordWorkspace()).asStateFlow()
+    override suspend fun execute(command: ChordCommand): Either<ChordFailure, Unit> = Either.Right(Unit)
+}
+
+internal class ControlledTuner : Tuner {
     val snapshot = MutableStateFlow(TunerSnapshot())
     override val current: StateFlow<TunerSnapshot> = snapshot.asStateFlow()
     val requests = mutableListOf<TunerRequest>()
