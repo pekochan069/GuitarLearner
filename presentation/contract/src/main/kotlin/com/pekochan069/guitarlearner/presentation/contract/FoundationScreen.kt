@@ -53,6 +53,7 @@ sealed interface FoundationEvent : CircuitUiEvent {
     data object NavigateBack : FoundationEvent
     data object StartTuner : FoundationEvent
     data object StopTuner : FoundationEvent
+    data class SelectHeadstockLayout(val value: HeadstockLayoutUi) : FoundationEvent
     data class SelectTunerTarget(val value: TunerTargetUi) : FoundationEvent
     data class SelectTunerTolerance(val value: ToleranceUi) : FoundationEvent
     data object ReloadTunerTolerance : FoundationEvent

@@ -243,6 +243,8 @@ class FoundationPresentationTest {
         }
         compose.openTuner()
         compose.onNodeWithTag("tuner_string_E4").performScrollTo().performClick()
+        compose.onNodeWithTag("tuner_headstock_ThreePlusThree").assertIsSelected()
+        compose.onNodeWithTag("tuner_headstock_InlineSix").performScrollTo().performClick().assertIsSelected()
         compose.openMetronome()
         compose.onNodeWithTag("increase_bpm").performScrollTo().performClick()
         compose.onNodeWithTag("increase_bpm").performScrollTo().performClick()
@@ -258,6 +260,7 @@ class FoundationPresentationTest {
         compose.onNodeWithTag("gallery_selection").performScrollTo().assertIsOff()
         compose.openTuner()
         compose.onNodeWithTag("tuner_string_E4").performScrollTo().assertIsSelected()
+        compose.onNodeWithTag("tuner_headstock_InlineSix").performScrollTo().assertIsSelected()
         compose.openMetronome()
         compose.onNodeWithTag("bpm_value").assertTextEquals("92")
         val context = ApplicationProvider.getApplicationContext<Context>()

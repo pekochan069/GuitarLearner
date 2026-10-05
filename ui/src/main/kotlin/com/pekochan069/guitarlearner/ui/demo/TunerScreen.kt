@@ -23,7 +23,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -38,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.GuitarStringUi
+import com.pekochan069.guitarlearner.presentation.contract.HeadstockLayoutUi
 import com.pekochan069.guitarlearner.presentation.contract.ToleranceUi
 import com.pekochan069.guitarlearner.presentation.contract.TunerActionUi
 import com.pekochan069.guitarlearner.presentation.contract.TunerFeedbackUi
@@ -82,6 +89,22 @@ fun TunerScreen(state: TunerUiState, eventSink: (FoundationEvent) -> Unit) {
                     }))
                 }
             }
+        }
+    }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HeadstockLayoutUi.entries.forEach { layout ->
+            val description = stringResource(when (layout) {
+                HeadstockLayoutUi.ThreePlusThree -> R.string.tuner_headstock_three_plus_three_description
+                HeadstockLayoutUi.InlineSix -> R.string.tuner_headstock_inline_six_description
+            })
+            FilterChip(selected = state.headstockLayout == layout,
+                onClick = { eventSink(FoundationEvent.SelectHeadstockLayout(layout)) },
+                label = { Text(stringResource(when (layout) {
+                    HeadstockLayoutUi.ThreePlusThree -> R.string.tuner_headstock_three_plus_three
+                    HeadstockLayoutUi.InlineSix -> R.string.tuner_headstock_inline_six
+                })) },
+                modifier = Modifier.heightIn(min = 48.dp).testTag("tuner_headstock_" + layout.name)
+                    .semantics { contentDescription = description })
         }
     }
     SectionHeading(R.string.tuner_target)
@@ -168,6 +191,7 @@ private fun TunerReading(state: TunerUiState) {
                 selected?.number?.toString() ?: stringResource(R.string.note_placeholder)),
                 style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.tuner_reference), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            TunerHeadstock(state.headstockLayout, selected, Modifier.fillMaxWidth().height(112.dp))
             Canvas(Modifier.fillMaxWidth().height(64.dp).clearAndSetSemantics {}) {
                 val left = 12.dp.toPx()
                 val width = size.width - left * 2
@@ -193,6 +217,73 @@ private fun TunerReading(state: TunerUiState) {
                 ?: stringResource(R.string.tuner_cents_placeholder),
                 Modifier.fillMaxWidth().testTag(if (measured != null) "tuner_cents" else "tuner_cents_placeholder"),
                 style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"), textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+private fun TunerHeadstock(layout: HeadstockLayoutUi, selectedString: GuitarStringUi?, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Canvas(modifier.clearAndSetSemantics {}) {
+        val scale = minOf(size.width / 260f, size.height / 112f)
+        withTransform({
+            translate((size.width - 260f * scale) / 2, (size.height - 112f * scale) / 2)
+            scale(scale, scale, pivot = Offset.Zero)
+        }) {
+            drawRect(colors.surfaceContainerHighest, Offset(2f, 36f), Size(32f, 40f))
+            drawRect(colors.outline, Offset(2f, 36f), Size(32f, 40f), style = Stroke(1.5f))
+            val body = Path().apply {
+                moveTo(34f, 36f)
+                when (layout) {
+                    HeadstockLayoutUi.ThreePlusThree -> {
+                        cubicTo(47f, 36f, 42f, 20f, 60f, 20f)
+                        lineTo(224f, 20f)
+                        quadraticTo(250f, 20f, 250f, 44f)
+                        lineTo(250f, 68f)
+                        quadraticTo(250f, 92f, 224f, 92f)
+                        lineTo(60f, 92f)
+                        cubicTo(42f, 92f, 47f, 76f, 34f, 76f)
+                    }
+                    HeadstockLayoutUi.InlineSix -> {
+                        cubicTo(49f, 36f, 45f, 18f, 58f, 18f)
+                        lineTo(231f, 18f)
+                        cubicTo(249f, 18f, 255f, 31f, 246f, 43f)
+                        cubicTo(236f, 60f, 215f, 58f, 205f, 69f)
+                        cubicTo(182f, 97f, 92f, 83f, 56f, 77f)
+                        quadraticTo(46f, 76f, 34f, 76f)
+                    }
+                }
+                close()
+            }
+            drawPath(body, colors.surfaceContainerHighest)
+            drawPath(body, colors.outline, style = Stroke(1.5f))
+            drawRect(colors.secondaryContainer, Offset(30f, 36f), Size(6f, 40f))
+            drawRect(colors.outline, Offset(30f, 36f), Size(6f, 40f), style = Stroke(1.5f))
+            GuitarStringUi.entries.forEachIndexed { index, string ->
+                val bottom = layout == HeadstockLayoutUi.ThreePlusThree && index >= 3
+                val post = when (layout) {
+                    HeadstockLayoutUi.ThreePlusThree -> Offset(82f + (if (bottom) 5 - index else index) * 66f, if (bottom) 82f else 30f)
+                    HeadstockLayoutUi.InlineSix -> Offset(68f + index * 31f, 28f)
+                }
+                val active = string == selectedString
+                val color = if (active) colors.primary else colors.onSurfaceVariant
+                val stroke = if (active) 2.8f else 1.3f
+                val route = Path().apply {
+                    moveTo(2f, 40f + index * 6.4f)
+                    lineTo(36f, 40f + index * 6.4f)
+                    lineTo(post.x, post.y)
+                }
+                drawPath(route, color, style = Stroke(stroke, cap = StrokeCap.Round))
+                val gripY = if (bottom) 98f else 2f
+                drawLine(color, post, Offset(post.x, if (bottom) gripY else gripY + 12f), stroke, cap = StrokeCap.Round)
+                drawRoundRect(if (active) colors.primaryContainer else colors.secondaryContainer,
+                    Offset(post.x - 10f, gripY), Size(20f, 12f), CornerRadius(5f))
+                drawRoundRect(color, Offset(post.x - 10f, gripY), Size(20f, 12f), CornerRadius(5f), style = Stroke(stroke))
+                drawCircle(colors.surfaceContainerLow, 6f, post)
+                drawCircle(color, 6f, post, style = Stroke(stroke))
+                drawCircle(color, 1.8f, post)
+                if (active) drawCircle(colors.primary, 9f, post, style = Stroke(1.5f))
+            }
         }
     }
 }
