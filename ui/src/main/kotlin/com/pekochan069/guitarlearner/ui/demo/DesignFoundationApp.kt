@@ -99,7 +99,8 @@ fun DesignFoundationApp(
     val destination = state.destination
     val metronome = destination == FoundationDestination.Feature(FeatureId.Metronome)
     val chords = destination == FoundationDestination.Feature(FeatureId.Chords)
-    val contentSpacing = when { metronome -> 12.dp; chords -> 16.dp; else -> 24.dp }
+    val progressions = destination == FoundationDestination.Feature(FeatureId.Progressions)
+    val contentSpacing = when { metronome -> 12.dp; chords || progressions -> 16.dp; else -> 24.dp }
     val homeScroll = rememberScrollState()
     val preferencesEnabled = state.settingsStatus != SettingsStatus.Saving
 
@@ -108,8 +109,8 @@ fun DesignFoundationApp(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(stringResource(if (chords) R.string.chord_title else R.string.app_name),
-                        modifier = if (chords) Modifier.testTag("destination_title").semantics { heading() } else Modifier,
+                    Text(stringResource(when { chords -> R.string.chord_title; progressions -> R.string.progression_title; else -> R.string.app_name }),
+                        modifier = if (chords || progressions) Modifier.testTag("destination_title").semantics { heading() } else Modifier,
                         style = MaterialTheme.typography.titleMedium)
                 },
                 navigationIcon = {
@@ -121,12 +122,17 @@ fun DesignFoundationApp(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { state.eventSink(FoundationEvent.SetSettingsOpen(true)) },
+                    if (progressions) ProgressionAppBarActions(state.progressions, { state.eventSink(FoundationEvent.Progression(it)) }) {
+                        state.eventSink(FoundationEvent.SetSettingsOpen(true))
+                    } else IconButton(onClick = { state.eventSink(FoundationEvent.SetSettingsOpen(true)) },
                         modifier = Modifier.testTag("settings")) {
                         Icon(painterResource(R.drawable.ic_settings), stringResource(R.string.preferences))
                     }
                 },
             )
+        },
+        bottomBar = {
+            if (progressions) ProgressionTransportBar(state.progressions) { state.eventSink(FoundationEvent.Progression(it)) }
         },
     ) { padding ->
         Box(
@@ -134,7 +140,13 @@ fun DesignFoundationApp(
             contentAlignment = Alignment.TopCenter,
         ) {
             key(destination) {
-                Column(
+                if (progressions) {
+                    Box(Modifier.widthIn(max = 680.dp).fillMaxSize()) {
+                        ProgressionTool(state.progressions, { state.eventSink(FoundationEvent.Progression(it)) }) {
+                            CompactMetronomeControl(state.metronome, state.eventSink)
+                        }
+                    }
+                } else Column(
                     Modifier.widthIn(max = 680.dp).fillMaxWidth()
                         .verticalScroll(if (destination == FoundationDestination.Home) homeScroll else rememberScrollState())
                         .testTag(if (destination == FoundationDestination.Home) "home_scroll" else "feature_scroll")
@@ -181,7 +193,7 @@ fun DesignFoundationApp(
                                 state = state.metronome,
                                 eventSink = state.eventSink,
                             )
-                            FeatureId.Progressions -> ProgressionTool(state.progressions) { state.eventSink(FoundationEvent.Progression(it)) }
+                            FeatureId.Progressions -> Unit
                             FeatureId.Chords -> ChordTool(state.chords) { state.eventSink(FoundationEvent.Chord(it)) }
                             FeatureId.Tuner -> TunerScreen(state.tuner, state.eventSink)
                         }

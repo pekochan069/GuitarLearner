@@ -37,6 +37,7 @@ import com.pekochan069.guitarlearner.presentation.contract.FoundationDestination
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.FoundationScreen
 import com.pekochan069.guitarlearner.presentation.contract.FoundationState
+import com.pekochan069.guitarlearner.presentation.contract.ProgressionEvent
 import com.pekochan069.guitarlearner.presentation.contract.HeadstockLayoutUi
 import com.pekochan069.guitarlearner.presentation.contract.LanguageOption
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeConfigUi
@@ -94,6 +95,7 @@ class FoundationPresenter(
         }
 
         fun navigate(next: FoundationDestination) {
+            progressionPresentation.eventSink(ProgressionEvent.CloseSheet)
             if (destinationId == "feature:tuner" && next != FoundationDestination.Feature(FeatureId.Tuner)) {
                 tuner.submit(TunerRequest.Stop)
             }
@@ -288,7 +290,10 @@ class FoundationPresenter(
                     }
                     is FoundationEvent.SetGallerySelected -> if (developmentSamplesEnabled) gallerySelected = event.value
                     is FoundationEvent.SetSettingsOpen -> {
-                        if (event.value) overlay = Overlay.Settings
+                        if (event.value) {
+                            progressionPresentation.eventSink(ProgressionEvent.CloseSheet)
+                            overlay = Overlay.Settings
+                        }
                         else if (overlay == Overlay.Settings) overlay = Overlay.None
                     }
                     is FoundationEvent.SelectTheme -> select(AppearanceChange.Theme(event.value.toPreference()))

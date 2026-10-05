@@ -503,7 +503,7 @@ private fun ChordPanel(content: @Composable ColumnScope.() -> Unit) {
         color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-@Composable private fun ChordQualityUi.label(): String = if (this == ChordQualityUi.Major) stringResource(R.string.chord_major) else symbol
+@Composable internal fun ChordQualityUi.label(): String = if (this == ChordQualityUi.Major) stringResource(R.string.chord_major) else symbol
 private val ChordSection.label: Int get() = when (this) { ChordSection.Lookup -> R.string.chord_lookup; ChordSection.Edit -> R.string.chord_edit; ChordSection.Collection -> R.string.chord_collection }
 private val ChordStopUi.label: Int get() = when (this) { ChordStopUi.Muted -> R.string.chord_muted; ChordStopUi.Open -> R.string.chord_open; ChordStopUi.Fretted -> R.string.chord_fretted }
 private val ChordAnalysisUi.label: Int get() = when (this) { ChordAnalysisUi.Empty -> R.string.chord_empty; ChordAnalysisUi.Note -> R.string.chord_single_note; ChordAnalysisUi.Recognized -> R.string.chord_candidates; ChordAnalysisUi.Unrecognized -> R.string.chord_unrecognized }

@@ -4,9 +4,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.pekochan069.guitarlearner.domain.*
 import com.pekochan069.guitarlearner.presentation.contract.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 internal data class ProgressionPresentation(val state: ProgressionUiState, val eventSink: (ProgressionEvent) -> Unit)
 
@@ -14,8 +16,15 @@ internal data class ProgressionPresentation(val state: ProgressionUiState, val e
 internal fun presentProgressions(progressions: Progressions, chords: Chords): ProgressionPresentation {
     val workspace by progressions.current.collectAsState()
     val chordWorkspace by chords.current.collectAsState()
-    var editorOpen by rememberSaveable { mutableStateOf(false) }
-    var contextOpen by rememberSaveable { mutableStateOf(false) }
+    var sheetName by rememberSaveable { mutableStateOf(ProgressionSheetUi.None.name) }
+    var sourceName by rememberSaveable { mutableStateOf(ProgressionChordSourceUi.Named.name) }
+    var root by rememberSaveable { mutableStateOf(0) }
+    var qualityName by rememberSaveable { mutableStateOf(ChordQualityUi.Major.name) }
+    var lookupGeneration by rememberSaveable { mutableIntStateOf(0) }
+    var lookup by remember { mutableStateOf<ChordLookup>(ChordLookup.Idle) }
+    var lookupContext by remember { mutableStateOf<GuitarContext?>(null) }
+    var replacementNew by rememberSaveable { mutableStateOf(false) }
+    var replacementId by rememberSaveable { mutableStateOf<String?>(null) }
     var editingIndex by rememberSaveable { mutableStateOf<Int?>(null) }
     var stops by rememberSaveable { mutableStateOf(listOf(-1, 3, 2, 0, 1, 0)) }
     var editorName by rememberSaveable { mutableStateOf("") }
@@ -50,19 +59,70 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
         editorName = name
         stops = shape.stops.map { when (it) { StringStop.Muted -> -1; StringStop.Open -> 0; is StringStop.Fretted -> it.fret } }
         rawFrets = List(6) { null }
+        sourceName = ProgressionChordSourceUi.Manual.name
     }
     fun resetContextInputs() {
         tempo = null; numerator = null; capo = null
         notes = List(6) { null }; octaves = List(6) { null }
     }
     val content = workspace.draft.content
-    val editorShape = ChordShape(stops.map { when (it) { -1 -> StringStop.Muted; 0 -> StringStop.Open; else -> StringStop.Fretted(it) } })
-    val editorDraft = ChordTheory.normalize(ChordDraft(editorName, content.context, editorShape))
-    val editor = progressionChordUi(editorDraft, chordWorkspace.records, notes, octaves, rawFrets, capo, tuningExpanded)
+    val sheet = ProgressionSheetUi.valueOf(sheetName)
+    val source = ProgressionChordSourceUi.valueOf(sourceName)
+    val quality = ChordQualityUi.valueOf(qualityName)
+    val query = if (sheet == ProgressionSheetUi.Chord && source == ProgressionChordSourceUi.Named)
+        ChordQuery(content.context.copy(capo = 0), ChordIdentity(PitchClass.entries[root], ChordQuality.valueOf(quality.name))) else null
+    LaunchedEffect(query, content.context, lookupGeneration) {
+        lookup = ChordLookup.Idle
+        lookupContext = null
+        if (query != null) {
+            lookup = ChordLookup.Searching(query)
+            val context = content.context
+            val shapes = withContext(Dispatchers.Default) { ChordTheory.representatives(query) }
+            lookupContext = context
+            lookup = ChordLookup.Ready(query, shapes)
+        }
+    }
+    val ready = (lookup as? ChordLookup.Ready)?.takeIf { it.query == query && lookupContext == content.context }
+    val namedShape = ready?.shapes?.getOrNull(ready.selectedIndex)
+    val manualShape = ChordShape(stops.map { when (it) { -1 -> StringStop.Muted; 0 -> StringStop.Open; else -> StringStop.Fretted(it) } })
+    val editorShape = if (source == ProgressionChordSourceUi.Named && sheet == ProgressionSheetUi.Chord) namedShape ?: ChordShape() else manualShape
+    val selectedIdentity = query?.identity?.let { it.copy(root = it.root.transpose(content.context.capo)) }
+    val editorDraft = ChordTheory.normalize(ChordDraft(editorName, content.context, editorShape, selectedIdentity))
+    val candidate = ChordTheory.selectedCandidate(editorDraft)
+    val editor = progressionChordUi(editorDraft, chordWorkspace.records, notes, octaves,
+        if (source == ProgressionChordSourceUi.Named) List(6) { null } else rawFrets, capo, tuningExpanded).copy(
+        root = root, quality = quality,
+        lookup = when { query == null -> ChordLookupUi.Idle; ready == null -> ChordLookupUi.Searching
+            ready.shapes.isEmpty() -> ChordLookupUi.NoShapes; else -> ChordLookupUi.Ready },
+        lookupSymbol = candidate?.let(ChordTheory::symbol),
+        lookupShapeSymbol = query?.identity?.let { it.root.symbol + it.quality.symbol },
+        lookupStrings = if (namedShape == null) emptyList() else editorDraft.strings(),
+        lookupNotes = editorDraft.strings().mapNotNull { it.note }.distinct().joinToString(" · "),
+        lookupOmitted = candidate?.omitted?.joinToString(", ") { it.symbol }.orEmpty(),
+        representativeIndex = ready?.selectedIndex ?: 0, representativeCount = ready?.shapes?.size ?: 0).let {
+            if (source == ProgressionChordSourceUi.Saved) it.copy(canSave = false) else it
+        }
     val bpmInput = tempo ?: content.timing.bpm.toString()
     val numeratorInput = numerator ?: content.timing.numerator.toString()
     val bpmError = bpmInput.toIntOrNull()?.let { it !in 40..240 } ?: true
     val numeratorError = numeratorInput.toIntOrNull()?.let { it !in 1..16 } ?: true
+    val invalidSettings = bpmError || numeratorError || editor.capoError || editor.strings.any { it.noteError || it.octaveError }
+    val saved = workspace.records.firstOrNull { it.id == workspace.draft.targetId }
+    val hasUnsavedChanges = invalidSettings || workspace.persistence == DraftPersistence.Unsynced ||
+        if (saved != null) saved.content != content || saved.name != workspace.draft.name
+        else content.steps.isNotEmpty() || workspace.draft.name.isNotBlank()
+    val replacement = when {
+        replacementNew -> ProgressionReplacementUi.NewDraft
+        replacementId != null -> workspace.records.firstOrNull { it.id == replacementId }?.let { ProgressionReplacementUi.Load(it.id, it.name) }
+        else -> null
+    }
+    fun replaceDraft(command: ProgressionCommand) {
+        replacementNew = false; replacementId = null
+        resetContextInputs()
+        sheetName = ProgressionSheetUi.None.name
+        editingIndex = null
+        execute(record = true) { command }
+    }
     val playback = workspace.playback
     val position = when (playback) { is ProgressionPlayback.Playing -> playback.position; is ProgressionPlayback.Paused -> playback.position; else -> null }
     val state = ProgressionUiState(workspace.draft.name, content.steps.mapIndexed { index, step ->
@@ -77,10 +137,11 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             is ProgressionPlayback.Failed -> ProgressionTransportUi.Failed }, position?.stepIndex ?: -1, position?.countInBeat,
         (playback as? ProgressionPlayback.Stopped)?.reason?.let { MetronomeStopUi.valueOf(it.name) },
         position?.let { it.bpm != content.timing.bpm || it.metronomeEnabled != content.metronomeEnabled } == true,
-        editor, editorOpen, editingIndex, contextOpen, busy, workspace.persistence == DraftPersistence.Unsynced,
+        editor, sheet, editingIndex, source, replacement, hasUnsavedChanges, invalidSettings,
+        content.steps.isNotEmpty() && !invalidSettings && !busy && workspace.readFailure == null,
+        busy, workspace.persistence == DraftPersistence.Unsynced,
         workspace.readFailure != null, workspace.draft.name.trim().length in 1..80 && content.steps.isNotEmpty() && !busy && workspace.readFailure == null
-            && !editor.capoError && editor.strings.none { it.noteError || it.octaveError }
-            && !bpmError && !numeratorError,
+            && !invalidSettings,
         workspace.records.map { SavedProgressionUi(it.id, it.name, it.content.steps.size) },
         notice ?: workspace.actionFailure?.let { ProgressionNotice.valueOf(it.name) }
             ?: (playback as? ProgressionPlayback.Failed)?.failure?.let { ProgressionNotice.valueOf(it.name) })
@@ -97,22 +158,41 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
     return ProgressionPresentation(state) { event ->
         when (event) {
             is ProgressionEvent.Select -> send(ProgressionCommand.Select(event.index))
+            is ProgressionEvent.OpenStep -> if (event.index in content.steps.indices) execute(after = { sheetName = ProgressionSheetUi.Step.name }) {
+                ProgressionCommand.Select(event.index)
+            }
+            is ProgressionEvent.OpenSheet -> sheetName = event.value.name
             is ProgressionEvent.OpenEditor -> {
+                if (event.index != null && content.steps.getOrNull(event.index) !is ProgressionStep.Chord) return@ProgressionPresentation
                 if (event.index != null) transport(ProgressionCommand.Stop)
                 editingIndex = event.index
                 val chord = content.steps.getOrNull(event.index ?: -1) as? ProgressionStep.Chord
                 if (chord != null) copyShape(chord.name, chord.shape)
-                editorOpen = true
+                else { editorName = ""; root = 0; qualityName = ChordQualityUi.Major.name; sourceName = ProgressionChordSourceUi.Named.name }
+                lookupGeneration++
+                sheetName = ProgressionSheetUi.Chord.name
             }
-            ProgressionEvent.CloseEditor -> editorOpen = false
-            ProgressionEvent.CommitEditor -> if (editor.canSave) execute(record = true, after = { editorOpen = false }) {
+            ProgressionEvent.CloseSheet -> sheetName = ProgressionSheetUi.None.name
+            is ProgressionEvent.SetChordSource -> {
+                sourceName = event.value.name
+                if (event.value == ProgressionChordSourceUi.Named && editingIndex == null) editorName = ""
+            }
+            ProgressionEvent.CommitEditor -> if (sheet == ProgressionSheetUi.Chord && source != ProgressionChordSourceUi.Saved && editor.canSave && !invalidSettings &&
+                (source != ProgressionChordSourceUi.Named || (namedShape != null &&
+                    (lookup as? ChordLookup.Ready)?.query == ChordQuery(progressions.current.value.draft.content.context.copy(capo = 0),
+                        ChordIdentity(PitchClass.entries[root], ChordQuality.valueOf(qualityName))) &&
+                    lookupContext == progressions.current.value.draft.content.context))) execute(record = true, after = { sheetName = ProgressionSheetUi.None.name }) {
                 editingIndex?.let { ProgressionCommand.ReplaceChord(it, editorName, editorShape) }
                     ?: ProgressionCommand.Insert(ProgressionStep.Chord(editorName, editorShape))
             }
             ProgressionEvent.CopyCurrentChord -> copyShape(chordWorkspace.draft.name, chordWorkspace.draft.shape)
             is ProgressionEvent.CopyCustomChord -> chordWorkspace.records.firstOrNull { it.id == event.id }?.let { copyShape(it.content.name, it.content.shape) }
-            is ProgressionEvent.SetContextOpen -> contextOpen = event.value
             is ProgressionEvent.ChordInput -> when (val input = event.event) {
+                is ChordEvent.SetRoot -> if (input.value in PitchClass.entries.indices) root = input.value
+                is ChordEvent.SetQuality -> qualityName = input.value.name
+                is ChordEvent.SelectRepresentative -> if (ready != null && input.index in ready.shapes.indices) lookup = ready.copy(selectedIndex = input.index)
+                ChordEvent.CopyRepresentative -> namedShape?.let { copyShape("", it) }
+                ChordEvent.Search -> lookupGeneration++
                 is ChordEvent.SetName -> editorName = input.value
                 is ChordEvent.SetTuningExpanded -> tuningExpanded = input.value
                 is ChordEvent.SetPreset -> {
@@ -141,7 +221,7 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             is ProgressionEvent.SetDuration -> send(ProgressionCommand.SetDuration(event.index, NoteDuration(NoteValue.valueOf(event.value.name), event.dotted)))
             is ProgressionEvent.SetTie -> send(ProgressionCommand.SetTie(event.index, event.value))
             is ProgressionEvent.Move -> send(ProgressionCommand.Move(event.index, event.index + event.delta))
-            is ProgressionEvent.Remove -> send(ProgressionCommand.Remove(event.index))
+            is ProgressionEvent.Remove -> execute(after = { sheetName = ProgressionSheetUi.None.name }) { ProgressionCommand.Remove(event.index) }
             is ProgressionEvent.SetName -> send(ProgressionCommand.SetName(event.value))
             is ProgressionEvent.SetTempo -> { tempo = event.value; event.value.toIntOrNull()?.takeIf { it in 40..240 }?.let { send(ProgressionCommand.SetTempo(it)) } }
             is ProgressionEvent.SetNumerator -> { numerator = event.value; event.value.toIntOrNull()?.takeIf { it in 1..16 }?.let { value -> execute {
@@ -150,8 +230,9 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             is ProgressionEvent.SetDenominator -> execute { ProgressionCommand.SetSignature(BeatUnit.valueOf(event.value.name), progressions.current.value.draft.content.timing.numerator) }
             is ProgressionEvent.SetMetronome -> send(ProgressionCommand.SetMetronome(event.value))
             is ProgressionEvent.SetLoop -> send(ProgressionCommand.SetLoop(event.value))
-            is ProgressionEvent.Play -> scope.launch {
+            is ProgressionEvent.Play -> if (state.canPlay) scope.launch {
                 if (event.selected) {
+                    sheetName = ProgressionSheetUi.None.name
                     val stopped = progressions.execute(ProgressionCommand.Stop).fold(
                         { notice = ProgressionNotice.valueOf(it.name); false }, { true })
                     if (!stopped) return@launch
@@ -160,11 +241,25 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
                     .fold({ notice = ProgressionNotice.valueOf(it.name) }, { notice = null })
             }
             ProgressionEvent.Pause -> transport(ProgressionCommand.Pause)
-            ProgressionEvent.Resume -> transport(ProgressionCommand.Resume)
+            ProgressionEvent.Resume -> if (state.canPlay) transport(ProgressionCommand.Resume)
             ProgressionEvent.Stop -> transport(ProgressionCommand.Stop)
-            ProgressionEvent.NewDraft -> { resetContextInputs(); send(ProgressionCommand.NewDraft) }
-            ProgressionEvent.Save -> execute(record = true) { ProgressionCommand.Save }
-            is ProgressionEvent.Load -> { resetContextInputs(); execute(record = true) { ProgressionCommand.Load(event.id) } }
+            ProgressionEvent.NewDraft -> if (!busy && !state.readFailed) {
+                if (hasUnsavedChanges) { replacementNew = true; replacementId = null }
+                else replaceDraft(ProgressionCommand.NewDraft)
+            }
+            ProgressionEvent.ConfirmReplacement -> if (!busy) when (val pending = replacement) {
+                ProgressionReplacementUi.NewDraft -> replaceDraft(ProgressionCommand.NewDraft)
+                is ProgressionReplacementUi.Load -> replaceDraft(ProgressionCommand.Load(pending.id))
+                null -> Unit
+            }
+            ProgressionEvent.CancelReplacement -> { replacementNew = false; replacementId = null }
+            ProgressionEvent.Save -> if (state.canSave) execute(record = true, after = { sheetName = ProgressionSheetUi.None.name }) { ProgressionCommand.Save }
+            is ProgressionEvent.Load -> if (!busy && !state.readFailed) {
+                val record = workspace.records.firstOrNull { it.id == event.id }
+                if (record == null) notice = ProgressionNotice.RecordMissing
+                else if (hasUnsavedChanges) { replacementNew = false; replacementId = record.id }
+                else replaceDraft(ProgressionCommand.Load(record.id))
+            }
             is ProgressionEvent.Delete -> execute(record = true) { ProgressionCommand.Delete(event.id) }
             ProgressionEvent.RetryDraftWrite -> execute(record = true) { ProgressionCommand.RetryDraftWrite }
             ProgressionEvent.RetryStorageRead -> execute(record = true) { ProgressionCommand.RetryStorageRead }
