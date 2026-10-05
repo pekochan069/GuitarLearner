@@ -2,11 +2,15 @@ package com.pekochan069.guitarlearner
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -16,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import com.pekochan069.guitarlearner.adapters.AndroidTrainingHost
 import com.pekochan069.guitarlearner.domain.*
 import com.pekochan069.guitarlearner.presentation.contract.TrainingNoteUi
+import com.pekochan069.guitarlearner.presentation.contract.TrainingExerciseUi
 import com.pekochan069.guitarlearner.ui.R as UiR
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -87,10 +92,12 @@ class TrainingSessionTest {
         assertEquals(TrainingAudioStatus.Idle, host.current.value.audio)
     }
 
-    @Test fun everySubjectAndFormatHasHiddenAnswersAndTenResponsesProduceCurrentResults() {
-        for (subject in TrainingSubject.entries) for (representation in TrainingRepresentation.entries) {
+    @Test fun everyExerciseHasHiddenAnswersAndTenResponsesProduceCurrentResults() {
+        for (exercise in TrainingExerciseUi.entries) {
+            val subject = TrainingSubject.valueOf(exercise.subject.name)
+            val representation = TrainingRepresentation.valueOf(exercise.format.name)
             configure(TrainingSettings(subject, representation, intervals = setOf(TrainingInterval.MinorThird, TrainingInterval.PerfectFifth)))
-            openTraining()
+            openTraining(exercise)
             compose.onNodeWithTag("training_start").performScrollTo().performClick()
             compose.onNodeWithTag("training_feedback").assertDoesNotExist()
             when (representation) {
@@ -112,7 +119,7 @@ class TrainingSessionTest {
             assertEquals(TrainingStage.Setup, host.current.value.stage)
         }
         configure(TrainingSettings(representation = TrainingRepresentation.Tab))
-        openTraining()
+        openTraining(TrainingExerciseUi.TabNote)
         compose.onNodeWithTag("training_start").performScrollTo().performClick()
         repeat(10) { number ->
             val current = session()
@@ -157,40 +164,43 @@ class TrainingSessionTest {
         assertTrue(graph.metronomeHost.current.value.playback is PlaybackState.Stopped)
     }
 
-    @Test fun formatMenusFixedSetupRotationAndBackKeepPagesSeparate() {
-        openTrainingMenu()
-        compose.onNodeWithTag("training_start").assertDoesNotExist()
-        TrainingRepresentation.entries.forEach { compose.onNodeWithTag("training_format_${it.name}").assertExists() }
-        compose.onNodeWithTag("training_exercise_Note").assertDoesNotExist()
-        compose.onNodeWithTag("training_format_Staff").performClick()
-        compose.onNodeWithTag("training_format_title").assertTextEquals(compose.activity.getString(UiR.string.training_staff_menu))
-        compose.activityRule.scenario.recreate()
-        compose.waitForIdle()
-        compose.onNodeWithTag("training_format_title").assertTextEquals(compose.activity.getString(UiR.string.training_staff_menu))
-        compose.onNodeWithTag("training_exercise_Interval").performClick()
-        awaitSettings()
-        compose.onNodeWithTag("training_exercise_title").assertTextEquals(compose.activity.getString(UiR.string.training_interval_exercise))
-        compose.onNodeWithTag("training_fixed_format").assertTextEquals(compose.activity.getString(UiR.string.training_staff_menu))
-        compose.onNodeWithTag("training_format").assertDoesNotExist()
-        compose.onNodeWithTag("training_instrument").assertDoesNotExist()
-        assertEquals(TrainingRepresentation.Staff, host.current.value.settings.representation)
-        compose.activityRule.scenario.recreate()
-        compose.waitForIdle()
-        compose.onNodeWithTag("training_exercise_title").assertTextEquals(compose.activity.getString(UiR.string.training_interval_exercise))
-        compose.onNodeWithTag("training_start").performScrollTo().performClick()
-        assertEquals(TrainingSubject.Interval, session().settings.subject)
-        assertEquals(TrainingRepresentation.Staff, session().settings.representation)
-        compose.onNodeWithTag("navigate_up").performClick()
-        compose.onNodeWithTag("training_fixed_format").assertExists()
-        assertEquals(TrainingStage.Setup, host.current.value.stage)
-        compose.onNodeWithTag("navigate_up").performClick()
-        compose.onNodeWithTag("training_exercise_Interval").assertExists()
-        compose.onNodeWithTag("training_start").assertDoesNotExist()
-        compose.onNodeWithTag("navigate_up").performClick()
-        TrainingRepresentation.entries.forEach { compose.onNodeWithTag("training_format_${it.name}").assertExists() }
-        compose.onNodeWithTag("training_exercise_Interval").assertDoesNotExist()
-        compose.onNodeWithTag("navigate_up").performClick()
-        compose.onNodeWithTag("feature_Training").performScrollTo().assertIsDisplayed()
+    @Test fun flatReadingExercisesOpenSetupDirectlyAndRotationBackKeepTheirIdentity() {
+        for (exercise in listOf(TrainingExerciseUi.StaffNote, TrainingExerciseUi.FretboardNote, TrainingExerciseUi.TabNote)) {
+            openTrainingMenu()
+            compose.onNodeWithTag("training_start").assertDoesNotExist()
+            TrainingExerciseUi.entries.forEach { compose.onNodeWithTag("training_exercise_${it.name}").assertExists() }
+            compose.onAllNodes(hasClickAction() and hasAnyAncestor(hasTestTag("training_menu"))).assertCountEquals(5)
+            compose.onNodeWithTag("training_exercise_${exercise.name}").performClick()
+            awaitSettings()
+            val title = when (exercise) {
+                TrainingExerciseUi.StaffNote -> UiR.string.training_staff_reading
+                TrainingExerciseUi.FretboardNote -> UiR.string.training_fretboard_notes
+                else -> UiR.string.training_tab_reading
+            }
+            compose.onNodeWithTag("training_exercise_title").assertTextEquals(compose.activity.getString(title))
+            compose.onNodeWithTag("training_exercise_Interval").assertDoesNotExist()
+            compose.onNodeWithTag("training_format").assertDoesNotExist()
+            compose.onNodeWithTag("training_instrument").assertDoesNotExist()
+            TrainingInterval.entries.forEach { compose.onNodeWithTag("training_interval_${it.name}").assertDoesNotExist() }
+            assertEquals(TrainingSubject.Note, host.current.value.settings.subject)
+            assertEquals(exercise.format.name, host.current.value.settings.representation.name)
+            if (exercise == TrainingExerciseUi.StaffNote) {
+                compose.activityRule.scenario.recreate()
+                compose.waitForIdle()
+                compose.onNodeWithTag("training_exercise_title").assertTextEquals(compose.activity.getString(title))
+            }
+            compose.onNodeWithTag("training_start").performScrollTo().performClick()
+            assertEquals(TrainingSubject.Note, session().settings.subject)
+            assertEquals(exercise.format.name, session().settings.representation.name)
+            compose.onNodeWithTag("navigate_up").performClick()
+            compose.onNodeWithTag("training_exercise_title").assertTextEquals(compose.activity.getString(title))
+            assertEquals(TrainingStage.Setup, host.current.value.stage)
+            compose.onNodeWithTag("navigate_up").performClick()
+            TrainingExerciseUi.entries.forEach { compose.onNodeWithTag("training_exercise_${it.name}").assertExists() }
+            compose.onNodeWithTag("training_start").assertDoesNotExist()
+            compose.onNodeWithTag("navigate_up").performClick()
+            compose.onNodeWithTag("feature_Training").performScrollTo().assertIsDisplayed()
+        }
     }
 
     @Test fun selectedPianoAndGuitarPlayNativeQuestionAndComparisonWithFrozenResponses() {
@@ -216,16 +226,15 @@ class TrainingSessionTest {
     }
 
     private fun openTrainingMenu() {
-        repeat(4) {
+        repeat(3) {
             if (compose.onAllNodesWithTag("navigate_up").fetchSemanticsNodes().isNotEmpty()) compose.onNodeWithTag("navigate_up").performClick()
         }
         compose.onNodeWithTag("feature_Training").performScrollTo().performClick()
     }
 
-    private fun openTraining() {
+    private fun openTraining(exercise: TrainingExerciseUi = TrainingExerciseUi.NoteListening) {
         openTrainingMenu()
-        compose.onNodeWithTag("training_format_${host.current.value.settings.representation.name}").performScrollTo().performClick()
-        compose.onNodeWithTag("training_exercise_${host.current.value.settings.subject.name}").performScrollTo().performClick()
+        compose.onNodeWithTag("training_exercise_${exercise.name}").performScrollTo().performClick()
         awaitSettings()
     }
 

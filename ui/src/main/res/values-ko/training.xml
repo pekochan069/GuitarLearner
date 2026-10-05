@@ -1,14 +1,13 @@
 <resources>
     <string name="training_title">훈련</string>
     <string name="training_back">뒤로</string>
-    <string name="training_note_exercise">음 이름 맞히기</string>
-    <string name="training_interval_exercise">음정 맞히기</string>
+    <string name="training_note_listening">음 이름 듣기</string>
+    <string name="training_interval_listening">음정 듣기</string>
+    <string name="training_staff_reading">오선보 읽기</string>
+    <string name="training_fretboard_notes">지판 읽기</string>
+    <string name="training_tab_reading">TAB 읽기</string>
     <string name="training_notes">음이름</string>
     <string name="training_intervals">음정</string>
-    <string name="training_listening_menu">듣기 훈련</string>
-    <string name="training_staff_menu">오선보 훈련</string>
-    <string name="training_fretboard_menu">지판 훈련</string>
-    <string name="training_tab_menu">TAB 훈련</string>
     <string name="training_instrument">악기</string>
     <string name="training_piano">피아노</string>
     <string name="training_guitar">기타</string>

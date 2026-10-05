@@ -3,6 +3,13 @@ package com.pekochan069.guitarlearner.presentation.contract
 enum class TrainingSubjectUi { Note, Interval }
 enum class TrainingRepresentationUi { Listening, Staff, Fretboard, Tab }
 enum class TrainingInstrumentUi { Piano, Guitar }
+enum class TrainingExerciseUi(val subject: TrainingSubjectUi, val format: TrainingRepresentationUi) {
+    NoteListening(TrainingSubjectUi.Note, TrainingRepresentationUi.Listening),
+    IntervalListening(TrainingSubjectUi.Interval, TrainingRepresentationUi.Listening),
+    StaffNote(TrainingSubjectUi.Note, TrainingRepresentationUi.Staff),
+    FretboardNote(TrainingSubjectUi.Note, TrainingRepresentationUi.Fretboard),
+    TabNote(TrainingSubjectUi.Note, TrainingRepresentationUi.Tab),
+}
 enum class IntervalPresentationUi { Ascending, Descending, Harmonic }
 enum class TrainingIntervalUi {
     Unison, MinorSecond, MajorSecond, MinorThird, MajorThird, PerfectFourth, Tritone,
@@ -32,8 +39,7 @@ data class TrainingFeedbackUi(val chosen: TrainingAnswerUi, val answer: Training
 data class TrainingResultUi(val number: Int, val feedback: TrainingFeedbackUi)
 sealed interface TrainingPageUi {
     data object Root : TrainingPageUi
-    data class Exercises(val format: TrainingRepresentationUi) : TrainingPageUi
-    data class Setup(val format: TrainingRepresentationUi, val subject: TrainingSubjectUi) : TrainingPageUi
+    data class Setup(val exercise: TrainingExerciseUi) : TrainingPageUi
 }
 sealed interface TrainingStageUi {
     data class Navigation(val page: TrainingPageUi) : TrainingStageUi
@@ -57,8 +63,7 @@ data class TrainingUiState(
     val notice: TrainingNoticeUi? = null,
 )
 sealed interface TrainingEvent {
-    data class OpenFormat(val format: TrainingRepresentationUi) : TrainingEvent
-    data class OpenExercise(val format: TrainingRepresentationUi, val subject: TrainingSubjectUi) : TrainingEvent
+    data class OpenExercise(val exercise: TrainingExerciseUi) : TrainingEvent
     data class SetSettings(val settings: TrainingSettingsUi) : TrainingEvent
     data object RetrySettings : TrainingEvent
     data object Start : TrainingEvent

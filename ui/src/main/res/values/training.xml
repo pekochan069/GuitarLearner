@@ -1,14 +1,13 @@
 <resources>
     <string name="training_title">Training</string>
     <string name="training_back">Back</string>
-    <string name="training_note_exercise">Note identification</string>
-    <string name="training_interval_exercise">Interval identification</string>
+    <string name="training_note_listening">Note by ear</string>
+    <string name="training_interval_listening">Interval by ear</string>
+    <string name="training_staff_reading">Read staff</string>
+    <string name="training_fretboard_notes">Read fretboard</string>
+    <string name="training_tab_reading">Read TAB</string>
     <string name="training_notes">Notes</string>
     <string name="training_intervals">Intervals</string>
-    <string name="training_listening_menu">Listening training</string>
-    <string name="training_staff_menu">Staff training</string>
-    <string name="training_fretboard_menu">Fretboard training</string>
-    <string name="training_tab_menu">TAB training</string>
     <string name="training_instrument">Instrument</string>
     <string name="training_piano">Piano</string>
     <string name="training_guitar">Guitar</string>

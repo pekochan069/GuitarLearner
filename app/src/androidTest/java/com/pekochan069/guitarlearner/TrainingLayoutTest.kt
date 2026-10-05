@@ -43,68 +43,72 @@ import org.junit.Test
 class TrainingLayoutTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun enlargedEnglishAndKoreanMenusKeepFourEqualFormatCardsAndExercisesAccessible() {
+    @Test fun enlargedEnglishAndKoreanMenusKeepFiveEqualExercisesAndTheirDirectSetupAccessible() {
         val language = mutableStateOf("en")
         val dark = mutableStateOf(false)
-        val page = mutableStateOf<TrainingPageUi>(TrainingPageUi.Root)
+        val state = mutableStateOf(TrainingUiState())
         val events = mutableListOf<TrainingEvent>()
         compose.setContent { CompositionLocalProvider(LocalContext provides localizedContext(language.value),
             LocalDensity provides Density(LocalDensity.current.density, 2f)) {
             GuitarLearnerTheme(dark.value) {
                 Column(Modifier.width(320.dp).verticalScroll(rememberScrollState())) {
-                    TrainingScreen(TrainingUiState(stage = TrainingStageUi.Navigation(page.value))) { event ->
+                    TrainingScreen(state.value) { event ->
                         events.add(event)
-                        if (event is TrainingEvent.OpenFormat) page.value = TrainingPageUi.Exercises(event.format)
+                        if (event is TrainingEvent.OpenExercise) state.value = state.value.copy(
+                            settings = state.value.settings.copy(subject = event.exercise.subject, representation = event.exercise.format),
+                            stage = TrainingStageUi.Navigation(TrainingPageUi.Setup(event.exercise)))
                     }
                 }
             }
         } }
         for (locale in listOf("en", "ko")) for (theme in listOf(false, true)) {
-            compose.runOnIdle { language.value = locale; dark.value = theme; page.value = TrainingPageUi.Root }
+            compose.runOnIdle { language.value = locale; dark.value = theme; state.value = TrainingUiState() }
             val context = localizedContext(locale)
-            val cards = TrainingRepresentationUi.entries.map { compose.onNodeWithTag("training_format_${it.name}").getUnclippedBoundsInRoot() }
+            val cards = TrainingExerciseUi.entries.map { compose.onNodeWithTag("training_exercise_${it.name}").getUnclippedBoundsInRoot() }
             assertTrue(cards.all { it.right - it.left == cards.first().right - cards.first().left &&
                 it.bottom - it.top == cards.first().bottom - cards.first().top })
             assertEquals(cards[0].top, cards[1].top)
             assertEquals(cards[2].top, cards[3].top)
             assertTrue(cards[1].left > cards[0].right && cards[2].top > cards[0].bottom)
+            assertEquals(cards[0].left, cards[4].left)
+            assertTrue(cards[4].top > cards[2].bottom)
             if (locale == "en") {
                 val layouts = mutableListOf<TextLayoutResult>()
-                compose.onNodeWithTag("training_format_label_Fretboard", useUnmergedTree = true)
+                compose.onNodeWithTag("training_exercise_label_FretboardNote", useUnmergedTree = true)
                     .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
                 val layout = layouts.single()
-                assertTrue("Fretboard must fit on one line at enlarged text size", layout.getLineEnd(0, visibleEnd = true) >= "Fretboard".length)
+                val start = layout.layoutInput.text.text.indexOf("fretboard")
+                assertTrue("Fretboard must fit on one line at enlarged text size",
+                    layout.getLineEnd(layout.getLineForOffset(start), visibleEnd = true) >= start + "fretboard".length)
             }
-            for (format in TrainingRepresentationUi.entries) {
-                compose.runOnIdle { page.value = TrainingPageUi.Root }
-                val title = when (format) {
-                    TrainingRepresentationUi.Listening -> UiR.string.training_listening_menu
-                    TrainingRepresentationUi.Staff -> UiR.string.training_staff_menu
-                    TrainingRepresentationUi.Fretboard -> UiR.string.training_fretboard_menu
-                    TrainingRepresentationUi.Tab -> UiR.string.training_tab_menu
+            for (exercise in TrainingExerciseUi.entries) {
+                compose.runOnIdle { state.value = TrainingUiState() }
+                val title = when (exercise) {
+                    TrainingExerciseUi.NoteListening -> UiR.string.training_note_listening
+                    TrainingExerciseUi.IntervalListening -> UiR.string.training_interval_listening
+                    TrainingExerciseUi.StaffNote -> UiR.string.training_staff_reading
+                    TrainingExerciseUi.FretboardNote -> UiR.string.training_fretboard_notes
+                    TrainingExerciseUi.TabNote -> UiR.string.training_tab_reading
                 }
-                compose.onNodeWithTag("training_format_${format.name}").performScrollTo().assertIsDisplayed()
+                compose.onNodeWithTag("training_exercise_${exercise.name}").performScrollTo().assertIsDisplayed()
                     .assertHasClickAction().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
                     .assertTextEquals(context.getString(title)).performClick()
-                assertEquals(TrainingEvent.OpenFormat(format), events.last())
-                compose.onNodeWithTag("training_format_title").assertTextEquals(context.getString(title))
-                for (subject in TrainingSubjectUi.entries) {
-                    val exerciseTitle = if (subject == TrainingSubjectUi.Note) UiR.string.training_note_exercise else UiR.string.training_interval_exercise
-                    compose.onNodeWithTag("training_exercise_${subject.name}").performScrollTo().assertIsDisplayed()
-                        .assertHasClickAction().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
-                        .assertTextEquals(context.getString(exerciseTitle)).performClick()
-                    assertEquals(TrainingEvent.OpenExercise(format, subject), events.last())
+                assertEquals(TrainingEvent.OpenExercise(exercise), events.last())
+                compose.onNodeWithTag("training_exercise_title").assertTextEquals(context.getString(title))
+                compose.onNodeWithTag("training_start").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+                compose.onNodeWithTag("training_exercise_IntervalListening").assertDoesNotExist()
+                if (exercise.format != TrainingRepresentationUi.Listening) {
+                    compose.onNodeWithTag("training_instrument").assertDoesNotExist()
+                    TrainingIntervalUi.entries.forEach { compose.onNodeWithTag("training_interval_${it.name}").assertDoesNotExist() }
                 }
-                compose.onNodeWithTag("training_start").assertDoesNotExist()
-                compose.onNodeWithTag("training_instrument").assertDoesNotExist()
+                compose.onNodeWithTag("training_format").assertDoesNotExist()
             }
-            compose.onNodeWithTag("training_format").assertDoesNotExist()
         }
     }
 
     @Test fun failedExerciseSettingsKeepStartDisabledAndRetryAvailable() {
         val state = TrainingUiState(settings = TrainingSettingsUi(subject = TrainingSubjectUi.Interval),
-            stage = TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingRepresentationUi.Listening, TrainingSubjectUi.Interval)),
+            stage = TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingExerciseUi.IntervalListening)),
             settingsNotice = TrainingNoticeUi.SettingsWriteFailed)
         compose.setContent { GuitarLearnerTheme(false) {
             Column(Modifier.width(320.dp).verticalScroll(rememberScrollState())) { TrainingScreen(state) {} }

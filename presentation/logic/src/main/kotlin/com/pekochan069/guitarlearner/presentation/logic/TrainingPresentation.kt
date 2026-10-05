@@ -34,7 +34,7 @@ internal fun TrainingSnapshot.toUi(): TrainingUiState = TrainingUiState(
 )
 
 internal fun TrainingEvent.toRequest(): TrainingRequest? = when (this) {
-    is TrainingEvent.OpenFormat, is TrainingEvent.OpenExercise -> null
+    is TrainingEvent.OpenExercise -> null
     is TrainingEvent.SetSettings -> TrainingRequest.SetSettings(settings.toDomain())
     TrainingEvent.RetrySettings -> TrainingRequest.RetrySettings
     TrainingEvent.Start -> TrainingRequest.Start

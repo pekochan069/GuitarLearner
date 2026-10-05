@@ -63,8 +63,11 @@ class TrainingPresentationTest {
             TrainingEvent.Replay(key, TrainingSoundUi.Comparison).toRequest())
         val changed = TrainingSettingsUi(TrainingSubjectUi.Interval, TrainingRepresentationUi.Tab,
             IntervalPresentationUi.Descending, setOf(TrainingIntervalUi.Unison), TrainingInstrumentUi.Guitar)
-        assertNull(TrainingEvent.OpenFormat(TrainingRepresentationUi.Tab).toRequest())
-        assertNull(TrainingEvent.OpenExercise(TrainingRepresentationUi.Tab, TrainingSubjectUi.Interval).toRequest())
+        assertNull(TrainingEvent.OpenExercise(TrainingExerciseUi.TabNote).toRequest())
+        assertEquals(listOf(TrainingSubjectUi.Note to TrainingRepresentationUi.Listening,
+            TrainingSubjectUi.Interval to TrainingRepresentationUi.Listening, TrainingSubjectUi.Note to TrainingRepresentationUi.Staff,
+            TrainingSubjectUi.Note to TrainingRepresentationUi.Fretboard, TrainingSubjectUi.Note to TrainingRepresentationUi.Tab),
+            TrainingExerciseUi.entries.map { it.subject to it.format })
         assertEquals(TrainingSettings(TrainingSubject.Interval, TrainingRepresentation.Tab, IntervalPresentation.Descending,
             setOf(TrainingInterval.Unison), TrainingInstrument.Guitar), (TrainingEvent.SetSettings(changed).toRequest() as TrainingRequest.SetSettings).settings)
     }
@@ -83,33 +86,26 @@ class TrainingPresentationTest {
             val menuSink = state.eventSink
             menuSink(FoundationEvent.Training(TrainingEvent.Start))
             assertTrue(training.requests.isEmpty())
-            menuSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingRepresentationUi.Staff, TrainingSubjectUi.Interval)))
-            assertTrue(training.requests.isEmpty())
-            menuSink(FoundationEvent.Training(TrainingEvent.OpenFormat(TrainingRepresentationUi.Staff)))
-            state = awaitItem()
-            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Exercises(TrainingRepresentationUi.Staff)), state.training.stage)
-            menuSink(FoundationEvent.Training(TrainingEvent.OpenFormat(TrainingRepresentationUi.Listening)))
-            state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingRepresentationUi.Listening, TrainingSubjectUi.Note)))
-            runCurrent()
-            expectNoEvents()
-            assertTrue(training.requests.isEmpty())
-            state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingRepresentationUi.Staff, TrainingSubjectUi.Interval)))
+            menuSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingExerciseUi.StaffNote)))
             runCurrent()
             state = expectMostRecentItem()
-            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingRepresentationUi.Staff, TrainingSubjectUi.Interval)), state.training.stage)
+            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingExerciseUi.StaffNote)), state.training.stage)
+            val countInSetup = training.requests.size
+            menuSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingExerciseUi.IntervalListening)))
+            assertEquals(countInSetup, training.requests.size)
             val staleSetupSink = state.eventSink
             state.eventSink(FoundationEvent.NavigateBack)
             staleSetupSink(FoundationEvent.Training(TrainingEvent.Start))
             state = awaitItem()
-            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Exercises(TrainingRepresentationUi.Staff)), state.training.stage)
+            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Root), state.training.stage)
             assertFalse(training.requests.contains(TrainingRequest.Start))
-            state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingRepresentationUi.Staff, TrainingSubjectUi.Interval)))
+            state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingExerciseUi.IntervalListening)))
             runCurrent()
             state = expectMostRecentItem()
             assertEquals(TrainingSubjectUi.Interval, state.training.settings.subject)
             val countBeforeInvalidSettings = training.requests.size
             staleSetupSink(FoundationEvent.Training(TrainingEvent.SetSettings(state.training.settings.copy(subject = TrainingSubjectUi.Note))))
-            staleSetupSink(FoundationEvent.Training(TrainingEvent.SetSettings(state.training.settings.copy(representation = TrainingRepresentationUi.Listening))))
+            staleSetupSink(FoundationEvent.Training(TrainingEvent.SetSettings(state.training.settings.copy(representation = TrainingRepresentationUi.Staff))))
             assertEquals(countBeforeInvalidSettings, training.requests.size)
             val requested = training.current.value.settings.copy(instrument = TrainingInstrument.Guitar)
             training.current.value = training.current.value.copy(storage = TrainingStorageStatus.Failed(TrainingFailure.SettingsWriteFailed, requested))
@@ -126,8 +122,7 @@ class TrainingPresentationTest {
             assertTrue(state.training.stage is TrainingStageUi.Question)
             assertEquals(TrainingInstrumentUi.Guitar, (state.training.stage as TrainingStageUi.Question).settings.instrument)
             val activeRequestCount = training.requests.size
-            menuSink(FoundationEvent.Training(TrainingEvent.OpenFormat(TrainingRepresentationUi.Listening)))
-            menuSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingRepresentationUi.Listening, TrainingSubjectUi.Note)))
+            menuSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingExerciseUi.NoteListening)))
             staleSetupSink(FoundationEvent.Training(TrainingEvent.SetSettings(TrainingSettingsUi())))
             assertEquals(activeRequestCount, training.requests.size)
             state.eventSink(FoundationEvent.SetSettingsOpen(true))
@@ -139,10 +134,7 @@ class TrainingPresentationTest {
             assertTrue(state.training.stage is TrainingStageUi.Question)
             state.eventSink(FoundationEvent.NavigateBack)
             state = awaitItem()
-            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingRepresentationUi.Staff, TrainingSubjectUi.Interval)), state.training.stage)
-            state.eventSink(FoundationEvent.NavigateBack)
-            state = awaitItem()
-            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Exercises(TrainingRepresentationUi.Staff)), state.training.stage)
+            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingExerciseUi.IntervalListening)), state.training.stage)
             state.eventSink(FoundationEvent.NavigateBack)
             state = awaitItem()
             assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Root), state.training.stage)
@@ -172,9 +164,7 @@ class TrainingPresentationTest {
             var state = awaitItem()
             state.eventSink(FoundationEvent.OpenFeature(FeatureId.Training))
             state = awaitItem()
-            state.eventSink(FoundationEvent.Training(TrainingEvent.OpenFormat(TrainingRepresentationUi.Listening)))
-            state = awaitItem()
-            state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingRepresentationUi.Listening, TrainingSubjectUi.Interval)))
+            state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingExerciseUi.IntervalListening)))
             runCurrent()
             state = expectMostRecentItem()
             val requested = retained.current.value.settings.copy(instrument = TrainingInstrument.Guitar)
@@ -185,7 +175,7 @@ class TrainingPresentationTest {
         }
         presenterTestOf(trainingPresenter(retained).withRegistry(SaveableStateRegistry(saved) { true })) {
             val state = awaitItem()
-            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingRepresentationUi.Listening, TrainingSubjectUi.Interval)), state.training.stage)
+            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingExerciseUi.IntervalListening)), state.training.stage)
             assertEquals(TrainingInstrumentUi.Guitar, state.training.settings.instrument)
             state.eventSink(FoundationEvent.Training(TrainingEvent.Start))
             assertFalse(retained.requests.contains(TrainingRequest.Start))
@@ -204,12 +194,33 @@ class TrainingPresentationTest {
             restarted.current.value = TrainingSnapshot(settings = durable)
             runCurrent()
             state = expectMostRecentItem()
-            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingRepresentationUi.Fretboard, TrainingSubjectUi.Note)), state.training.stage)
+            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingExerciseUi.FretboardNote)), state.training.stage)
             state.eventSink(FoundationEvent.Training(TrainingEvent.Start))
             state = awaitItem()
             val question = state.training.stage as TrainingStageUi.Question
             assertEquals(TrainingRepresentationUi.Fretboard, question.settings.representation)
             assertEquals(TrainingSubjectUi.Note, question.settings.subject)
+        }
+        val legacy = ControlledTraining()
+        legacy.current.value = TrainingSnapshot(settings = TrainingSettings(TrainingSubject.Interval, TrainingRepresentation.Staff))
+        presenterTestOf(trainingPresenter(legacy).withRegistry(SaveableStateRegistry(saved) { true })) {
+            awaitItem()
+            runCurrent()
+            var state = expectMostRecentItem()
+            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Root), state.training.stage)
+            assertEquals(FoundationDestination.Feature(FeatureId.Training), state.destination)
+            state.eventSink(FoundationEvent.Training(TrainingEvent.Start))
+            assertTrue(legacy.requests.isEmpty())
+            state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingExerciseUi.StaffNote)))
+            assertEquals(TrainingSubject.Note, legacy.current.value.settings.subject)
+            runCurrent()
+            state = expectMostRecentItem()
+            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingExerciseUi.StaffNote)), state.training.stage)
+            state.eventSink(FoundationEvent.Training(TrainingEvent.Start))
+            state = awaitItem()
+            val question = state.training.stage as TrainingStageUi.Question
+            assertEquals(TrainingSubjectUi.Note, question.settings.subject)
+            assertEquals(TrainingRepresentationUi.Staff, question.settings.representation)
         }
     }
 }

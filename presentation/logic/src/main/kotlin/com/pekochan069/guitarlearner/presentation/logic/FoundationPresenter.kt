@@ -19,6 +19,7 @@ import com.pekochan069.guitarlearner.domain.Chords
 import com.pekochan069.guitarlearner.domain.Training
 import com.pekochan069.guitarlearner.domain.TrainingRequest
 import com.pekochan069.guitarlearner.domain.TrainingStage
+import com.pekochan069.guitarlearner.domain.TrainingSettings
 import com.pekochan069.guitarlearner.domain.TrainingStorageStatus
 import com.pekochan069.guitarlearner.domain.TrainingFailure
 import com.pekochan069.guitarlearner.domain.LanguagePreference
@@ -58,8 +59,7 @@ import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
 import com.pekochan069.guitarlearner.presentation.contract.TrainingStageUi
 import com.pekochan069.guitarlearner.presentation.contract.TrainingPageUi
-import com.pekochan069.guitarlearner.presentation.contract.TrainingRepresentationUi
-import com.pekochan069.guitarlearner.presentation.contract.TrainingSubjectUi
+import com.pekochan069.guitarlearner.presentation.contract.TrainingExerciseUi
 import com.pekochan069.guitarlearner.presentation.contract.TrainingEvent
 import com.slack.circuit.runtime.CircuitContext
 import com.slack.circuit.runtime.Navigator
@@ -107,8 +107,7 @@ class FoundationPresenter(
         LaunchedEffect(trainingSnapshot.storage, trainingSnapshot.settings, trainingSnapshot.stage, trainingPage) {
             val live = training.current.value
             if (live.stage == TrainingStage.Setup && live.storage == TrainingStorageStatus.Ready && trainingPage is TrainingPageUi.Setup) {
-                val settings = live.toUi().settings
-                trainingPage = TrainingPageUi.Setup(settings.representation, settings.subject)
+                trainingPage = live.settings.toExerciseUi()?.let { TrainingPageUi.Setup(it) } ?: TrainingPageUi.Root
             }
         }
 
@@ -131,8 +130,7 @@ class FoundationPresenter(
                 TrainingStage.Setup -> null
             }
             if (settings != null) {
-                trainingPage = TrainingPageUi.Setup(TrainingRepresentationUi.valueOf(settings.representation.name),
-                    TrainingSubjectUi.valueOf(settings.subject.name))
+                trainingPage = settings.toExerciseUi()?.let { TrainingPageUi.Setup(it) } ?: TrainingPageUi.Root
                 training.submit(TrainingRequest.Exit)
             }
         }
@@ -146,8 +144,7 @@ class FoundationPresenter(
                         if (training.current.value.stage != TrainingStage.Setup) {
                             exitTraining()
                         } else when (val page = trainingPage) {
-                            is TrainingPageUi.Setup -> trainingPage = TrainingPageUi.Exercises(page.format)
-                            is TrainingPageUi.Exercises -> trainingPage = TrainingPageUi.Root
+                            is TrainingPageUi.Setup -> trainingPage = TrainingPageUi.Root
                             TrainingPageUi.Root -> navigate(FoundationDestination.Home)
                         }
                     } else navigate(FoundationDestination.Home)
@@ -278,21 +275,18 @@ class FoundationPresenter(
                         val setup = live.stage == TrainingStage.Setup
                         val page = trainingPage
                         when (val request = event.value) {
-                            is TrainingEvent.OpenFormat -> if (setup && page == TrainingPageUi.Root) {
-                                trainingPage = TrainingPageUi.Exercises(request.format)
-                            }
-                            is TrainingEvent.OpenExercise -> if (setup && page == TrainingPageUi.Exercises(request.format) && live.storage !is TrainingStorageStatus.Saving &&
+                            is TrainingEvent.OpenExercise -> if (setup && page == TrainingPageUi.Root && live.storage !is TrainingStorageStatus.Saving &&
                                 (live.storage as? TrainingStorageStatus.Failed)?.failure != TrainingFailure.SettingsReadFailed) {
-                                trainingPage = TrainingPageUi.Setup(request.format, request.subject)
-                                TrainingEvent.SetSettings(live.toUi().settings.copy(representation = request.format, subject = request.subject))
+                                TrainingEvent.SetSettings(live.toUi().settings.copy(representation = request.exercise.format, subject = request.exercise.subject))
                                     .toRequest()?.let(training::submit)
+                                trainingPage = TrainingPageUi.Setup(request.exercise)
                             }
                             TrainingEvent.Start -> if (setup && page is TrainingPageUi.Setup && live.storage == TrainingStorageStatus.Ready &&
-                                page.format.name == live.settings.representation.name && page.subject.name == live.settings.subject.name) {
+                                page.exercise.format.name == live.settings.representation.name && page.exercise.subject.name == live.settings.subject.name) {
                                 request.toRequest()?.let(training::submit)
                             }
                             is TrainingEvent.SetSettings -> if (setup && page is TrainingPageUi.Setup &&
-                                request.settings.subject == page.subject && request.settings.representation == page.format) {
+                                request.settings.subject == page.exercise.subject && request.settings.representation == page.exercise.format) {
                                 request.toRequest()?.let(training::submit)
                             }
                             TrainingEvent.Exit -> if (!setup) {
@@ -410,21 +404,22 @@ private fun restoreDestination(savedId: String, samples: List<DevelopmentSample>
 private val TrainingPageSaver = Saver<TrainingPageUi, Any>(
     save = { page -> when (page) {
         TrainingPageUi.Root -> listOf("root")
-        is TrainingPageUi.Exercises -> listOf("exercises", page.format.name)
-        is TrainingPageUi.Setup -> listOf("setup", page.format.name, page.subject.name)
+        is TrainingPageUi.Setup -> listOf("setup", page.exercise.name)
     } },
     restore = { saved ->
         val values = saved as? List<*>
-        val format = TrainingRepresentationUi.entries.firstOrNull { it.name == values?.getOrNull(1) }
-        val subject = TrainingSubjectUi.entries.firstOrNull { it.name == values?.getOrNull(2) }
+        val exercise = TrainingExerciseUi.entries.firstOrNull { it.name == values?.getOrNull(1) }
         when (values?.firstOrNull()) {
             "root" -> TrainingPageUi.Root
-            "exercises" -> format?.let { TrainingPageUi.Exercises(it) }
-            "setup" -> if (format != null && subject != null) TrainingPageUi.Setup(format, subject) else null
+            "setup" -> exercise?.let { TrainingPageUi.Setup(it) }
             else -> null
         }
     },
 )
+
+private fun TrainingSettings.toExerciseUi(): TrainingExerciseUi? = TrainingExerciseUi.entries.firstOrNull {
+    it.format.name == representation.name && it.subject.name == subject.name
+}
 
 private sealed interface Overlay {
     data object None : Overlay
