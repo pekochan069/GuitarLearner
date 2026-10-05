@@ -7,11 +7,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
@@ -29,7 +33,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -41,6 +44,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.GuitarStringUi
@@ -110,18 +114,11 @@ fun TunerScreen(state: TunerUiState, eventSink: (FoundationEvent) -> Unit) {
     SectionHeading(R.string.tuner_target)
     Text(stringResource(R.string.tuner_target_description), style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(selected = state.target == TunerTargetUi.Automatic,
-            onClick = { eventSink(FoundationEvent.SelectTunerTarget(TunerTargetUi.Automatic)) },
-            label = { Text(stringResource(R.string.tuner_auto)) },
-            modifier = Modifier.heightIn(min = 48.dp).testTag("tuner_auto"))
-        GuitarStringUi.entries.forEach { target ->
-            FilterChip(selected = state.target == TunerTargetUi.Manual(target),
-                onClick = { eventSink(FoundationEvent.SelectTunerTarget(TunerTargetUi.Manual(target))) },
-                label = { Text(stringResource(R.string.tuner_string_option, target.number, target.note + target.octave)) },
-                modifier = Modifier.heightIn(min = 48.dp).testTag("tuner_string_" + target.name))
-        }
-    }
+    FilterChip(selected = state.target == TunerTargetUi.Automatic,
+        onClick = { eventSink(FoundationEvent.SelectTunerTarget(TunerTargetUi.Automatic)) },
+        label = { Text(stringResource(R.string.tuner_auto)) },
+        modifier = Modifier.heightIn(min = 48.dp).testTag("tuner_auto"))
+    TunerStringControls(state, eventSink)
     SectionHeading(R.string.tuner_tolerance)
     Text(stringResource(R.string.tuner_tolerance_description), style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -191,7 +188,6 @@ private fun TunerReading(state: TunerUiState) {
                 selected?.number?.toString() ?: stringResource(R.string.note_placeholder)),
                 style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.tuner_reference), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-            TunerHeadstock(state.headstockLayout, selected, Modifier.fillMaxWidth().height(112.dp))
             Canvas(Modifier.fillMaxWidth().height(64.dp).clearAndSetSemantics {}) {
                 val left = 12.dp.toPx()
                 val width = size.width - left * 2
@@ -222,67 +218,110 @@ private fun TunerReading(state: TunerUiState) {
 }
 
 @Composable
-private fun TunerHeadstock(layout: HeadstockLayoutUi, selectedString: GuitarStringUi?, modifier: Modifier = Modifier) {
+private fun TunerStringControls(state: TunerUiState, eventSink: (FoundationEvent) -> Unit) {
+    val pegRows: List<Pair<GuitarStringUi, GuitarStringUi?>> = when (state.headstockLayout) {
+        HeadstockLayoutUi.ThreePlusThree -> listOf(GuitarStringUi.D3 to GuitarStringUi.G3,
+            GuitarStringUi.A2 to GuitarStringUi.B3, GuitarStringUi.E2 to GuitarStringUi.E4)
+        HeadstockLayoutUi.InlineSix -> GuitarStringUi.entries.reversed().map { it to null }
+    }
+    val rowHeight = maxOf(56.dp, with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() } + 16.dp)
+    val selectedString = (state.target as? TunerTargetUi.Manual)?.string
+        ?: ((state.listening as? TunerListeningUi.Listening)?.feedback as? TunerFeedbackUi.Measured)?.string
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        Row(Modifier.widthIn(max = 320.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top) {
+            for (right in listOf(false, true)) {
+                Column(Modifier.width(IntrinsicSize.Max).widthIn(min = 80.dp)) {
+                    pegRows.forEach { (leftString, rightString) ->
+                        val string = if (right) rightString else leftString
+                        if (string == null) {
+                            Spacer(Modifier.height(rowHeight))
+                        } else {
+                            val description = stringResource(R.string.tuner_string_option, string.number, string.note + string.octave)
+                            FilterChip(selected = state.target == TunerTargetUi.Manual(string),
+                                onClick = { eventSink(FoundationEvent.SelectTunerTarget(TunerTargetUi.Manual(string))) },
+                                label = { Text(string.note + string.octave, maxLines = 1) },
+                                modifier = Modifier.fillMaxWidth().height(rowHeight).testTag("tuner_string_" + string.name)
+                                    .semantics { contentDescription = description })
+                        }
+                    }
+                }
+                if (!right) {
+                    TunerHeadstock(state.headstockLayout, pegRows, rowHeight, selectedString,
+                        Modifier.weight(1f).height(rowHeight * pegRows.size + 32.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TunerHeadstock(layout: HeadstockLayoutUi, pegRows: List<Pair<GuitarStringUi, GuitarStringUi?>>,
+    rowHeight: Dp, selectedString: GuitarStringUi?, modifier: Modifier) {
     val colors = MaterialTheme.colorScheme
     Canvas(modifier.clearAndSetSemantics {}) {
-        val scale = minOf(size.width / 260f, size.height / 112f)
-        withTransform({
-            translate((size.width - 260f * scale) / 2, (size.height - 112f * scale) / 2)
-            scale(scale, scale, pivot = Offset.Zero)
-        }) {
-            drawRect(colors.surfaceContainerHighest, Offset(2f, 36f), Size(32f, 40f))
-            drawRect(colors.outline, Offset(2f, 36f), Size(32f, 40f), style = Stroke(1.5f))
-            val body = Path().apply {
-                moveTo(34f, 36f)
-                when (layout) {
-                    HeadstockLayoutUi.ThreePlusThree -> {
-                        cubicTo(47f, 36f, 42f, 20f, 60f, 20f)
-                        lineTo(224f, 20f)
-                        quadraticTo(250f, 20f, 250f, 44f)
-                        lineTo(250f, 68f)
-                        quadraticTo(250f, 92f, 224f, 92f)
-                        lineTo(60f, 92f)
-                        cubicTo(42f, 92f, 47f, 76f, 34f, 76f)
-                    }
-                    HeadstockLayoutUi.InlineSix -> {
-                        cubicTo(49f, 36f, 45f, 18f, 58f, 18f)
-                        lineTo(231f, 18f)
-                        cubicTo(249f, 18f, 255f, 31f, 246f, 43f)
-                        cubicTo(236f, 60f, 215f, 58f, 205f, 69f)
-                        cubicTo(182f, 97f, 92f, 83f, 56f, 77f)
-                        quadraticTo(46f, 76f, 34f, 76f)
-                    }
+        val rowHeightPx = rowHeight.toPx()
+        val nutY = rowHeightPx * pegRows.size
+        val nutLeft = size.width * .32f
+        val nutRight = size.width * .68f
+        val bodyLeft = size.width * .22f
+        val bodyRight = size.width * .78f
+        val outline = Stroke(1.5.dp.toPx())
+        drawRect(colors.surfaceContainerHighest, Offset(nutLeft, nutY), Size(nutRight - nutLeft, size.height - nutY))
+        drawRect(colors.outline, Offset(nutLeft, nutY), Size(nutRight - nutLeft, size.height - nutY), style = outline)
+        val body = Path().apply {
+            moveTo(nutLeft, nutY)
+            cubicTo(nutLeft, nutY - rowHeightPx * .2f, bodyLeft, nutY - rowHeightPx * .1f,
+                bodyLeft, nutY - rowHeightPx * .25f)
+            lineTo(bodyLeft, rowHeightPx * .3f)
+            when (layout) {
+                HeadstockLayoutUi.ThreePlusThree -> {
+                    quadraticTo(bodyLeft, 6.dp.toPx(), size.width / 2, 6.dp.toPx())
+                    quadraticTo(bodyRight, 6.dp.toPx(), bodyRight, rowHeightPx * .3f)
+                    lineTo(bodyRight, nutY - rowHeightPx * .25f)
+                    cubicTo(bodyRight, nutY - rowHeightPx * .1f, nutRight, nutY - rowHeightPx * .2f, nutRight, nutY)
                 }
-                close()
+                HeadstockLayoutUi.InlineSix -> {
+                    cubicTo(bodyLeft, 0f, size.width * .8f, 0f, size.width * .82f, rowHeightPx * .25f)
+                    cubicTo(size.width * .94f, rowHeightPx * .7f, size.width * .72f, rowHeightPx * .85f,
+                        size.width * .68f, rowHeightPx * 1.2f)
+                    cubicTo(size.width * .52f, nutY * .4f, size.width * .75f, nutY * .8f, nutRight, nutY)
+                }
             }
-            drawPath(body, colors.surfaceContainerHighest)
-            drawPath(body, colors.outline, style = Stroke(1.5f))
-            drawRect(colors.secondaryContainer, Offset(30f, 36f), Size(6f, 40f))
-            drawRect(colors.outline, Offset(30f, 36f), Size(6f, 40f), style = Stroke(1.5f))
-            GuitarStringUi.entries.forEachIndexed { index, string ->
-                val bottom = layout == HeadstockLayoutUi.ThreePlusThree && index >= 3
-                val post = when (layout) {
-                    HeadstockLayoutUi.ThreePlusThree -> Offset(82f + (if (bottom) 5 - index else index) * 66f, if (bottom) 82f else 30f)
-                    HeadstockLayoutUi.InlineSix -> Offset(68f + index * 31f, 28f)
-                }
+            close()
+        }
+        drawPath(body, colors.surfaceContainerHighest)
+        drawPath(body, colors.outline, style = outline)
+        val nut = Offset(nutLeft, nutY - 3.dp.toPx())
+        val nutSize = Size(nutRight - nutLeft, 6.dp.toPx())
+        drawRect(colors.secondaryContainer, nut, nutSize)
+        drawRect(colors.outline, nut, nutSize, style = outline)
+        pegRows.forEachIndexed { row, strings ->
+            for ((right, string) in listOf(false to strings.first, true to strings.second)) {
+                if (string == null) continue
+                val index = GuitarStringUi.entries.indexOf(string)
+                val post = Offset(size.width * if (right) .7f else .3f, (row + .5f) * rowHeightPx)
                 val active = string == selectedString
                 val color = if (active) colors.primary else colors.onSurfaceVariant
-                val stroke = if (active) 2.8f else 1.3f
+                val stroke = if (active) 2.8.dp.toPx() else 1.3.dp.toPx()
+                val nutX = nutLeft + (nutRight - nutLeft) * index / (GuitarStringUi.entries.size - 1)
                 val route = Path().apply {
-                    moveTo(2f, 40f + index * 6.4f)
-                    lineTo(36f, 40f + index * 6.4f)
+                    moveTo(nutX, size.height)
+                    lineTo(nutX, nutY)
                     lineTo(post.x, post.y)
                 }
                 drawPath(route, color, style = Stroke(stroke, cap = StrokeCap.Round))
-                val gripY = if (bottom) 98f else 2f
-                drawLine(color, post, Offset(post.x, if (bottom) gripY else gripY + 12f), stroke, cap = StrokeCap.Round)
+                val gripWidth = 12.dp.toPx()
+                val grip = Offset(if (right) size.width - gripWidth else 0f, post.y - 10.dp.toPx())
+                val gripSize = Size(gripWidth, 20.dp.toPx())
+                drawLine(color, post, Offset(if (right) grip.x else grip.x + gripWidth, post.y), stroke, cap = StrokeCap.Round)
                 drawRoundRect(if (active) colors.primaryContainer else colors.secondaryContainer,
-                    Offset(post.x - 10f, gripY), Size(20f, 12f), CornerRadius(5f))
-                drawRoundRect(color, Offset(post.x - 10f, gripY), Size(20f, 12f), CornerRadius(5f), style = Stroke(stroke))
-                drawCircle(colors.surfaceContainerLow, 6f, post)
-                drawCircle(color, 6f, post, style = Stroke(stroke))
-                drawCircle(color, 1.8f, post)
-                if (active) drawCircle(colors.primary, 9f, post, style = Stroke(1.5f))
+                    grip, gripSize, CornerRadius(5.dp.toPx()))
+                drawRoundRect(color, grip, gripSize, CornerRadius(5.dp.toPx()), style = Stroke(stroke))
+                drawCircle(colors.surfaceContainerLow, 6.dp.toPx(), post)
+                drawCircle(color, 6.dp.toPx(), post, style = Stroke(stroke))
+                drawCircle(color, 1.8.dp.toPx(), post)
+                if (active) drawCircle(colors.primary, 9.dp.toPx(), post, style = outline)
             }
         }
     }
