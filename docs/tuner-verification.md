@@ -31,6 +31,29 @@ pwsh scripts/verify-tuner-guitar.ps1 -FixtureDirectory C:/path/to/guitar-fixture
 
 You can also set `TUNER_GUITAR_FIXTURES` and run `./gradlew.bat :domain:test --rerun-tasks`. The rerun flag prevents a prior skipped fixture test from being reused. The fixture test is skipped when the environment variable is absent.
 
+## Android verification
+
+The verified debug APK had SHA256 `D44399A3B1036861B04592C37A0F433A35E5EA176D73FEC9D5CC9F5F117422D0`. The isolated API 35 emulator suite reported `OK (51 tests)`, with 50 passed and the existing opt-in acoustic recording test skipped. The focused API 37 `TunerCaptureTest` also passed. The result logs are `connected-api35-isolated.log` and `tuner-capture-api37.log` in the issue 9 verification artifacts.
+
+These were the actual test commands. Use your own emulator serial for another run. The API 35 run used a private adb server to avoid unrelated workspace installs.
+
+```powershell
+adb -P 5049 -s emulator-5656 shell am instrument -w -r com.pekochan069.guitarlearner.test/androidx.test.runner.AndroidJUnitRunner
+adb -s emulator-5554 shell am instrument -w -r -e class com.pekochan069.guitarlearner.TunerCaptureTest com.pekochan069.guitarlearner.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+API 35 journeys verified retained B3 selection, listening, and tolerance through rotation. Background, lock, navigation, and the Metronome notification's native navigation action ended capture. Returning required Start. Microphone privacy recovery required explicit Retry. Starting the tuner ended actual metronome playback before capture. Tolerances 3, 5, and 10 were checked on disk. A fresh process restored Auto and the last saved tolerance of 10. English and Korean scrollable layouts were checked in portrait and landscape, including an 800×360 landscape at font scale 2.0. Static gates, negative boundary probes, and recorded-guitar checks also passed.
+
+Two earlier API 35 attempts were inconclusive because unrelated workspace APK installs changed the running package. The isolated run used the exact APK above. No assertions were weakened.
+
+![Korean portrait tuner listening with B3 selected](assets/tuner-ko-portrait.png)
+
+Korean portrait after the tuner stopped metronome playback and began listening.
+
+![English tuner tolerance controls at font scale 2.0](assets/tuner-en-large-controls.png)
+
+English portrait controls at font scale 2.0, scrolled to the saved 10-cent tolerance.
+
 ## Evidence limits
 
-Synthetic tests cover exact tones, signed cents, six strings, dominant harmonics, a missing fundamental, identifiable mixed strings, noise, decay, weak input, and clipping. Policy tests cover continuous 300 ms dwell, tolerance boundaries, invalid input, gaps, resets, absolute octaves, and independent 900 ms expiry. Recorded fixtures exercise the actual detector on authored guitar audio. Live microphone capture, device privacy controls, rotation, and shutdown need separate Android device evidence.
+Synthetic tests cover exact tones, signed cents, six strings, dominant harmonics, a missing fundamental, identifiable mixed strings, noise, decay, weak input, and clipping. Policy tests cover continuous 300 ms dwell, tolerance boundaries, invalid input, gaps, resets, absolute octaves, and independent 900 ms expiry. Recorded fixtures exercise the actual detector on authored guitar audio. Android evidence comes from emulators. Live plucked-guitar accuracy, physical handset lifecycle and privacy behavior, pre-API-33 locale behavior, and TalkBack remain unverified.
