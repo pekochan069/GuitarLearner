@@ -355,7 +355,8 @@ class ProgressionPresentationTest {
             state.progression(ProgressionEvent.CommitEditor)
             runCurrent()
             release.complete(Unit)
-            state = stateWhere { it.progressions.notice == ProgressionNotice.ShapeChanged && !it.progressions.busy }
+            state = stateWhere { it.progressions.notice == ProgressionNotice.ShapeChanged && !it.progressions.busy &&
+                it.progressions.editor.preset == TuningPresetUi.OpenD && it.progressions.editor.lookup == ChordLookupUi.Ready }
             assertEquals(ProgressionSheetUi.Chord, state.progressions.sheet)
             assertEquals(TuningPresetUi.OpenD, state.progressions.editor.preset)
             assertTrue(port.current.value.draft.content.steps.isEmpty())
