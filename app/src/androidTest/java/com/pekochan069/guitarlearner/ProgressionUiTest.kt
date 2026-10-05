@@ -198,7 +198,9 @@ class ProgressionUiTest {
                 .candidates.any { it.identity == identity })
         }
         identities.indices.forEach { index ->
-            compose.onNodeWithTag("progression_step_$index").assertIsDisplayed().assertTextContains("Quarter note", substring = true)
+            val symbol = identities[index].root.symbol + identities[index].quality.symbol
+            compose.onNodeWithTag("progression_step_$index").assertIsDisplayed().assertTextContains(symbol, substring = true)
+                .assertTextContains("Quarter note", substring = true)
         }
         compose.onNodeWithTag("progression_add_chord").assertIsDisplayed()
         compose.onNodeWithTag("progression_play").assertIsDisplayed().assertIsEnabled()
