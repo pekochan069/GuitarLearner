@@ -20,43 +20,52 @@ import java.math.BigDecimal
 
 @Composable
 fun ProgressionTool(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit, metronomeStatus: @Composable () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(16.dp).testTag("progression_tool"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalButton(onClick = { eventSink(ProgressionEvent.OpenEditor()) }, enabled = !state.busy && !state.readFailed,
-                modifier = Modifier.heightIn(min = 48.dp).testTag("progression_add_chord")) { Text(stringResource(R.string.progression_add_chord)) }
-            OutlinedButton(onClick = { eventSink(ProgressionEvent.AddRest) }, enabled = !state.busy && !state.readFailed,
-                modifier = Modifier.heightIn(min = 48.dp).testTag("progression_add_rest")) { Text(stringResource(R.string.progression_add_rest)) }
-        }
-        LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("progression_list"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { metronomeStatus() }
-            item { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { ProgressionWarnings(state, eventSink) } }
-            if (state.name.isNotBlank()) item { Text(state.name, Modifier.testTag("progression_draft_name"), style = MaterialTheme.typography.titleSmall) }
-            if (state.steps.isEmpty()) item {
-                Text(stringResource(R.string.progression_empty), Modifier.testTag("progression_empty"), style = MaterialTheme.typography.bodyMedium)
-            }
-            items(state.steps) { step ->
-                val highlighted = step.index == state.playingIndex
-                val playing = highlighted && state.transport == ProgressionTransportUi.Playing
-                val playingDescription = stringResource(R.string.progression_playing)
-                Surface(shape = MaterialTheme.shapes.large,
-                    color = if (highlighted) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
-                    ListItem(headlineContent = { Text(step.title()) },
-                        supportingContent = { Text(listOfNotNull(step.name.takeIf { it.isNotBlank() },
-                            step.sounding?.takeIf { it != step.shape }?.let { stringResource(R.string.progression_sounding, it) },
-                            step.durationLabel(state.denominator), if (step.tied) stringResource(R.string.progression_tie) else null).joinToString(" · ")) },
-                        leadingContent = { Text((step.index + 1).toString(), style = MaterialTheme.typography.labelLarge) },
-                        trailingContent = { Icon(painterResource(R.drawable.ic_arrow_forward), null) },
-                        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { eventSink(ProgressionEvent.OpenStep(step.index)) }
-                            .testTag("progression_step_${step.index}").semantics {
-                                selected = step.index == state.selectedIndex
-                                if (playing) stateDescription = playingDescription
-                            },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent))
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val shortViewport = maxHeight < 300.dp
+        Column(Modifier.fillMaxSize().padding(16.dp).testTag("progression_tool"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (!shortViewport) ProgressionAddActions(state, eventSink)
+            LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("progression_list"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (shortViewport) item { ProgressionAddActions(state, eventSink) }
+                item { metronomeStatus() }
+                item { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { ProgressionWarnings(state, eventSink) } }
+                if (state.name.isNotBlank()) item { Text(state.name, Modifier.testTag("progression_draft_name"), style = MaterialTheme.typography.titleSmall) }
+                if (state.steps.isEmpty()) item {
+                    Text(stringResource(R.string.progression_empty), Modifier.testTag("progression_empty"), style = MaterialTheme.typography.bodyMedium)
+                }
+                items(state.steps) { step ->
+                    val highlighted = step.index == state.playingIndex
+                    val playing = highlighted && state.transport == ProgressionTransportUi.Playing
+                    val playingDescription = stringResource(R.string.progression_playing)
+                    Surface(shape = MaterialTheme.shapes.large,
+                        color = if (highlighted) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
+                        ListItem(headlineContent = { Text(step.title()) },
+                            supportingContent = { Text(listOfNotNull(step.name.takeIf { it.isNotBlank() },
+                                step.sounding?.takeIf { it != step.shape }?.let { stringResource(R.string.progression_sounding, it) },
+                                step.durationLabel(state.denominator), if (step.tied) stringResource(R.string.progression_tie) else null).joinToString(" · ")) },
+                            leadingContent = { Text((step.index + 1).toString(), style = MaterialTheme.typography.labelLarge) },
+                            trailingContent = { Icon(painterResource(R.drawable.ic_arrow_forward), null) },
+                            modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { eventSink(ProgressionEvent.OpenStep(step.index)) }
+                                .testTag("progression_step_${step.index}").semantics {
+                                    selected = step.index == state.selectedIndex
+                                    if (playing) stateDescription = playingDescription
+                                },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent))
+                    }
                 }
             }
         }
     }
     ProgressionSheets(state, eventSink)
+}
+
+@Composable
+private fun ProgressionAddActions(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilledTonalButton(onClick = { eventSink(ProgressionEvent.OpenEditor()) }, enabled = !state.busy && !state.readFailed,
+            modifier = Modifier.heightIn(min = 48.dp).testTag("progression_add_chord")) { Text(stringResource(R.string.progression_add_chord)) }
+        OutlinedButton(onClick = { eventSink(ProgressionEvent.AddRest) }, enabled = !state.busy && !state.readFailed,
+            modifier = Modifier.heightIn(min = 48.dp).testTag("progression_add_rest")) { Text(stringResource(R.string.progression_add_rest)) }
+    }
 }
 
 @Composable

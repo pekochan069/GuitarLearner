@@ -144,6 +144,10 @@ class ProgressionUiTest {
         click("progression_commit_chord")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.isNotEmpty() }
         awaitSheetClosed()
+        compose.onNodeWithTag("progression_list").performScrollToNode(hasTestTag("progression_step_0"))
+        val row = compose.onNodeWithTag("progression_step_0").getUnclippedBoundsInRoot()
+        val viewport = compose.onNodeWithTag("progression_list").getUnclippedBoundsInRoot()
+        assertTrue("The entire chord row must fit in the large-text landscape viewport", row.top >= viewport.top && row.bottom <= viewport.bottom)
         click("progression_settings")
         compose.onNodeWithTag("chord_capo").performScrollTo().performTextReplacement("bad")
         closeSheet()
@@ -171,6 +175,7 @@ class ProgressionUiTest {
         step(0)
         compose.onNodeWithTag("progression_play_selected").assertIsDisplayed().assertIsEnabled()
         closeSheet()
+        compose.onNodeWithTag("progression_list").performScrollToNode(hasTestTag("progression_add_rest"))
         click("progression_add_rest")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == 2 }
     }
