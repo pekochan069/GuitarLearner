@@ -12,7 +12,7 @@ sealed interface TunerTargetUi {
 }
 
 enum class ToleranceUi(val cents: Int) { Strict(3), Normal(5), Relaxed(10) }
-enum class TunerNoticeUi { PermissionDenied, PermissionRevoked, MicBlocked, InputFailed, NoInput, ShutdownFailed, MetronomeStopFailed, SettingsFailed, ReadFailed, SaveFailed }
+enum class TunerNoticeUi { PermissionDenied, PermissionRevoked, MicBlocked, InputFailed, NoInput, ShutdownFailed, MetronomeStopFailed, ProgressionStopFailed, SettingsFailed, ReadFailed, SaveFailed }
 enum class TunerActionUi { Retry, AppSettings, PrivacySettings }
 enum class TunerJudgmentUi { Low, High, Settling, InTune }
 

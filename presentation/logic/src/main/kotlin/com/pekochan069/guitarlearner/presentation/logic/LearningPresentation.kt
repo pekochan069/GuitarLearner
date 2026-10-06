@@ -114,7 +114,8 @@ internal fun LessonId.trainingLinks(): List<TrainingExerciseUi> = when (this) {
     else -> listOf(TrainingExerciseUi.TabNote)
 }
 internal fun LessonId.toolLinks(): List<FeatureId> = when (this) {
-    LessonId.ChordConstruction, LessonId.DiatonicFunctions, LessonId.BasicProgressions -> listOf(FeatureId.Chords)
+    LessonId.ChordConstruction, LessonId.DiatonicFunctions -> listOf(FeatureId.Chords)
+    LessonId.BasicProgressions -> listOf(FeatureId.Progressions, FeatureId.Chords)
     LessonId.NotesIntervals, LessonId.Scales, LessonId.CircleOfFifths -> emptyList()
     else -> listOf(FeatureId.Metronome)
 }

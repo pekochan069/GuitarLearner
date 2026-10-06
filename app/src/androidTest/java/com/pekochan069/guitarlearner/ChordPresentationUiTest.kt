@@ -225,7 +225,7 @@ class ChordPresentationUiTest {
     }
 
     private fun show(locale: Locale, dark: Boolean, scale: Float) {
-        val circuit = Circuit.Builder().addPresenterFactory(FoundationPresenter.Factory(ChordUiAppearance(), metronome, FakeTuner(), host, TrainingTestPort(), LearningTestPort()))
+        val circuit = Circuit.Builder().addPresenterFactory(FoundationPresenter.Factory(ChordUiAppearance(), metronome, FakeTuner(), host, FakeProgressions(), TrainingTestPort(), LearningTestPort()))
             .addUiFactory(FoundationUiFactory).build()
         compose.runOnUiThread {
             val localized = ContextThemeWrapper(compose.activity, compose.activity.theme).apply {
@@ -244,7 +244,7 @@ class ChordPresentationUiTest {
         if (tag.startsWith("chord_section_")) {
             compose.onNodeWithTag("feature_scroll").performScrollToNode(
                 hasScrollAction() and hasAnyDescendant(hasTestTag(tag)))
-            compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed().performClick().assertIsSelected()
+            compose.onNodeWithTag(tag).assertIsDisplayed().assertHasClickAction().performClick().assertIsSelected()
         } else {
             compose.onNodeWithTag(tag).performScrollTo().performClick()
         }

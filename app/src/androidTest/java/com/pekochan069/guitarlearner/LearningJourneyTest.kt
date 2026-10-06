@@ -138,6 +138,13 @@ class LearningJourneyTest {
         back()
         compose.onNodeWithTag("learning_lesson_title").assertExists()
         assertEquals(LessonId.Strumming, host.current.value.progress.lastViewed)
+        back()
+        click("learning_lesson_BasicProgressions")
+        click("learning_link_Progressions")
+        compose.onNodeWithTag("progression_tool").assertExists()
+        back()
+        compose.onNodeWithTag("learning_lesson_title").assertExists()
+        assertEquals(LessonId.BasicProgressions, host.current.value.progress.lastViewed)
     }
 
     private fun openLearning() = click("feature_Learning")

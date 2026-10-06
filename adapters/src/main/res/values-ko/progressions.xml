@@ -1,0 +1,7 @@
+<resources>
+    <string name="progression_notification_channel">코드 진행 재생</string>
+    <string name="progression_notification_title">코드 진행</string>
+    <string name="progression_notification_paused">일시정지됨</string>
+    <string name="progression_notification_pause">일시정지</string>
+    <string name="progression_notification_resume">계속 재생</string>
+</resources>

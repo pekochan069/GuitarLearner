@@ -25,6 +25,19 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidTunerHostTest {
+    @Test fun progressionStopFailureNeverOpensMicrophoneAndSuccessfulRetryStopsBothTools() = runTest {
+        val rig = Rig(this)
+        rig.progressions.result = ProgressionFailure.AudioUnavailable.left()
+        rig.start()
+        assertEquals(TunerListening.Failed(TunerFailure.ProgressionStopFailed(ProgressionFailure.AudioUnavailable)), rig.host.current.value.listening)
+        assertTrue(rig.captures.isEmpty())
+        assertTrue(rig.metronome.commands.isEmpty())
+        rig.progressions.result = Unit.right()
+        rig.start()
+        assertEquals(listOf(ProgressionCommand.Stop, ProgressionCommand.Stop), rig.progressions.commands)
+        assertEquals(listOf(MetronomeCommand.Stop), rig.metronome.commands)
+        assertEquals(1, rig.captures.size)
+    }
     @Test fun stopRevokesStartBeforeMetronomePreflightCompletes() = runTest {
         val rig = Rig(this)
         rig.metronome.gate = CompletableDeferred()
@@ -275,6 +288,7 @@ class AndroidTunerHostTest {
 
     private class Rig(val scope: TestScope, io: CoroutineDispatcher? = null) {
         val metronome = FakeMetronome()
+        val progressions = FakeProgressions()
         val store = FakeStore()
         val captures = mutableListOf<FakeCapture>()
         var granted = true
@@ -284,7 +298,7 @@ class AndroidTunerHostTest {
         var settingsResult: Either<TunerFailure, Unit> = Unit.right()
         val openedSettings = mutableListOf<TunerSettingsPage>()
         val dispatcher = StandardTestDispatcher(scope.testScheduler)
-        val host = AndroidTunerHost(scope.backgroundScope, metronome,
+        val host = AndroidTunerHost(scope.backgroundScope, metronome, progressions,
             TunerCaptureFactory { FakeCapture(::now, autoReady, autoClose).also(captures::add) }, store,
             { granted }, { openedSettings += it; settingsResult },
             GuitarPitchDetector { _, _ ->
@@ -306,6 +320,16 @@ class AndroidTunerHostTest {
         override suspend fun execute(command: MetronomeCommand): Either<MetronomeFailure, Unit> {
             commands += command
             return (gate?.await() ?: result).also { if (it.isRight()) current.value = current.value.copy(playback = PlaybackState.Stopped()) }
+        }
+    }
+
+    private class FakeProgressions : com.pekochan069.guitarlearner.domain.Progressions {
+        override val current = MutableStateFlow(com.pekochan069.guitarlearner.domain.ProgressionWorkspace())
+        val commands = mutableListOf<com.pekochan069.guitarlearner.domain.ProgressionCommand>()
+        var result: Either<com.pekochan069.guitarlearner.domain.ProgressionFailure, Unit> = Unit.right()
+        override suspend fun execute(command: com.pekochan069.guitarlearner.domain.ProgressionCommand): Either<com.pekochan069.guitarlearner.domain.ProgressionFailure, Unit> {
+            commands += command
+            return result
         }
     }
 

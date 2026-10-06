@@ -141,6 +141,7 @@
     <string name="overwrite_preset">Replace</string>
     <string name="cancel_action">Cancel</string>
     <string name="dismiss_notice">Dismiss</string>
+    <string name="progression_removed">%1$s removed</string>
     <string name="metronome_invalid_configuration">Use 40–240 BPM and 1–16 beats per bar.</string>
     <string name="preset_invalid_name">Enter a preset name.</string>
     <string name="preset_exists">This preset name exists. Confirm to replace it.</string>

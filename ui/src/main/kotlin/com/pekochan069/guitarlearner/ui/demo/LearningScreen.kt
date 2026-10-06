@@ -320,7 +320,14 @@ private fun LearningLinks(state: LearningUiState, eventSink: (LearningEvent) -> 
         }
         state.toolLinks.forEach { tool ->
             OutlinedButton(onClick = { eventSink(LearningEvent.OpenTool(tool)) }, modifier = Modifier.testTag("learning_link_${tool.name}")) {
-                Text(stringResource(if (tool == FeatureId.Chords) R.string.chord_title else R.string.metronome_title))
+                Text(stringResource(when (tool) {
+                    FeatureId.Metronome -> R.string.metronome_title
+                    FeatureId.Tuner -> R.string.tuner_title
+                    FeatureId.Chords -> R.string.chord_title
+                    FeatureId.Progressions -> R.string.progression_title
+                    FeatureId.Training -> R.string.training_title
+                    FeatureId.Learning -> R.string.learning_title
+                }))
             }
         }
     }

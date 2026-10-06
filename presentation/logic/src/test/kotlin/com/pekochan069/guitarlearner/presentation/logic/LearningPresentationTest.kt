@@ -132,7 +132,7 @@ class LearningPresentationTest {
         }
     }
 
-    @Test fun onlyRelevantUsableLinksOpenAndNormalNavigationClearsAnOldLessonReturn() = runTest {
+    @Test fun onlyRelevantLinksKeepReturnOnNotificationReopenAndNormalDepartureClearsIt() = runTest {
         val learning = ControlledLearning()
         val training = ControlledTraining()
         presenter(learning, training).test {
@@ -154,9 +154,11 @@ class LearningPresentationTest {
             runCurrent()
             state = expectMostRecentItem()
             assertTrue(state.returningToLesson)
+            state.eventSink(FoundationEvent.OpenFeature(FeatureId.Metronome))
             state.eventSink(FoundationEvent.SetSettingsOpen(true))
             runCurrent()
             state = expectMostRecentItem()
+            assertTrue(state.returningToLesson)
             state.eventSink(FoundationEvent.NavigateBack)
             runCurrent()
             state = expectMostRecentItem()
@@ -202,8 +204,67 @@ class LearningPresentationTest {
         }
     }
 
-    private fun presenter(learning: Learning, training: Training = ControlledTraining()) = FoundationPresenter(
-        ControlledAppearance(), ControlledMetronome(), ControlledTuner(), ControlledChords(), training, learning,
+    @Test fun basicProgressionsNotificationReopenReturnsToItsCourseSelectionWithoutEditingTheToolDraft() = runTest {
+        val learning = ControlledLearning()
+        val progressions = ControlledProgressions()
+        val original = progressions.current.value
+        presenter(learning, progressions = progressions).test {
+            var state = awaitItem()
+            state.eventSink(FoundationEvent.OpenFeature(FeatureId.Learning))
+            runCurrent()
+            state = expectMostRecentItem()
+            state.eventSink(FoundationEvent.Learning(LearningEvent.SetMode(LearningModeUi.Courses)))
+            runCurrent()
+            state = expectMostRecentItem()
+            state.eventSink(FoundationEvent.Learning(LearningEvent.OpenLesson(LessonUi.BasicProgressions)))
+            runCurrent()
+            state = expectMostRecentItem()
+            state.eventSink(FoundationEvent.Learning(LearningEvent.SetRoot(state.learning.roots.indexOf("G"))))
+            runCurrent()
+            state = expectMostRecentItem()
+            state.eventSink(FoundationEvent.Learning(LearningEvent.SetProgression(LearningProgressionUi.TwoFiveOne)))
+            runCurrent()
+            state = expectMostRecentItem()
+            state.eventSink(FoundationEvent.Learning(LearningEvent.SetInstrument(TrainingInstrumentUi.Guitar)))
+            runCurrent()
+            state = expectMostRecentItem()
+            state.eventSink(FoundationEvent.Learning(LearningEvent.Listen))
+            runCurrent()
+            state = expectMostRecentItem()
+            assertEquals(LearningAudioUi.Playing, state.learning.audio)
+            assertTrue(FeatureId.Progressions in state.learning.toolLinks)
+            state.eventSink(FoundationEvent.Learning(LearningEvent.OpenTool(FeatureId.Progressions)))
+            runCurrent()
+            state = expectMostRecentItem()
+            assertEquals(FoundationDestination.Feature(FeatureId.Progressions), state.destination)
+            assertTrue(state.returningToLesson)
+            assertEquals(LearningAudioUi.Idle, state.learning.audio)
+            state.eventSink(FoundationEvent.OpenFeature(FeatureId.Progressions))
+            state.eventSink(FoundationEvent.SetSettingsOpen(true))
+            runCurrent()
+            state = expectMostRecentItem()
+            assertTrue(state.returningToLesson)
+            state.eventSink(FoundationEvent.NavigateBack)
+            runCurrent()
+            state = expectMostRecentItem()
+            assertEquals(FoundationDestination.Feature(FeatureId.Progressions), state.destination)
+            state.eventSink(FoundationEvent.NavigateBack)
+            runCurrent()
+            state = expectMostRecentItem()
+            assertEquals(FoundationDestination.Feature(FeatureId.Learning), state.destination)
+            assertEquals(LessonUi.BasicProgressions, state.learning.lesson)
+            assertEquals(LearningModeUi.Courses, state.learning.mode)
+            assertEquals("G", state.learning.root)
+            assertEquals(LearningProgressionUi.TwoFiveOne, state.learning.progression)
+            assertEquals(TrainingInstrumentUi.Guitar, state.learning.instrument)
+            assertFalse(state.returningToLesson)
+            assertEquals(original, progressions.current.value)
+            assertTrue(progressions.commands.isEmpty())
+        }
+    }
+
+    private fun presenter(learning: Learning, training: Training = ControlledTraining(), progressions: Progressions = ControlledProgressions()) = FoundationPresenter(
+        ControlledAppearance(), ControlledMetronome(), ControlledTuner(), ControlledChords(), progressions, training, learning,
     )
 }
 
