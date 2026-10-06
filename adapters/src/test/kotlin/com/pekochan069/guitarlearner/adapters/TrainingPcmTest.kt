@@ -1,6 +1,5 @@
 package com.pekochan069.guitarlearner.adapters
 
-import com.pekochan069.guitarlearner.domain.IntervalPresentation
 import com.pekochan069.guitarlearner.domain.TrainingInstrument
 import java.io.File
 import java.nio.ByteBuffer
@@ -17,11 +16,11 @@ import org.junit.Test
 
 class TrainingPcmTest {
     @Test fun ascendingDescendingAndHarmonicShareTheSamePitchSamplesAndNeverClip() {
-        val first = TrainingPcm.render(TrainingTone(listOf(52), IntervalPresentation.Ascending), ::sample)
-        val second = TrainingPcm.render(TrainingTone(listOf(55), IntervalPresentation.Ascending), ::sample)
-        val ascending = TrainingPcm.render(TrainingTone(listOf(52, 55), IntervalPresentation.Ascending), ::sample)
-        val descending = TrainingPcm.render(TrainingTone(listOf(52, 55), IntervalPresentation.Descending), ::sample)
-        val harmonic = TrainingPcm.render(TrainingTone(listOf(52, 55), IntervalPresentation.Harmonic), ::sample)
+        val first = TrainingPcm.render(TrainingTone(listOf(listOf(52))), ::sample)
+        val second = TrainingPcm.render(TrainingTone(listOf(listOf(55))), ::sample)
+        val ascending = TrainingPcm.render(TrainingTone(listOf(listOf(52), listOf(55))), ::sample)
+        val descending = TrainingPcm.render(TrainingTone(listOf(listOf(55), listOf(52))), ::sample)
+        val harmonic = TrainingPcm.render(TrainingTone(listOf(listOf(52, 55))), ::sample)
         val offset = TrainingPcm.NOTE_FRAMES + TrainingPcm.GAP_FRAMES
         assertTrue(first.contentEquals(ascending.sliceArray(first.indices)))
         assertTrue(second.contentEquals(ascending.sliceArray(offset until offset + second.size)))
@@ -37,7 +36,7 @@ class TrainingPcmTest {
     @Test fun theSelectedInstrumentBankSuppliesEveryPitchIncludingComparisonC4() {
         val requested = mutableListOf<Pair<TrainingInstrument, Int>>()
         val outputs = TrainingInstrument.entries.map { instrument ->
-            TrainingPcm.render(TrainingTone(listOf(60), IntervalPresentation.Ascending, instrument)) { chosen, midi ->
+            TrainingPcm.render(TrainingTone(listOf(listOf(60)), instrument)) { chosen, midi ->
                 requested.add(chosen to midi)
                 sample(chosen, midi)
             }
@@ -46,7 +45,7 @@ class TrainingPcmTest {
         assertFalse(outputs[0].contentEquals(outputs[1]))
         assertEquals(sample(TrainingInstrument.Guitar, 60)[1000], outputs[1][1000])
         assertThrows(IllegalArgumentException::class.java) {
-            TrainingPcm.render(TrainingTone(listOf(60), IntervalPresentation.Ascending)) { _, _ -> ShortArray(10) }
+            TrainingPcm.render(TrainingTone(listOf(listOf(60)))) { _, _ -> ShortArray(10) }
         }
     }
 
@@ -58,7 +57,7 @@ class TrainingPcmTest {
             assertEquals(0.toShort(), samples.last())
             val peak = samples.maxOf { abs(it.toInt()) }
             assertTrue("$instrument/$midi must be audible and bounded", peak in 500..12_000)
-            assertArrayEquals(samples, TrainingPcm.render(TrainingTone(listOf(midi), IntervalPresentation.Ascending, instrument), ::recordedSample))
+            assertArrayEquals(samples, TrainingPcm.render(TrainingTone(listOf(listOf(midi)), instrument), ::recordedSample))
         }
         assertFalse(recordedSample(TrainingInstrument.Piano, 60).contentEquals(recordedSample(TrainingInstrument.Guitar, 60)))
     }
@@ -71,6 +70,33 @@ class TrainingPcmTest {
             assertTrue("$instrument/$midi fundamental offset $peak cents", abs(peak) <= 15)
             val signal = power(samples, reference * 2.0.pow(peak / 1200.0))
             assertTrue(signal > maxOf(power(samples, reference * 2.0.pow(-1.0 / 12)), power(samples, reference * 2.0.pow(1.0 / 12))) * 3)
+        }
+    }
+
+    @Test fun fullScaleTriadSeventhAndProgressionUseEveryStepAndEveryChordTone() {
+        val examples = listOf(
+            listOf(60, 62, 64, 65, 67, 69, 71, 72).map { listOf(it) } to listOf(6000, 6200, 6400, 6500, 6700, 6900, 7100, 7200),
+            listOf(listOf(60, 64, 67)) to listOf(6366),
+            listOf(listOf(60, 64, 67, 70)) to listOf(6525),
+            listOf(listOf(60, 64, 67), listOf(65, 69, 72), listOf(67, 71, 74), listOf(60, 64, 67)) to listOf(6366, 6866, 7066, 6366),
+        )
+        for (instrument in TrainingInstrument.entries) for ((steps, expected) in examples) {
+            val requested = mutableListOf<Pair<TrainingInstrument, Int>>()
+            val pcm = TrainingPcm.render(TrainingTone(steps, instrument)) { bank, midi ->
+                requested.add(bank to midi)
+                ShortArray(TrainingPcm.NOTE_FRAMES) { (midi * 100).toShort() }
+            }
+            assertEquals(steps.flatten().map { instrument to it }, requested)
+            assertEquals(expected.size * 31_200 + (expected.size - 1) * 6_720, pcm.size)
+            expected.forEachIndexed { index, value ->
+                val start = index * (31_200 + 6_720)
+                assertEquals(value.toShort(), pcm[start])
+                assertEquals(value.toShort(), pcm[start + 31_199])
+                if (index < expected.lastIndex) assertTrue(pcm.sliceArray(start + 31_200 until start + 37_920).all { it == 0.toShort() })
+            }
+        }
+        for (steps in listOf(emptyList(), listOf(emptyList()), listOf(listOf(39)), listOf(listOf(77)))) {
+            assertThrows(IllegalArgumentException::class.java) { TrainingTone(steps) }
         }
     }
 
