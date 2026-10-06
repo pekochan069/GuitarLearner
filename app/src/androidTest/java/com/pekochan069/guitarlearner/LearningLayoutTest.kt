@@ -40,12 +40,13 @@ class LearningLayoutTest {
 
     @Test fun enlargedKoreanAndEnglishKeepLessonReadableAndOfferBothRecoveryActions() {
         val language = mutableStateOf("en")
+        val fontScale = mutableStateOf(2f)
         val lesson = mutableStateOf(LessonUi.Scales)
         val events = mutableListOf<LearningEvent>()
         compose.setContent {
             CompositionLocalProvider(
                 LocalContext provides localizedContext(language.value),
-                LocalDensity provides Density(LocalDensity.current.density, 2f),
+                LocalDensity provides Density(LocalDensity.current.density, fontScale.value),
             ) {
                 GuitarLearnerTheme(false) {
                     Column(Modifier.width(320.dp).verticalScroll(rememberScrollState())) {
@@ -77,12 +78,14 @@ class LearningLayoutTest {
             compose.onNodeWithTag("learning_retry_audio").performScrollTo().assertHasClickAction()
                 .assertHeightIsAtLeast(48.dp).performClick()
             compose.runOnIdle { assertEquals(listOf(LearningEvent.RetrySave, LearningEvent.Listen), events.takeLast(2)) }
-            compose.runOnIdle { lesson.value = LessonUi.CircleOfFifths }
-            val controls = circle.map { compose.onNodeWithTag("learning_circle_${it.tonic}").getUnclippedBoundsInRoot() }
-            controls.forEachIndexed { index, first ->
-                controls.drop(index + 1).forEach { second ->
-                    assertFalse("$locale circle key touch targets overlap", first.left < second.right && first.right > second.left &&
-                        first.top < second.bottom && first.bottom > second.top)
+            for (scale in listOf(1.2f, 2f)) {
+                compose.runOnIdle { fontScale.value = scale; lesson.value = LessonUi.CircleOfFifths }
+                val controls = circle.map { compose.onNodeWithTag("learning_circle_${it.tonic}").getUnclippedBoundsInRoot() }
+                controls.forEachIndexed { index, first ->
+                    controls.drop(index + 1).forEach { second ->
+                        assertFalse("$locale circle key touch targets overlap at $scale font scale",
+                            first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top)
+                    }
                 }
             }
             for (technique in listOf(LessonUi.Strumming, LessonUi.AlternatePicking, LessonUi.HammerOnPullOff,

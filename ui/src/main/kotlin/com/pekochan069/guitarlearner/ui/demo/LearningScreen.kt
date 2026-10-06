@@ -282,7 +282,7 @@ private fun LearningCircle(state: LearningUiState, eventSink: (LearningEvent) ->
                 val rootIndex = state.roots.indexOf(key.tonic)
                 val label = stringResource(R.string.learning_circle_key, key.tonic, key.relativeMinor)
                 FilterChip(selected = state.root == key.tonic, onClick = { if (rootIndex >= 0) eventSink(LearningEvent.SetRoot(rootIndex)) },
-                    modifier = Modifier.padding(start = x, top = y).width(nodeSize).heightIn(min = 48.dp)
+                    modifier = Modifier.padding(start = x.coerceAtLeast(0.dp), top = y.coerceAtLeast(0.dp)).width(nodeSize).heightIn(min = 48.dp)
                         .testTag("learning_circle_${key.tonic}").semantics { contentDescription = label },
                     label = { Text("${key.tonic}\n${key.relativeMinor}m", style = MaterialTheme.typography.labelLarge) })
             }
