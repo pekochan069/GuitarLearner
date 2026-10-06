@@ -26,6 +26,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.pekochan069.guitarlearner.adapters.TunerPermissionOutcome
 import com.pekochan069.guitarlearner.adapters.TunerVisibility
+import com.pekochan069.guitarlearner.adapters.TrainingVisibility
 import com.pekochan069.guitarlearner.domain.AppearanceFailure
 import com.pekochan069.guitarlearner.domain.TunerFailure
 import com.pekochan069.guitarlearner.domain.TunerRecovery
@@ -45,6 +46,9 @@ class MainActivity : AppCompatActivity() {
     private val tunerOwner: TunerSessionOwner by lazy {
         ViewModelProvider(this, TunerSessionOwner.Factory(graph.tunerHostFactory))[TunerSessionOwner::class.java]
     }
+    private val trainingOwner: TrainingSessionOwner by lazy {
+        ViewModelProvider(this, TrainingSessionOwner.Factory(graph.trainingHostFactory))[TrainingSessionOwner::class.java]
+    }
     private val microphonePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val launched = tunerOwner.launchedPermission
         tunerOwner.launchedPermission = null
@@ -59,7 +63,10 @@ class MainActivity : AppCompatActivity() {
     }
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_SCREEN_OFF) tunerOwner.host.visibilityChanged(TunerVisibility.Locked)
+            if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                tunerOwner.host.visibilityChanged(TunerVisibility.Locked)
+                trainingOwner.host.visibilityChanged(TrainingVisibility.Locked)
+            }
         }
     }
 
@@ -76,7 +83,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         setContent {
-            val presenterFactory = remember(graph, tunerOwner) { graph.createPresenterFactory(tunerOwner.host) }
+            val presenterFactory = remember(graph, tunerOwner, trainingOwner) { graph.createPresenterFactory(tunerOwner.host, trainingOwner.host) }
             val circuit = remember(graph, presenterFactory) { graph.createCircuit(presenterFactory) }
             val darkTheme = isSystemInDarkTheme()
             SideEffect {
@@ -130,6 +137,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         tunerOwner.host.visibilityChanged(if (isChangingConfigurations) TunerVisibility.ConfigurationContinuation else TunerVisibility.Background)
+        trainingOwner.host.visibilityChanged(if (isChangingConfigurations) TrainingVisibility.ConfigurationContinuation else TrainingVisibility.Background)
         super.onStop()
     }
 
@@ -142,6 +150,7 @@ class MainActivity : AppCompatActivity() {
         val locked = getSystemService(KeyguardManager::class.java).isKeyguardLocked ||
             !getSystemService(PowerManager::class.java).isInteractive
         tunerOwner.host.visibilityChanged(if (locked) TunerVisibility.Locked else TunerVisibility.Foreground)
+        trainingOwner.host.visibilityChanged(if (locked) TrainingVisibility.Locked else TrainingVisibility.Foreground)
     }
 
     private fun pumpPermissionRequest() {

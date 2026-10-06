@@ -22,7 +22,7 @@ class ProgressionPresentationTest {
         val original = ProgressionDraft("Practice", ProgressionContent(steps = listOf(ProgressionStep.Chord("C", shape))))
         port.current.value = ProgressionWorkspace(draft = original, playback = ProgressionPlayback.Playing(ProgressionPosition(0)))
         port.onCommand = { if (it == ProgressionCommand.Stop) port.current.value = port.current.value.copy(playback = ProgressionPlayback.Stopped()) }
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.OpenEditor(0))
             state = stateWhere { it.progressions.sheet == ProgressionSheetUi.Chord && it.progressions.transport == ProgressionTransportUi.Stopped }
@@ -39,7 +39,7 @@ class ProgressionPresentationTest {
             timing = MetronomeConfig(80, BeatUnit.Eighth, List(6) { BeatAccent.Normal }), steps = listOf(ProgressionStep.Rest()))
         val record = SavedProgression("saved", "Loaded", loaded)
         port.current.value = ProgressionWorkspace(draft = ProgressionDraft("Old", old), records = listOf(record))
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.SetTempo("0140"))
             state = stateWhere { it.progressions.bpmInput == "0140" }
@@ -87,7 +87,7 @@ class ProgressionPresentationTest {
         val port = ControlledProgressions()
         port.current.value = ProgressionWorkspace(draft = ProgressionDraft(content = ProgressionContent(context = GuitarContext(capo = 2))))
         val chords = ProgressionSourceChords(ChordDraft("Viewer C", GuitarContext(capo = 7), shape))
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), chords, port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), chords, port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.OpenEditor())
             state = stateWhere { it.progressions.sheet == ProgressionSheetUi.Chord }
@@ -109,7 +109,7 @@ class ProgressionPresentationTest {
     @Test fun invalidRawInputsKeepAcceptedMusicAndPreventSaving() = runTest {
         val port = ControlledProgressions()
         port.current.value = ProgressionWorkspace(draft = ProgressionDraft("Practice", ProgressionContent(steps = listOf(ProgressionStep.Chord("C", shape)))))
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             var state = awaitItem()
             assertTrue(state.progressions.canSave)
             state.progression(ProgressionEvent.SetTempo("bad"))
@@ -138,7 +138,7 @@ class ProgressionPresentationTest {
         val port = ControlledProgressions()
         port.current.value = ProgressionWorkspace(draft = ProgressionDraft("Practice", ProgressionContent(timing = MetronomeConfig(bpm = 120),
             metronomeEnabled = false, steps = listOf(ProgressionStep.Rest()))), playback = ProgressionPlayback.Paused(ProgressionPosition(0, bpm = 90)))
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             val state = awaitItem()
             assertEquals(ProgressionTransportUi.Paused, state.progressions.transport)
             assertTrue(state.progressions.pendingChange)
@@ -152,7 +152,7 @@ class ProgressionPresentationTest {
         val port = ControlledProgressions()
         port.current.value = ProgressionWorkspace(selectedIndex = 1, draft = ProgressionDraft("Practice", ProgressionContent(steps = listOf(ProgressionStep.Rest(), ProgressionStep.Rest()))),
             persistence = DraftPersistence.Unsynced, actionFailure = ProgressionFailure.WriteFailed)
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             val state = awaitItem()
             assertTrue(state.progressions.unsynced)
             assertEquals(ProgressionNotice.WriteFailed, state.progressions.notice)
@@ -167,7 +167,7 @@ class ProgressionPresentationTest {
         port.current.value = ProgressionWorkspace(draft = ProgressionDraft(content = ProgressionContent(context = GuitarContext(capo = 2))))
         val chords = ProgressionSourceChords(ChordDraft("Viewer C", GuitarContext(capo = 7), shape))
         val viewer = chords.current.value
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), chords, port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), chords, port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.OpenEditor())
             state = stateWhere { it.progressions.editor.lookup == ChordLookupUi.Ready }
@@ -189,7 +189,7 @@ class ProgressionPresentationTest {
     @Test fun staleNamedPreviewCannotCommitAfterRootChangeAndNeverOverwritesAManualCopy() = runTest {
         val port = ControlledProgressions()
         val chords = ProgressionSourceChords(ChordDraft("Viewer C", shape = shape))
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), chords, port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), chords, port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.OpenEditor())
             state = stateWhere { it.progressions.editor.lookup == ChordLookupUi.Ready }
@@ -216,7 +216,7 @@ class ProgressionPresentationTest {
         val port = ControlledProgressions()
         val chords = ProgressionSourceChords(ChordDraft("Viewer C", shape = shape))
         val viewer = chords.current.value
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), chords, port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), chords, port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.OpenEditor())
             state = stateWhere { it.progressions.editor.lookup == ChordLookupUi.Ready }
@@ -241,7 +241,7 @@ class ProgressionPresentationTest {
     @Test fun mainReorderAndRemovalSendOneAtomicCommandEachWithoutOpeningAnEditor() = runTest {
         val port = ControlledProgressions()
         port.current.value = ProgressionWorkspace(draft = ProgressionDraft(content = ProgressionContent(steps = List(4) { ProgressionStep.Chord("", shape) })))
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             val state = awaitItem()
             state.progression(ProgressionEvent.Move(1, 2))
             runCurrent()
@@ -263,7 +263,7 @@ class ProgressionPresentationTest {
             port.current.value = port.current.value.copy(draft = draft.copy(content = draft.content.copy(steps =
                 draft.content.steps.filterIndexed { index, _ -> index != command.index })))
         } }
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.Remove(0))
             state = stateWhere { it.progressions.steps.size == 2 && it.progressions.removedStep != null }
@@ -290,7 +290,7 @@ class ProgressionPresentationTest {
         port.current.value = ProgressionWorkspace(draft = ProgressionDraft(content = ProgressionContent(steps = listOf(ProgressionStep.Rest()))),
             playback = ProgressionPlayback.Playing(ProgressionPosition(0)))
         port.onCommand = { if (it is ProgressionCommand.Select) port.current.value = port.current.value.copy(selectedIndex = it.index) }
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.OpenStep(0))
             state = stateWhere { it.progressions.sheet == ProgressionSheetUi.Step }
@@ -310,7 +310,7 @@ class ProgressionPresentationTest {
     @Test fun failedSaveKeepsTheSheetAndNameUntilCheckedRetrySucceeds() = runTest {
         val port = ControlledProgressions()
         port.current.value = ProgressionWorkspace(draft = ProgressionDraft("Practice", ProgressionContent(steps = listOf(ProgressionStep.Rest()))))
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.OpenSheet(ProgressionSheetUi.Save))
             state = stateWhere { it.progressions.sheet == ProgressionSheetUi.Save }
@@ -331,7 +331,7 @@ class ProgressionPresentationTest {
         val original = ProgressionDraft("Practice", ProgressionContent(steps = listOf(ProgressionStep.Rest())))
         val record = SavedProgression("saved", "Saved", original.content)
         port.current.value = ProgressionWorkspace(draft = original, records = listOf(record))
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.SetTempo("bad"))
             state = stateWhere { it.progressions.invalidSettings }
@@ -353,7 +353,7 @@ class ProgressionPresentationTest {
         port.current.value = ProgressionWorkspace(draft = ProgressionDraft(content = ProgressionContent(steps = listOf(ProgressionStep.Rest()))))
         val selected = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.NewDraft)
             state = stateWhere { it.progressions.replacement != null }
@@ -380,7 +380,7 @@ class ProgressionPresentationTest {
         val saving = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         port.onCommand = { if (it == ProgressionCommand.Save) { saving.complete(Unit); release.await() } }
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.OpenSheet(ProgressionSheetUi.Save))
             state = stateWhere { it.progressions.sheet == ProgressionSheetUi.Save }
@@ -404,7 +404,7 @@ class ProgressionPresentationTest {
                 draft = port.current.value.draft.copy(content = port.current.value.draft.content.copy(context = it.context)))
             else -> Unit
         } }
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.OpenEditor())
             state = stateWhere { it.progressions.editor.lookup == ChordLookupUi.Ready }
@@ -429,7 +429,7 @@ class ProgressionPresentationTest {
         val writing = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         port.onCommand = { if (it is ProgressionCommand.SetName) { writing.complete(Unit); release.await() } }
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port, ControlledTraining()).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.OpenEditor())
             state = stateWhere { it.progressions.editor.lookup == ChordLookupUi.Ready }

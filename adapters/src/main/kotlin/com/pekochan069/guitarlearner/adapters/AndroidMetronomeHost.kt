@@ -36,6 +36,7 @@ import com.pekochan069.guitarlearner.domain.ScheduledBeat
 import com.pekochan069.guitarlearner.domain.StopReason
 import java.util.Collections
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -74,12 +75,15 @@ class AndroidMetronomeHost(
     private var nextRunId = 0L
     private var requestedRunId: Long? = null
     @Volatile private var run: PlaybackRun? = null
+    private val pendingStops = mutableListOf<MetronomeOutput>()
 
     fun currentAudioDiagnostics(): MetronomeAudioDiagnostics? = run?.audio?.diagnostics
 
     override suspend fun execute(command: MetronomeCommand): Either<MetronomeFailure, Unit> = when (command) {
         MetronomeCommand.Start -> withContext(main) { requestStart() }
-        MetronomeCommand.Stop -> withContext(main) { stop(StopReason.User); Unit.right() }
+        MetronomeCommand.Stop -> withContext(main) {
+            if (stop(StopReason.User)) Unit.right() else MetronomeFailure.AudioUnavailable.left()
+        }
         else -> change(command)
     }
 
@@ -166,6 +170,7 @@ class AndroidMetronomeHost(
 
     private suspend fun requestStart(): Either<MetronomeFailure, Unit> {
         if (requestedRunId != null) return Unit.right()
+        if (!retryPendingStops()) return MetronomeFailure.AudioUnavailable.left()
         val id = ++nextRunId
         requestedRunId = id
         snapshot.value = snapshot.value.copy(playback = PlaybackState.Preparing)
@@ -224,12 +229,33 @@ class AndroidMetronomeHost(
         }
     }
 
-    private fun stop(reason: StopReason) {
+    private fun stop(reason: StopReason): Boolean {
         requestedRunId = null
         val previous = run
         run = null
-        snapshot.value = snapshot.value.copy(playback = PlaybackState.Stopped(reason))
-        previous?.close()
+        val pendingSilent = retryPendingStops()
+        val currentSilent = previous?.close() ?: true
+        val silent = pendingSilent && currentSilent
+        snapshot.value = snapshot.value.copy(playback = if (silent) PlaybackState.Stopped(reason)
+            else PlaybackState.Failed(MetronomeFailure.AudioUnavailable))
+        return silent
+    }
+
+    private fun stopOutput(output: MetronomeOutput?): Boolean {
+        if (output == null) return true
+        val silent = try {
+            output.stop()
+        } catch (failure: IllegalStateException) {
+            if (failure is CancellationException) throw failure
+            false
+        }
+        if (!silent && output !in pendingStops) pendingStops.add(output)
+        return silent
+    }
+
+    private fun retryPendingStops(): Boolean {
+        pendingStops.removeAll { stopOutput(it) }
+        return pendingStops.isEmpty()
     }
 
     private fun fail(id: Long, failure: MetronomeFailure) {
@@ -327,7 +353,7 @@ class AndroidMetronomeHost(
             lastActiveOutputId = previous?.routedDeviceId ?: lastActiveOutputId
             val epoch = ++audioEpoch
             audio = null
-            previous?.stop()
+            if (!stopOutput(previous)) { fail(id, MetronomeFailure.AudioUnavailable); return }
             lastConfig = null
             snapshot.value = snapshot.value.copy(playback = PlaybackState.Preparing)
             media.setPlaybackState(NativePlaybackState.Builder().setActions(NativePlaybackState.ACTION_STOP)
@@ -352,7 +378,7 @@ class AndroidMetronomeHost(
                 } },
             )
             if (!acceptsAudio(epoch)) {
-                output.stop()
+                stopOutput(output)
                 return
             }
             audio = output
@@ -406,24 +432,28 @@ class AndroidMetronomeHost(
                 .build()
         }
 
-        fun close() {
-            if (closed) return
+        fun close(): Boolean {
+            if (closed) return true
             closed = true
             ++audioEpoch
-            audio?.stop()
-            audio = null
-            wakeJob?.cancel()
-            if (wakeLock.isHeld) wakeLock.release()
-            if (focused) manager.abandonAudioFocusRequest(focus)
-            if (registered) {
-                application.unregisterReceiver(noisy)
-                manager.unregisterAudioDeviceCallback(devices)
-                if (Build.VERSION.SDK_INT >= 31) modes?.let(manager::removeOnModeChangedListener)
+            val silent = try {
+                stopOutput(audio)
+            } finally {
+                audio = null
+                wakeJob?.cancel()
+                if (wakeLock.isHeld) wakeLock.release()
+                if (focused) manager.abandonAudioFocusRequest(focus)
+                if (registered) {
+                    application.unregisterReceiver(noisy)
+                    manager.unregisterAudioDeviceCallback(devices)
+                    if (Build.VERSION.SDK_INT >= 31) modes?.let(manager::removeOnModeChangedListener)
+                }
+                media.isActive = false
+                media.release()
+                if (foreground) service.stopForeground(Service.STOP_FOREGROUND_REMOVE)
+                service.stopSelfResult(startId)
             }
-            media.isActive = false
-            media.release()
-            if (foreground) service.stopForeground(Service.STOP_FOREGROUND_REMOVE)
-            service.stopSelfResult(startId)
+            return silent
         }
     }
 

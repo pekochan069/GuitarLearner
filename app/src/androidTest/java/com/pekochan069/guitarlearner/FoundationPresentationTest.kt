@@ -117,7 +117,7 @@ class FoundationPresentationTest {
         assertEquals(category.left.value, tile.left.value, 1f)
         assertEquals(tile.width.value,
             compose.onNodeWithTag("feature_Chords").getUnclippedBoundsInRoot().width.value, 1f)
-        compose.onNodeWithTag("category_Training").assertDoesNotExist()
+        compose.onNodeWithTag("category_Training").assertExists()
         compose.onNodeWithTag("category_Learning").assertDoesNotExist()
         compose.onNodeWithTag("sample_Tuner").assertDoesNotExist()
         compose.onNodeWithTag("sample_Gallery").assertDoesNotExist()
@@ -697,7 +697,7 @@ class FoundationPresentationTest {
 
 private fun testCircuit(settings: AppearanceSettings, metronome: Metronome, developmentSamplesEnabled: Boolean = true,
     tuner: Tuner = FakeTuner()): Circuit = Circuit.Builder()
-    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome, tuner, FakeChords(), FakeProgressions(), developmentSamplesEnabled))
+    .addPresenterFactory(FoundationPresenter.Factory(settings, metronome, tuner, FakeChords(), FakeProgressions(), TrainingTestPort(), developmentSamplesEnabled))
     .addUiFactory(FoundationUiFactory)
     .build()
 

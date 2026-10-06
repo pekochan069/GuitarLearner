@@ -73,6 +73,7 @@ class MetronomeRestartTest {
     @After
     fun restoreProductionGraph(): Unit = runBlocking {
         if (::preferences.isInitialized) preferences.releaseCommit()
+        if (::outputs.isInitialized) outputs.created.forEach { it.acknowledgeStop = true }
         if (::host.isInitialized) {
             host.execute(MetronomeCommand.Stop).assertSuccess()
             awaitServiceRemoved()
@@ -338,6 +339,41 @@ class MetronomeRestartTest {
         return outputs.created.last().also { assertTrue(it.started) }
     }
 
+    @Test
+    fun failedStopAcknowledgementCleansUpAndCannotReviveOrStartUntilRetrySucceeds(): Unit = runBlocking {
+        val original = startOutput()
+        present(original, 0)
+        original.acknowledgeStop = false
+        assertEquals(arrow.core.Either.Left(MetronomeFailure.AudioUnavailable), host.execute(MetronomeCommand.Stop))
+        assertEquals(PlaybackState.Failed(MetronomeFailure.AudioUnavailable), host.current.value.playback)
+        assertTrue(original.stopped)
+        awaitServiceRemoved()
+        assertTrue(application.getSystemService(NotificationManager::class.java).activeNotifications.none { it.id == 1 })
+        original.nextBeat()
+        original.fail()
+        withContext(Dispatchers.Main) { }
+        assertEquals(PlaybackState.Failed(MetronomeFailure.AudioUnavailable), host.current.value.playback)
+        assertEquals(arrow.core.Either.Left(MetronomeFailure.AudioUnavailable), host.execute(MetronomeCommand.Start))
+        assertEquals(1, outputs.created.size)
+        original.acknowledgeStop = true
+        host.execute(MetronomeCommand.Stop).assertSuccess()
+        present(startOutput(), 0)
+    }
+
+    @Test
+    fun failedReplacementStopNeverCreatesASuccessorOutput(): Unit = runBlocking {
+        val original = startOutput()
+        present(original, 0)
+        original.acknowledgeStop = false
+        host.execute(MetronomeCommand.SetPattern(BeatUnit.Eighth, List(7) { BeatAccent.Normal })).assertSuccess()
+        assertEquals(PlaybackState.Failed(MetronomeFailure.AudioUnavailable), host.current.value.playback)
+        assertEquals(1, outputs.created.size)
+        awaitServiceRemoved()
+        original.acknowledgeStop = true
+        host.execute(MetronomeCommand.Stop).assertSuccess()
+        present(startOutput(), 0)
+    }
+
     private suspend fun present(output: ControlledMetronomeOutput, index: Int): PlaybackState.Playing {
         val beat = output.nextBeat()
         assertEquals(index, beat.beatIndex)
@@ -351,7 +387,10 @@ class MetronomeRestartTest {
     }
 
     private suspend fun awaitServiceRemoved() {
-        withTimeout(5_000) { while (runningService() != null) delay(10) }
+        val notifications = application.getSystemService(NotificationManager::class.java)
+        withTimeout(5_000) {
+            while (runningService() != null || notifications.activeNotifications.any { it.id == 1 }) delay(10)
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -387,10 +426,11 @@ private class ControlledMetronomeOutput(
     private val sequencer = MetronomeSequencer(initial, 48_000)
     @Volatile var started = false
     @Volatile var stopped = false
+    @Volatile var acknowledgeStop = true
     override val routedDeviceId: Int? = null
     override val diagnostics = MetronomeAudioDiagnostics()
     override fun start(scope: CoroutineScope) { started = true; if (failStart) onFailure() }
-    override fun stop() { stopped = true }
+    override fun stop(): Boolean { stopped = true; return acknowledgeStop }
     override fun setTempo(bpm: Int) = sequencer.setTempo(bpm)
     override fun setPattern(denominator: BeatUnit, beats: List<BeatAccent>) = sequencer.setPattern(denominator, beats)
     override fun load(config: MetronomeConfig) = sequencer.setConfig(config)

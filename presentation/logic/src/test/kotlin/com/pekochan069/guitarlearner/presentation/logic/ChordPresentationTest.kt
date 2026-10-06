@@ -58,7 +58,7 @@ import org.junit.Test
 class ChordPresentationTest {
     @Test fun invalidCapoOctaveAndFretTextKeepAcceptedMusicAndDisableSaveUntilCorrected() = runTest {
         val port = ChordTestPort()
-        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions()).test {
+        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions(), ControlledTraining()).test {
             var state = awaitItem()
             assertTrue(state.chords.canSave)
             state.chord(ChordEvent.SetCapo("12x"))
@@ -93,7 +93,7 @@ class ChordPresentationTest {
         assertEquals(GuitarPitch(PitchClass.B, 3), parseGuitarPitch("C♭", "4"))
         assertEquals(null, parseGuitarPitch("B#", "6"))
         val port = ChordTestPort()
-        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions()).test {
+        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions(), ControlledTraining()).test {
             var state = awaitItem()
             state.chord(ChordEvent.SetNote(0, "B#"))
             state = stateWhere { it.chords.strings[0].tuning == "C3" }
@@ -122,7 +122,7 @@ class ChordPresentationTest {
             StringStop.Fretted(2), StringStop.Fretted(1), StringStop.Fretted(3)))
         val identity = ChordIdentity(PitchClass.A, ChordQuality.MinorSeventh)
         port.snapshot.value = port.snapshot.value.copy(lookup = ChordLookup.Ready(ChordQuery(port.snapshot.value.draft.context, identity), listOf(shape)))
-        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions()).test {
+        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions(), ControlledTraining()).test {
             var state = awaitItem()
             assertEquals("Am7/C", state.chords.lookupSymbol)
             state.chord(ChordEvent.CopyRepresentative)
@@ -145,7 +145,7 @@ class ChordPresentationTest {
     @Test fun typedSaveFailureKeepsDraftAndRepeatedTapsDoNotQueueDuplicateRecordOperations() = runTest {
         val port = ChordTestPort()
         port.pending = CompletableDeferred()
-        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions()).test {
+        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions(), ControlledTraining()).test {
             var state = awaitItem()
             state.chord(ChordEvent.Save)
             state.chord(ChordEvent.Save)
@@ -167,7 +167,7 @@ class ChordPresentationTest {
         val latest = CompletableDeferred<Either<ChordFailure, Unit>>()
         port.pendingCommands[ChordCommand.SetName("f")] = first
         port.pendingCommands[ChordCommand.SetName("fo")] = latest
-        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions()).test {
+        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions(), ControlledTraining()).test {
             var state = awaitItem()
             state.chord(ChordEvent.SetName("f"))
             state = stateWhere { it.chords.name == "f" && it.chords.canSave }
@@ -188,7 +188,7 @@ class ChordPresentationTest {
         val port = ChordTestPort()
         val contextResult = CompletableDeferred<Either<ChordFailure, Unit>>()
         port.pendingCommands[ChordCommand.SetCapo(2)] = contextResult
-        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions()).test {
+        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions(), ControlledTraining()).test {
             var state = awaitItem()
             state.chord(ChordEvent.SetCapo("2"))
             state = stateWhere { it.chords.capo == 2 }
@@ -209,7 +209,7 @@ class ChordPresentationTest {
         val contextResult = CompletableDeferred<Either<ChordFailure, Unit>>()
         port.pendingCommands[ChordCommand.SetCapo(2)] = contextResult
         port.pendingCommands[ChordCommand.SetName("Latest")] = CompletableDeferred(Either.Left(ChordFailure.WriteFailed))
-        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions()).test {
+        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions(), ControlledTraining()).test {
             var state = awaitItem()
             state.chord(ChordEvent.SetCapo("2"))
             state = stateWhere { it.chords.capo == 2 }
@@ -227,7 +227,7 @@ class ChordPresentationTest {
         val acknowledged = port.current.value.draft
         port.pendingCommands[ChordCommand.SetName("Changed")] = CompletableDeferred(Either.Left(ChordFailure.WriteFailed))
         val registry = SaveableStateRegistry(null) { true }
-        val presenter = FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions())
+        val presenter = FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions(), ControlledTraining())
         var saved: Map<String, List<Any?>> = emptyMap()
         presenterTestOf(presenter.presentWithRegistry(registry)) {
             var state = awaitItem()
@@ -248,7 +248,7 @@ class ChordPresentationTest {
         assertTrue(saved.isNotEmpty())
         val restarted = ChordTestPort()
         val restoredRegistry = SaveableStateRegistry(saved) { true }
-        val restoredPresenter = FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), restarted, ControlledProgressions())
+        val restoredPresenter = FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), restarted, ControlledProgressions(), ControlledTraining())
         presenterTestOf(restoredPresenter.presentWithRegistry(restoredRegistry)) {
             val state = awaitItem()
             assertEquals(saved.keys, restoredRegistry.performSave().keys)
@@ -273,7 +273,7 @@ class ChordPresentationTest {
             tuning = port.current.value.draft.context.tuning.withString(1, GuitarPitch(PitchClass.C, 4)))))
         val acknowledged = port.current.value.draft
         val registry = SaveableStateRegistry(null) { true }
-        val presenter = FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions())
+        val presenter = FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions(), ControlledTraining())
         var saved: Map<String, List<Any?>> = emptyMap()
         presenterTestOf(presenter.presentWithRegistry(registry)) {
             var state = awaitItem()
@@ -292,7 +292,7 @@ class ChordPresentationTest {
         assertTrue(saved.isNotEmpty())
         val restarted = ChordTestPort().apply { update(acknowledged) }
         val restoredRegistry = SaveableStateRegistry(saved) { true }
-        val restoredPresenter = FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), restarted, ControlledProgressions())
+        val restoredPresenter = FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), restarted, ControlledProgressions(), ControlledTraining())
         presenterTestOf(restoredPresenter.presentWithRegistry(restoredRegistry)) {
             val state = awaitItem()
             assertEquals(saved.keys, restoredRegistry.performSave().keys)
@@ -320,7 +320,7 @@ class ChordPresentationTest {
     @Test fun navigationLeavesMetronomeAloneAndEventsMapToTypedCommands() = runTest {
         val port = ChordTestPort()
         val metronome = ChordTestMetronome()
-        FoundationPresenter(ChordTestAppearance(), metronome, ControlledTuner(), port, ControlledProgressions()).test {
+        FoundationPresenter(ChordTestAppearance(), metronome, ControlledTuner(), port, ControlledProgressions(), ControlledTraining()).test {
             var state = awaitItem()
             state.eventSink(FoundationEvent.OpenFeature(FeatureId.Chords))
             state = stateWhere { it.destination == FoundationDestination.Feature(FeatureId.Chords) }
@@ -348,7 +348,7 @@ class ChordPresentationTest {
             StringStop.Fretted(3), StringStop.Fretted(1), StringStop.Open))
         port.update(port.snapshot.value.draft.copy(shape = stops))
         port.snapshot.value = port.snapshot.value.copy(readFailure = ChordFailure.ReadFailed)
-        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions()).test {
+        FoundationPresenter(ChordTestAppearance(), ChordTestMetronome(), ControlledTuner(), port, ControlledProgressions(), ControlledTraining()).test {
             val state = awaitItem()
             assertTrue(state.chords.readFailed)
             assertFalse(state.chords.canSave)

@@ -10,6 +10,18 @@ A capability for setting guitar practice conditions or inspecting and constructi
 **Training**:
 Exercises in identifying musical information by ear or by reading, including notes, intervals, chords, and scales. The menu category is 훈련 in Korean and Training in English.
 
+**Note identification**:
+A training exercise in identifying a note's name by ear or from staff notation, a guitar fretboard, or TAB. The answer does not distinguish octaves.
+
+**Interval identification**:
+A training exercise in identifying the pitch distance between two notes by ear or from staff notation, a guitar fretboard, or TAB.
+
+**Comparison note**:
+A named note that a learner can listen to when identifying another note by ear. It is distinct from the reference pitch used to define tuning.
+
+**Training session**:
+A finite sequence of identification questions with results for the completed sequence. An interrupted session is not a completed result.
+
 **Learning**:
 Explanations and visualizations of music theory, harmony, and guitar techniques. The menu category is 학습 in Korean and Learning in English.
 

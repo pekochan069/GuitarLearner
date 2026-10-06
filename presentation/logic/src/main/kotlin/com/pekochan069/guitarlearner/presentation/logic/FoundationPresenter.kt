@@ -1,6 +1,7 @@
 package com.pekochan069.guitarlearner.presentation.logic
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,6 +17,12 @@ import com.pekochan069.guitarlearner.domain.AppearanceFailure
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
 import com.pekochan069.guitarlearner.domain.Progressions
 import com.pekochan069.guitarlearner.domain.Chords
+import com.pekochan069.guitarlearner.domain.Training
+import com.pekochan069.guitarlearner.domain.TrainingRequest
+import com.pekochan069.guitarlearner.domain.TrainingStage
+import com.pekochan069.guitarlearner.domain.TrainingSettings
+import com.pekochan069.guitarlearner.domain.TrainingStorageStatus
+import com.pekochan069.guitarlearner.domain.TrainingFailure
 import com.pekochan069.guitarlearner.domain.LanguagePreference
 import com.pekochan069.guitarlearner.domain.BeatAccent
 import com.pekochan069.guitarlearner.domain.BeatUnit
@@ -52,6 +59,10 @@ import com.pekochan069.guitarlearner.domain.TunerSettingsPage
 import com.pekochan069.guitarlearner.presentation.contract.TunerActionUi
 import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
+import com.pekochan069.guitarlearner.presentation.contract.TrainingStageUi
+import com.pekochan069.guitarlearner.presentation.contract.TrainingPageUi
+import com.pekochan069.guitarlearner.presentation.contract.TrainingExerciseUi
+import com.pekochan069.guitarlearner.presentation.contract.TrainingEvent
 import com.slack.circuit.runtime.CircuitContext
 import com.slack.circuit.runtime.Navigator
 import com.slack.circuit.runtime.presenter.Presenter
@@ -66,11 +77,13 @@ class FoundationPresenter(
     private val tuner: Tuner,
     private val chords: Chords,
     private val progressions: Progressions,
+    private val training: Training,
     private val developmentSamplesEnabled: Boolean = false,
 ) : Presenter<FoundationState> {
     @Composable
     override fun present(): FoundationState {
         var destinationId by rememberSaveable { mutableStateOf("home") }
+        var trainingPage by rememberSaveable(stateSaver = TrainingPageSaver) { mutableStateOf<TrainingPageUi>(TrainingPageUi.Root) }
         var headstockLayout by rememberSaveable { mutableStateOf(HeadstockLayoutUi.ThreePlusThree) }
         var gallerySelected by rememberSaveable { mutableStateOf(true) }
         var overlay by rememberSaveable(stateSaver = OverlaySaver) { mutableStateOf<Overlay>(Overlay.None) }
@@ -80,6 +93,7 @@ class FoundationPresenter(
         val chordPresentation = presentChords(chords)
         val progressionPresentation = presentProgressions(progressions, chords)
         val tunerSnapshot by tuner.current.collectAsState()
+        val trainingSnapshot by training.current.collectAsState()
         var presetName by rememberSaveable { mutableStateOf("") }
         var savingPreset by remember { mutableStateOf(false) }
         var metronomeNotice by remember { mutableStateOf<MetronomeNotice?>(null) }
@@ -87,15 +101,30 @@ class FoundationPresenter(
         val commands = remember { Mutex() }
         val scope = rememberCoroutineScope()
         val samples = if (developmentSamplesEnabled) DevelopmentSample.entries else emptyList()
-        val destination = restoreDestination(destinationId, samples)
+        val destination = restoreDestination(destinationId, samples, trainingPage)
         val visibleOverlay = when {
             overlay == Overlay.Settings -> overlay
             destination == FoundationDestination.Feature(FeatureId.Metronome) -> overlay
             else -> Overlay.None
         }
 
+        LaunchedEffect(trainingSnapshot.storage, trainingSnapshot.settings, trainingSnapshot.stage, trainingPage, destinationId) {
+            val live = training.current.value
+            if (live.stage == TrainingStage.Setup && live.storage == TrainingStorageStatus.Ready && trainingPage is TrainingPageUi.Setup) {
+                trainingPage = live.settings.toExerciseUi()?.let { TrainingPageUi.Setup(it) } ?: TrainingPageUi.Root
+            }
+            if (destinationId == "feature:training" && trainingPage == TrainingPageUi.Root) {
+                training.submit(TrainingRequest.Exit)
+                destinationId = "home"
+            }
+        }
+
         fun navigate(next: FoundationDestination) {
             progressionPresentation.eventSink(ProgressionEvent.CloseSheet)
+            if (destinationId == "feature:training" && next != FoundationDestination.Feature(FeatureId.Training)) {
+                training.submit(TrainingRequest.Exit)
+                trainingPage = TrainingPageUi.Root
+            }
             if (destinationId == "feature:tuner" && next != FoundationDestination.Feature(FeatureId.Tuner)) {
                 tuner.submit(TunerRequest.Stop)
             }
@@ -103,12 +132,28 @@ class FoundationPresenter(
             destinationId = next.savedId()
         }
 
+        fun exitTraining() {
+            val settings = when (val stage = training.current.value.stage) {
+                is TrainingStage.Active -> stage.session.settings
+                is TrainingStage.Results -> stage.settings
+                TrainingStage.Setup -> null
+            }
+            if (settings != null) {
+                trainingPage = settings.toExerciseUi()?.let { TrainingPageUi.Setup(it) } ?: TrainingPageUi.Root
+                training.submit(TrainingRequest.Exit)
+            }
+        }
+
         fun navigateBack() {
             overlay = when (overlay) {
                 is Overlay.Overwrite -> Overlay.Presets
                 Overlay.Settings, Overlay.Presets -> Overlay.None
                 Overlay.None -> {
-                    navigate(FoundationDestination.Home)
+                    if (destinationId == "feature:training") {
+                        if (training.current.value.stage != TrainingStage.Setup) {
+                            exitTraining()
+                        } else navigate(FoundationDestination.Home)
+                    } else navigate(FoundationDestination.Home)
                     Overlay.None
                 }
             }
@@ -202,7 +247,7 @@ class FoundationPresenter(
 
         return FoundationState(
             destination = destination,
-            featureGroups = featureCatalog.filter { it.features.isNotEmpty() },
+            featureGroups = featureCatalog,
             developmentSamples = samples,
             canNavigateBack = destination != FoundationDestination.Home || visibleOverlay != Overlay.None,
             tuner = tunerSnapshot.toUi().copy(headstockLayout = headstockLayout),
@@ -223,6 +268,9 @@ class FoundationPresenter(
             gallerySelected = gallerySelected,
             chords = chordPresentation.state,
             progressions = progressionPresentation.state,
+            training = trainingSnapshot.toUi().let { ui ->
+                if (ui.stage is TrainingStageUi.Navigation) ui.copy(stage = TrainingStageUi.Navigation(trainingPage)) else ui
+            },
             settingsOpen = visibleOverlay == Overlay.Settings,
             theme = snapshot.theme.toOption(),
             language = snapshot.language?.toOption(),
@@ -230,6 +278,35 @@ class FoundationPresenter(
             eventSink = { event ->
                 when (event) {
                     is FoundationEvent.Progression -> progressionPresentation.eventSink(event.value)
+                    is FoundationEvent.Training -> if (destinationId == "home" || destinationId == "feature:training") {
+                        val live = training.current.value
+                        val setup = live.stage == TrainingStage.Setup
+                        val page = trainingPage
+                        when (val request = event.value) {
+                            is TrainingEvent.OpenExercise -> if (destinationId == "home" && setup && page == TrainingPageUi.Root && live.storage !is TrainingStorageStatus.Saving &&
+                                (live.storage as? TrainingStorageStatus.Failed)?.failure != TrainingFailure.SettingsReadFailed) {
+                                TrainingEvent.SetSettings(live.toUi().settings.copy(representation = request.exercise.format, subject = request.exercise.subject))
+                                    .toRequest()?.let(training::submit)
+                                trainingPage = TrainingPageUi.Setup(request.exercise)
+                                navigate(FoundationDestination.Feature(FeatureId.Training))
+                            }
+                            TrainingEvent.Start -> if (destinationId == "feature:training" && setup && page is TrainingPageUi.Setup && live.storage == TrainingStorageStatus.Ready &&
+                                page.exercise.format.name == live.settings.representation.name && page.exercise.subject.name == live.settings.subject.name) {
+                                request.toRequest()?.let(training::submit)
+                            }
+                            is TrainingEvent.SetSettings -> if (destinationId == "feature:training" && setup && page is TrainingPageUi.Setup &&
+                                request.settings.subject == page.exercise.subject && request.settings.representation == page.exercise.format) {
+                                request.toRequest()?.let(training::submit)
+                            }
+                            TrainingEvent.Exit -> if (destinationId == "feature:training" && !setup) {
+                                exitTraining()
+                            }
+                            TrainingEvent.RetrySettings -> request.toRequest()?.let(training::submit)
+                            is TrainingEvent.Answer, is TrainingEvent.Next, is TrainingEvent.Replay -> if (destinationId == "feature:training" && live.stage is TrainingStage.Active) {
+                                request.toRequest()?.let(training::submit)
+                            }
+                        }
+                    }
                     is FoundationEvent.Chord -> chordPresentation.eventSink(event.value)
                     is FoundationEvent.OpenFeature -> if (featureCatalog.any { event.id in it.features }) {
                         navigate(FoundationDestination.Feature(event.id))
@@ -310,16 +387,20 @@ class FoundationPresenter(
         private val tuner: Tuner,
         private val chords: Chords,
         private val progressions: Progressions,
+        private val training: Training,
         private val developmentSamplesEnabled: Boolean = false,
     ) : Presenter.Factory {
-        fun create(): FoundationPresenter = FoundationPresenter(appearance, metronome, tuner, chords, progressions, developmentSamplesEnabled)
+        fun create(): FoundationPresenter = FoundationPresenter(appearance, metronome, tuner, chords, progressions, training, developmentSamplesEnabled)
 
         override fun create(screen: Screen, navigator: Navigator, context: CircuitContext): Presenter<*>? =
             if (screen == FoundationScreen) create() else null
     }
 }
 
-private val featureCatalog = listOf(FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome, FeatureId.Tuner, FeatureId.Chords, FeatureId.Progressions)))
+private val featureCatalog = listOf(
+    FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome, FeatureId.Tuner, FeatureId.Chords, FeatureId.Progressions)),
+    FeatureGroup(FeatureCategory.Training, emptyList()),
+)
 
 private fun FoundationDestination.savedId(): String = when (this) {
     FoundationDestination.Home -> "home"
@@ -327,11 +408,32 @@ private fun FoundationDestination.savedId(): String = when (this) {
     is FoundationDestination.Sample -> "sample:${id.savedId}"
 }
 
-private fun restoreDestination(savedId: String, samples: List<DevelopmentSample>): FoundationDestination =
-    featureCatalog.flatMap { it.features }.firstOrNull { savedId == "feature:${it.savedId}" }
+private fun restoreDestination(savedId: String, samples: List<DevelopmentSample>, trainingPage: TrainingPageUi): FoundationDestination =
+    if (savedId == "feature:training" && trainingPage is TrainingPageUi.Setup) FoundationDestination.Feature(FeatureId.Training)
+    else featureCatalog.flatMap { it.features }.firstOrNull { savedId == "feature:${it.savedId}" }
         ?.let { FoundationDestination.Feature(it) }
         ?: samples.firstOrNull { savedId == "sample:${it.savedId}" }?.let { FoundationDestination.Sample(it) }
         ?: FoundationDestination.Home
+
+private val TrainingPageSaver = Saver<TrainingPageUi, Any>(
+    save = { page -> when (page) {
+        TrainingPageUi.Root -> listOf("root")
+        is TrainingPageUi.Setup -> listOf("setup", page.exercise.name)
+    } },
+    restore = { saved ->
+        val values = saved as? List<*>
+        val exercise = TrainingExerciseUi.entries.firstOrNull { it.name == values?.getOrNull(1) }
+        when (values?.firstOrNull()) {
+            "root" -> TrainingPageUi.Root
+            "setup" -> exercise?.let { TrainingPageUi.Setup(it) }
+            else -> null
+        }
+    },
+)
+
+private fun TrainingSettings.toExerciseUi(): TrainingExerciseUi? = TrainingExerciseUi.entries.firstOrNull {
+    it.format.name == representation.name && it.subject.name == subject.name
+}
 
 private sealed interface Overlay {
     data object None : Overlay

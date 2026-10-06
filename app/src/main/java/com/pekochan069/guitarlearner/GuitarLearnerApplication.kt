@@ -6,6 +6,7 @@ import com.pekochan069.guitarlearner.adapters.AndroidChordsHost
 import com.pekochan069.guitarlearner.adapters.AndroidMetronomeHost
 import com.pekochan069.guitarlearner.adapters.AndroidProgressionsHost
 import com.pekochan069.guitarlearner.adapters.AndroidTunerHost
+import com.pekochan069.guitarlearner.adapters.AndroidTrainingHost
 import com.pekochan069.guitarlearner.domain.Chords
 import com.pekochan069.guitarlearner.domain.Metronome
 import com.pekochan069.guitarlearner.domain.MetronomeCommand
@@ -13,6 +14,7 @@ import com.pekochan069.guitarlearner.domain.ProgressionCommand
 import com.pekochan069.guitarlearner.domain.Progressions
 import com.pekochan069.guitarlearner.domain.Tuner
 import com.pekochan069.guitarlearner.domain.TunerRequest
+import com.pekochan069.guitarlearner.domain.Training
 import com.pekochan069.guitarlearner.presentation.logic.FoundationPresenter
 import com.pekochan069.guitarlearner.ui.FoundationUiFactory
 import com.slack.circuit.foundation.Circuit
@@ -59,10 +61,11 @@ interface AppGraph {
     val progressionsHost: AndroidProgressionsHost
     val progressions: Progressions
     val tunerHostFactory: AndroidTunerHost.Factory
+    val trainingHostFactory: AndroidTrainingHost.Factory
     val chords: Chords
 
-    fun createPresenterFactory(tuner: Tuner): FoundationPresenter.Factory =
-        FoundationPresenter.Factory(appearanceHost, metronomeHost, tuner, chords, progressions, developmentSamplesEnabled = BuildConfig.DEBUG)
+    fun createPresenterFactory(tuner: Tuner, training: Training): FoundationPresenter.Factory =
+        FoundationPresenter.Factory(appearanceHost, metronomeHost, tuner, chords, progressions, training, developmentSamplesEnabled = BuildConfig.DEBUG)
 
     fun createCircuit(factory: FoundationPresenter.Factory): Circuit = Circuit.Builder()
         .addPresenterFactory(factory)
@@ -90,6 +93,11 @@ interface AppGraph {
     fun provideTunerFactory(application: Application, metronome: Metronome, progressions: Progressions): AndroidTunerHost.Factory =
         AndroidTunerHost.Factory(application, application.getSharedPreferences("tuner", Application.MODE_PRIVATE), metronome, progressions,
             onCreated = { (application as GuitarLearnerApplication).activeTuner = it })
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideTrainingFactory(application: Application, metronome: Metronome): AndroidTrainingHost.Factory =
+        AndroidTrainingHost.Factory(application, application.getSharedPreferences("training", Application.MODE_PRIVATE), metronome)
 
     @DependencyGraph.Factory
     fun interface Factory {

@@ -514,8 +514,7 @@ class ProgressionUiTest {
         Log.d("ProgressionUiDiagnostic", "$label screenshot: $path")
     }
     private fun show(locale: Locale, dark: Boolean, scale: Float) {
-        val circuit = Circuit.Builder().addPresenterFactory(FoundationPresenter.Factory(ProgressionUiAppearance(),
-            ProgressionUiMetronome(), FakeTuner(), chords, host)).addUiFactory(FoundationUiFactory).build()
+        val circuit = Circuit.Builder().addPresenterFactory(FoundationPresenter.Factory(ProgressionUiAppearance(), ProgressionUiMetronome(), FakeTuner(), chords, host, TrainingTestPort())).addUiFactory(FoundationUiFactory).build()
         compose.runOnUiThread {
             val localized = ContextThemeWrapper(compose.activity, compose.activity.theme).apply {
                 applyOverrideConfiguration(Configuration(compose.activity.resources.configuration).apply { setLocale(locale); fontScale = scale })
