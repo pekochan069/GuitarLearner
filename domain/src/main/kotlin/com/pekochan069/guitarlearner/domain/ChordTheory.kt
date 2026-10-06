@@ -4,13 +4,22 @@ import java.util.Collections
 
 object ChordTheory {
     private val rootLetters = listOf(0, 0, 1, 2, 2, 3, 3, 4, 5, 5, 6, 6)
-    private val letters = listOf("C", "D", "E", "F", "G", "A", "B")
-    private val naturals = listOf(0, 2, 4, 5, 7, 9, 11)
+
+    fun degree(number: Int, alteration: Int = 0): ChordDegree {
+        require(number > 0)
+        return ChordDegree(number, alteration, Math.floorMod(NoteLetter.entries[(number - 1) % 7].naturalSemitones + alteration, 12))
+    }
+
+    fun spell(tonic: SpelledNote, degree: ChordDegree): SpelledNote {
+        val letter = NoteLetter.entries[(tonic.letter.ordinal + degree.number - 1) % 7]
+        val accidental = Math.floorMod(tonic.pitchClass.ordinal + degree.semitones - letter.naturalSemitones + 6, 12) - 6
+        return SpelledNote(letter, accidental)
+    }
 
     private fun formula(source: String, vararg optional: Int): ChordFormula = ChordFormula(source.split(' ').map { token ->
         val alteration = token.count { it == 'b' } * -1 + token.count { it == '#' }
         val number = token.trimStart('b', '#').toInt()
-        ChordDegree(number, alteration, (naturals[(number - 1) % 7] + alteration + 12) % 12)
+        degree(number, alteration)
     }, optional.toSet())
 
     private val formulas = listOf(
@@ -92,22 +101,23 @@ object ChordTheory {
     fun degree(identity: ChordIdentity, pitch: PitchClass): ChordDegree? = formula(identity.quality).degrees
         .firstOrNull { identity.root.transpose(it.semitones) == pitch }
 
-    fun noteName(identity: ChordIdentity?, pitch: PitchClass): String {
-        val role = identity?.let { degree(it, pitch) } ?: return pitch.symbol
-        val letter = (rootLetters[identity.root.ordinal] + role.number - 1) % 7
-        val accidental = Math.floorMod(pitch.ordinal - naturals[letter] + 6, 12) - 6
-        return letters[letter] + when {
-            accidental < 0 -> "♭".repeat(-accidental)
-            else -> "♯".repeat(accidental)
-        }
-    }
+    fun noteName(identity: ChordIdentity?, pitch: PitchClass): String = spelling(identity, pitch).symbol
 
     fun pitchName(identity: ChordIdentity?, midi: Int): String {
-        val name = noteName(identity, PitchClass.entries[Math.floorMod(midi, 12)])
-        val natural = naturals[letters.indexOf(name.take(1))]
-        val accidental = name.count { it == '♯' } - name.count { it == '♭' }
-        val octave = (midi - natural - accidental) / 12 - 1
-        return name + octave
+        val note = spelling(identity, PitchClass.entries[Math.floorMod(midi, 12)])
+        val octave = Math.floorDiv(midi - note.letter.naturalSemitones - note.accidental, 12) - 1
+        return note.symbol + octave
+    }
+
+    private fun spelling(identity: ChordIdentity?, pitch: PitchClass): SpelledNote {
+        val selected = identity ?: return canonical(pitch)
+        val role = degree(selected, pitch) ?: return canonical(pitch)
+        return spell(canonical(selected.root), role)
+    }
+
+    private fun canonical(pitch: PitchClass): SpelledNote {
+        val letter = NoteLetter.entries[rootLetters[pitch.ordinal]]
+        return SpelledNote(letter, Math.floorMod(pitch.ordinal - letter.naturalSemitones + 6, 12) - 6)
     }
 
     fun representatives(query: ChordQuery): List<ChordShape> {
