@@ -402,6 +402,7 @@ class ProgressionUiTest {
 
     private fun click(tag: String, scroll: Boolean = false) {
         try {
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().size == 1 }
             val node = compose.onNodeWithTag(tag)
             if (scroll) node.performScrollTo()
             node.assertIsDisplayed().assertIsEnabled().assertHasClickAction().performClick()
