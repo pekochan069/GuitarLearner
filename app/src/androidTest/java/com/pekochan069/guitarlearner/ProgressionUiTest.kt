@@ -275,11 +275,49 @@ class ProgressionUiTest {
         compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Stopped && host.current.value.draft.content.steps == reordered.drop(1) }
         compose.onNodeWithTag("progression_sheet").assertDoesNotExist()
         compose.onNodeWithTag("progression_active_fretboard").assertDoesNotExist()
+        compose.onNodeWithTag("progression_removal_feedback").assertIsDisplayed()
+        compose.onNodeWithText("C removed").assertIsDisplayed()
+        click("progression_dismiss_removal")
         click("progression_play")
         compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Playing }
         click("progression_stop")
         compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Stopped }
         assertEquals(originalSource, chords.current.value)
+    }
+
+    @Test fun quickRemovalConfirmsDuplicateChordsRestsAndTheLastItemWithoutMovingControls(): Unit {
+        runBlocking {
+            repeat(2) { host.execute(ProgressionCommand.Insert(ProgressionStep.Chord("C", chords.current.value.draft.shape))) }
+            host.execute(ProgressionCommand.Insert(ProgressionStep.Rest()))
+        }
+        show(Locale.KOREAN, true, 1f)
+        click("feature_Progressions")
+        val viewport = compose.onNodeWithTag("progression_list").getUnclippedBoundsInRoot()
+        val timing = compose.onNodeWithTag("progression_settings").getUnclippedBoundsInRoot()
+        val transport = compose.onNodeWithTag("progression_transport").getUnclippedBoundsInRoot()
+        val original = host.current.value.draft.content.steps
+        click("progression_quick_remove_1")
+        compose.waitUntil(5_000) { host.current.value.draft.content.steps == listOf(original[0], original[2]) }
+        compose.onNodeWithTag("progression_removal_feedback").assertIsDisplayed()
+        compose.onNodeWithText("C 삭제됨").assertIsDisplayed()
+        assertEquals(viewport, compose.onNodeWithTag("progression_list").getUnclippedBoundsInRoot())
+        assertEquals(timing, compose.onNodeWithTag("progression_settings").getUnclippedBoundsInRoot())
+        assertEquals(transport, compose.onNodeWithTag("progression_transport").getUnclippedBoundsInRoot())
+        click("progression_quick_remove_1")
+        compose.waitUntil(5_000) { host.current.value.draft.content.steps == listOf(original[0]) }
+        compose.onNodeWithTag("progression_removal_feedback").assertIsDisplayed()
+        compose.onNodeWithText("쉼표 삭제됨").assertIsDisplayed()
+        diagnostic("removal_feedback_ko_dark")
+        click("progression_dismiss_removal")
+        compose.onNodeWithTag("progression_removal_feedback").assertDoesNotExist()
+        click("progression_quick_remove_0")
+        compose.waitUntil(5_000) { host.current.value.draft.content.steps.isEmpty() }
+        compose.onNodeWithTag("progression_removal_feedback").assertIsDisplayed()
+        compose.onNodeWithText("C 삭제됨").assertIsDisplayed()
+        compose.onNodeWithTag("progression_empty").assertIsDisplayed()
+        compose.onNodeWithTag("progression_play").assertIsNotEnabled()
+        compose.waitUntil(6_000) { compose.onAllNodesWithTag("progression_removal_feedback").fetchSemanticsNodes().isEmpty() }
+        assertEquals(transport, compose.onNodeWithTag("progression_transport").getUnclippedBoundsInRoot())
     }
 
     @Test fun aRestClearsTheActiveFretboardWithoutMovingTheSequence(): Unit {

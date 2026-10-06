@@ -38,6 +38,7 @@ private data class ProgressionDrag(val origin: Int, val destination: Int, val po
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ProgressionSequence(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit, modifier: Modifier,
     onDragVisual: (ProgressionDragVisual?) -> Unit, header: @Composable () -> Unit) {
@@ -49,12 +50,24 @@ internal fun ProgressionSequence(state: ProgressionUiState, eventSink: (Progress
     var nextKey by remember { mutableIntStateOf(state.steps.size) }
     var itemKeys by remember { mutableStateOf(state.steps.indices.toList()) }
     var pendingNotice by remember { mutableStateOf<ProgressionNotice?>(null) }
+    var requestedRemoval by remember { mutableStateOf<Int?>(null) }
     if (previousSteps != state.steps) {
         val accepted = pending?.takeIf { sameRows(it.preview(previousSteps), state.steps) }
-        itemKeys = if (accepted != null) itemKeys.moved(accepted.origin, accepted.destination)
-            else List(state.steps.size) { nextKey++ }
+        val removed = (requestedRemoval ?: state.removedStep?.index)?.takeIf { index ->
+            previousSteps.size == state.steps.size + 1 && index in previousSteps.indices &&
+                sameRows(previousSteps.filterIndexed { i, _ -> i != index }, state.steps)
+        }
+        itemKeys = when {
+            accepted != null -> itemKeys.moved(accepted.origin, accepted.destination)
+            removed != null -> itemKeys.filterIndexed { index, _ -> index != removed }
+            sameRows(previousSteps, state.steps) -> itemKeys
+            state.steps.size > previousSteps.size && sameRows(previousSteps, state.steps.take(previousSteps.size)) ->
+                itemKeys + List(state.steps.size - previousSteps.size) { nextKey++ }
+            else -> List(state.steps.size) { nextKey++ }
+        }
         previousSteps = state.steps
         pending = null
+        requestedRemoval = null
     } else if (pending != null && state.notice != null && state.notice != pendingNotice) pending = null
     val currentSink by rememberUpdatedState(eventSink)
     val visualSink by rememberUpdatedState(onDragVisual)
@@ -103,14 +116,15 @@ internal fun ProgressionSequence(state: ProgressionUiState, eventSink: (Progress
             val playingDescription = stringResource(R.string.progression_playing)
             val earlier = stringResource(R.string.progression_up)
             val later = stringResource(R.string.progression_down)
-            Surface(Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).graphicsLayer { alpha = if (dragged) 0f else 1f },
+            Surface(Modifier.animateItem(fadeInSpec = null, placementSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec()).graphicsLayer { alpha = if (dragged) 0f else 1f },
                 shape = MaterialTheme.shapes.large,
                 color = when { dragged -> MaterialTheme.colorScheme.primaryContainer
                     step.index == state.playingIndex -> MaterialTheme.colorScheme.tertiaryContainer
                     else -> MaterialTheme.colorScheme.surfaceContainerLow }) {
                 ListItem(headlineContent = { Text(title) }, supportingContent = { Text(step.noteLabel()) },
                     trailingContent = {
-                        IconButton(onClick = { currentSink(ProgressionEvent.Remove(step.index)) }, enabled = enabled && drag == null && pending == null,
+                        IconButton(onClick = { requestedRemoval = step.index; currentSink(ProgressionEvent.Remove(step.index)) }, enabled = enabled && drag == null && pending == null,
                             modifier = Modifier.size(48.dp).testTag("progression_quick_remove_${step.index}")) {
                             Icon(painterResource(R.drawable.ic_delete), stringResource(R.string.progression_remove_named, title, step.index + 1))
                         }

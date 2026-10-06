@@ -20,7 +20,8 @@ data class ProgressionUiState(val name: String, val steps: List<ProgressionStepU
     val pendingChange: Boolean, val editor: ChordUiState, val sheet: ProgressionSheetUi, val editingIndex: Int?,
     val chordSource: ProgressionChordSourceUi, val replacement: ProgressionReplacementUi?, val hasUnsavedChanges: Boolean,
     val invalidSettings: Boolean, val canPlay: Boolean, val busy: Boolean, val unsynced: Boolean, val readFailed: Boolean,
-    val canSave: Boolean, val records: List<SavedProgressionUi>, val notice: ProgressionNotice?)
+    val canSave: Boolean, val records: List<SavedProgressionUi>, val notice: ProgressionNotice?,
+    val removedStep: ProgressionStepUi? = null)
 sealed interface ProgressionEvent {
     data class Select(val index: Int) : ProgressionEvent
     data class OpenStep(val index: Int) : ProgressionEvent
@@ -37,6 +38,7 @@ sealed interface ProgressionEvent {
     data class SetTie(val index: Int, val value: Boolean) : ProgressionEvent
     data class Move(val index: Int, val delta: Int) : ProgressionEvent
     data class Remove(val index: Int) : ProgressionEvent
+    data object DismissRemoval : ProgressionEvent
     data class SetName(val value: String) : ProgressionEvent
     data class SetTempo(val value: String) : ProgressionEvent
     data class SetNumerator(val value: String) : ProgressionEvent

@@ -9,6 +9,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
@@ -250,6 +251,38 @@ class ProgressionPresentationTest {
             val failed = stateWhere { it.progressions.notice == ProgressionNotice.WriteFailed }
             assertEquals(listOf(ProgressionCommand.Move(1, 3), ProgressionCommand.Remove(0)), port.commands)
             assertEquals(ProgressionSheetUi.None, failed.progressions.sheet)
+            assertNull(failed.progressions.removedStep)
+        }
+    }
+    @Test fun acceptedRemovalReportsTheActualStepAndRepeatedRemovalRestartsItsTimeout() = runTest {
+        val port = ControlledProgressions()
+        port.current.value = ProgressionWorkspace(draft = ProgressionDraft(content = ProgressionContent(steps =
+            listOf(ProgressionStep.Chord("C", shape), ProgressionStep.Chord("C", shape), ProgressionStep.Rest()))))
+        port.onCommand = { command -> if (command is ProgressionCommand.Remove) {
+            val draft = port.current.value.draft
+            port.current.value = port.current.value.copy(draft = draft.copy(content = draft.content.copy(steps =
+                draft.content.steps.filterIndexed { index, _ -> index != command.index })))
+        } }
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+            var state = awaitItem()
+            state.progression(ProgressionEvent.Remove(0))
+            state = stateWhere { it.progressions.steps.size == 2 && it.progressions.removedStep != null }
+            assertEquals("C", state.progressions.removedStep?.name)
+            assertFalse(state.progressions.removedStep!!.rest)
+            advanceTimeBy(2_500); runCurrent()
+            state.progression(ProgressionEvent.Remove(0))
+            state = stateWhere { it.progressions.steps.size == 1 && it.progressions.removedStep != null }
+            advanceTimeBy(2_000); runCurrent()
+            port.current.value = port.current.value.copy(selectedIndex = 0)
+            state = stateWhere { it.progressions.selectedIndex == 0 }
+            assertNotNull(state.progressions.removedStep)
+            advanceTimeBy(2_001); runCurrent()
+            state = stateWhere { it.progressions.removedStep == null }
+            state.progression(ProgressionEvent.Remove(0))
+            state = stateWhere { it.progressions.steps.isEmpty() && it.progressions.removedStep != null }
+            assertTrue(state.progressions.removedStep!!.rest)
+            state.progression(ProgressionEvent.DismissRemoval)
+            stateWhere { it.progressions.removedStep == null }
         }
     }
     @Test fun stepInspectionKeepsPlaybackAndSelectedStartOnlyClosesAfterAcceptance() = runTest {

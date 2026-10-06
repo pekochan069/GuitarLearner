@@ -130,6 +130,7 @@
     <string name="overwrite_preset">덮어쓰기</string>
     <string name="cancel_action">취소</string>
     <string name="dismiss_notice">알림 닫기</string>
+    <string name="progression_removed">%1$s 삭제됨</string>
     <string name="metronome_invalid_configuration">40~240 BPM과 한 마디에 1~16박을 사용하세요.</string>
     <string name="preset_invalid_name">프리셋 이름을 입력하세요.</string>
     <string name="preset_exists">같은 이름의 프리셋이 있습니다. 덮어쓰려면 확인하세요.</string>

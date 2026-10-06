@@ -5,6 +5,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.pekochan069.guitarlearner.domain.*
 import com.pekochan069.guitarlearner.presentation.contract.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -38,6 +39,11 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
     var numerator by rememberSaveable { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<ProgressionNotice?>(null) }
+    var removedStep by remember { mutableStateOf<ProgressionStepUi?>(null) }
+    var removalGeneration by remember { mutableIntStateOf(0) }
+    LaunchedEffect(removalGeneration) {
+        if (removedStep != null) { delay(4_000); removedStep = null }
+    }
     val commands = remember { Mutex() }
     val scope = rememberCoroutineScope()
     fun execute(record: Boolean = false, after: () -> Unit = {}, validate: () -> ProgressionNotice? = { null }, command: () -> ProgressionCommand) {
@@ -136,12 +142,8 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
     }
     val playback = workspace.playback
     val position = when (playback) { is ProgressionPlayback.Playing -> playback.position; is ProgressionPlayback.Paused -> playback.position; else -> null }
-    val state = ProgressionUiState(workspace.draft.name, content.steps.mapIndexed { index, step ->
-        val chord = step as? ProgressionStep.Chord
-        val ui = chord?.let { progressionChordUi(ChordTheory.normalize(ChordDraft(it.name, content.context, it.shape)), emptyList()) }
-        ProgressionStepUi(index, chord == null, chord?.name.orEmpty(), ui?.soundingSymbol, ui?.shapeSymbol, ui?.strings.orEmpty(),
-            NoteValueUi.valueOf(step.duration.value.name), step.duration.dotted, chord?.tieToNext == true, content.canTie(index))
-    }, workspace.selectedIndex, bpmInput, content.timing.bpm, bpmError, numeratorInput, content.timing.numerator, numeratorError,
+    val state = ProgressionUiState(workspace.draft.name, content.steps.mapIndexed { index, step -> step.toUi(index, content) },
+        workspace.selectedIndex, bpmInput, content.timing.bpm, bpmError, numeratorInput, content.timing.numerator, numeratorError,
         BeatUnitUi.valueOf(content.timing.denominator.name), content.metronomeEnabled, content.loop,
         when (playback) { is ProgressionPlayback.Stopped -> ProgressionTransportUi.Stopped; ProgressionPlayback.Preparing -> ProgressionTransportUi.Preparing
             is ProgressionPlayback.Playing -> ProgressionTransportUi.Playing; is ProgressionPlayback.Paused -> ProgressionTransportUi.Paused
@@ -155,7 +157,7 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             && !invalidSettings,
         workspace.records.map { SavedProgressionUi(it.id, it.name, it.content.steps.size) },
         notice ?: workspace.actionFailure?.let { ProgressionNotice.valueOf(it.name) }
-            ?: (playback as? ProgressionPlayback.Failed)?.failure?.let { ProgressionNotice.valueOf(it.name) })
+            ?: (playback as? ProgressionPlayback.Failed)?.failure?.let { ProgressionNotice.valueOf(it.name) }, removedStep)
     fun pitch(index: Int) {
         val accepted = content.context.tuning.pitches[index]
         if (parseGuitarPitch(notes[index] ?: accepted.note.symbol, octaves[index] ?: accepted.octave.toString()) == null) return
@@ -253,8 +255,14 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
             is ProgressionEvent.Move -> send(ProgressionCommand.Move(event.index, event.index + event.delta))
             is ProgressionEvent.Remove -> {
                 val request = sheetGeneration
-                execute(after = { closeSheet(request) }) { ProgressionCommand.Remove(event.index) }
+                var removed: ProgressionStepUi? = null
+                execute(after = { closeSheet(request); removedStep = removed; removalGeneration++ }) {
+                    val current = progressions.current.value.draft.content
+                    removed = current.steps.getOrNull(event.index)?.toUi(event.index, current)
+                    ProgressionCommand.Remove(event.index)
+                }
             }
+            ProgressionEvent.DismissRemoval -> removedStep = null
             is ProgressionEvent.SetName -> send(ProgressionCommand.SetName(event.value))
             is ProgressionEvent.SetTempo -> { tempo = event.value; event.value.toIntOrNull()?.takeIf { it in 40..240 }?.let { send(ProgressionCommand.SetTempo(it)) } }
             is ProgressionEvent.SetNumerator -> { numerator = event.value; event.value.toIntOrNull()?.takeIf { it in 1..16 }?.let { value -> execute {
@@ -311,6 +319,12 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
 }
 
 private fun <T> List<T>.updated(index: Int, value: T): List<T> = mapIndexed { i, old -> if (i == index) value else old }
+private fun ProgressionStep.toUi(index: Int, content: ProgressionContent): ProgressionStepUi {
+    val chord = this as? ProgressionStep.Chord
+    val ui = chord?.let { progressionChordUi(ChordTheory.normalize(ChordDraft(it.name, content.context, it.shape)), emptyList()) }
+    return ProgressionStepUi(index, chord == null, chord?.name.orEmpty(), ui?.soundingSymbol, ui?.shapeSymbol, ui?.strings.orEmpty(),
+        NoteValueUi.valueOf(duration.value.name), duration.dotted, chord?.tieToNext == true, content.canTie(index))
+}
 private fun progressionChordSource(name: String): ProgressionChordSourceUi =
     if (name == "Saved") ProgressionChordSourceUi.Manual else ProgressionChordSourceUi.valueOf(name)
 private fun List<Int>.chordShape(): ChordShape = ChordShape(map { when (it) {

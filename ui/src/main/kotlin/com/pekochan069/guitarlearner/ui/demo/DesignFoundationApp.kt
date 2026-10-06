@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -57,6 +58,7 @@ import com.pekochan069.guitarlearner.presentation.contract.FeatureId
 import com.pekochan069.guitarlearner.presentation.contract.FoundationDestination
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.FoundationState
+import com.pekochan069.guitarlearner.presentation.contract.ProgressionEvent
 import com.pekochan069.guitarlearner.presentation.contract.LanguageOption
 import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
@@ -142,6 +144,16 @@ fun DesignFoundationApp(
             },
             bottomBar = {
                 if (progressions) ProgressionTransportBar(state.progressions) { state.eventSink(FoundationEvent.Progression(it)) }
+            },
+            snackbarHost = {
+                if (progressions) state.progressions.removedStep?.let { removed ->
+                    Snackbar(Modifier.padding(16.dp).testTag("progression_removal_feedback").semantics { liveRegion = LiveRegionMode.Polite }, dismissAction = {
+                        IconButton(onClick = { state.eventSink(FoundationEvent.Progression(ProgressionEvent.DismissRemoval)) },
+                            modifier = Modifier.testTag("progression_dismiss_removal")) {
+                            Icon(painterResource(R.drawable.ic_close), stringResource(R.string.dismiss_notice))
+                        }
+                    }) { Text(stringResource(R.string.progression_removed, removed.title())) }
+                }
             },
         ) { padding ->
             Box(
