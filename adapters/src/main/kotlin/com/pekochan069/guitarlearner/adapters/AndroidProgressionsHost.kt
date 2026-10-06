@@ -96,7 +96,7 @@ class AndroidProgressionsHost(
         var selected = state.selectedIndex
         val next = when (command) {
             is ProgressionCommand.Insert -> {
-                val at = (selected + 1).coerceIn(0, steps.size)
+                val at = steps.size
                 steps.add(at, command.step); selected = at
                 draft.copy(content = content.withEditedSteps(steps))
             }

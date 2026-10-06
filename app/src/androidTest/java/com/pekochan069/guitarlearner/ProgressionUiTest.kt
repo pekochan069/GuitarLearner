@@ -91,10 +91,13 @@ class ProgressionUiTest {
         click("progression_tie_0", scroll = true)
         compose.waitUntil(5_000) { (host.current.value.draft.content.steps[0] as ProgressionStep.Chord).tieToNext }
         closeSheet()
-        step(1)
+        val tiedChords = host.current.value.draft.content.steps
+        step(0)
         closeSheet()
         click("progression_add_rest")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == 3 }
+        assertEquals(tiedChords, host.current.value.draft.content.steps.take(2))
+        assertTrue(host.current.value.draft.content.steps[2] is ProgressionStep.Rest)
         step(2)
         click("progression_up_2", scroll = true)
         compose.waitUntil(5_000) { host.current.value.draft.content.steps[1] is ProgressionStep.Rest }
@@ -199,6 +202,10 @@ class ProgressionUiTest {
         val identities = listOf(ChordIdentity(PitchClass.C, ChordQuality.Major), ChordIdentity(PitchClass.A, ChordQuality.Minor),
             ChordIdentity(PitchClass.F, ChordQuality.Major), ChordIdentity(PitchClass.G, ChordQuality.Major))
         identities.forEachIndexed { index, identity ->
+            if (index > 0) {
+                step(0)
+                closeSheet()
+            }
             click("progression_add_chord")
             compose.onNodeWithTag("progression_root").assertIsDisplayed()
             compose.onNodeWithTag("progression_quality").assertIsDisplayed()
