@@ -7,7 +7,6 @@ import android.view.ContextThemeWrapper
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
@@ -192,7 +191,7 @@ class ProgressionUiTest {
         compose.onNodeWithTag("progression_empty").assertIsDisplayed()
         compose.onNodeWithTag("progression_add_chord").assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithTag("progression_transport").assertIsDisplayed()
-        compose.onNodeWithTag("progression_settings").assertTextContains("90 BPM").assertTextContains("4/4")
+        compose.onNodeWithTag("progression_settings").assertTextContains("90 BPM · 4/4")
         compose.onNodeWithTag("progression_name").assertDoesNotExist()
         val identities = listOf(ChordIdentity(PitchClass.C, ChordQuality.Major), ChordIdentity(PitchClass.A, ChordQuality.Minor),
             ChordIdentity(PitchClass.F, ChordQuality.Major), ChordIdentity(PitchClass.G, ChordQuality.Major))
@@ -305,11 +304,18 @@ class ProgressionUiTest {
         click("feature_Progressions")
         val original = host.current.value.draft.content.steps
         val viewport = compose.onNodeWithTag("progression_list").fetchSemanticsNode().boundsInRoot
+        val header = compose.onNodeWithTag("destination_title").fetchSemanticsNode().boundsInRoot
         val footer = compose.onNodeWithTag("progression_transport").fetchSemanticsNode().boundsInRoot
-        beginDrag(0, Offset(24f, footer.center.y - viewport.top))
+        beginDrag(0, Offset(24f, header.center.y - viewport.top))
         compose.waitUntil(5_000) { compose.onNodeWithTag("progression_drag_overlay").isDisplayed() }
+        val aboveHeader = compose.onNodeWithTag("progression_drag_overlay").fetchSemanticsNode().boundsInRoot
+        assertTrue("The dragged card must cross the app header", aboveHeader.top < header.bottom && aboveHeader.bottom > header.top)
+        diagnostic("drag_overlay_above_header")
+        compose.onNodeWithTag("progression_list").performTouchInput { moveTo(Offset(24f, footer.center.y - viewport.top), delayMillis = 200) }
+        compose.waitUntil(5_000) { compose.onNodeWithTag("progression_drag_overlay").fetchSemanticsNode().boundsInRoot.bottom > footer.top }
         val overlay = compose.onNodeWithTag("progression_drag_overlay").fetchSemanticsNode().boundsInRoot
         assertTrue("The dragged card must extend beyond the list and over the footer", overlay.bottom > viewport.bottom && overlay.bottom > footer.top)
+        diagnostic("drag_overlay_above_footer")
         assertEquals(original, host.current.value.draft.content.steps)
         compose.onNodeWithTag("progression_list").performTouchInput { cancel() }
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("progression_drag_overlay").fetchSemanticsNodes().isEmpty() }
@@ -351,10 +357,23 @@ class ProgressionUiTest {
         val last = compose.onNodeWithTag("progression_step_$destination").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val start = Offset(first.left + first.width * 0.25f - viewport.left, first.center.y - viewport.top)
         val end = Offset(start.x, last.center.y - viewport.top)
-        compose.onNodeWithTag("progression_list").performTouchInput {
-            val hold = viewConfiguration.longPressTimeoutMillis + 100
-            swipe(curve = { time -> if (time <= hold) start else lerp(start, end, (time - hold) / 400f) },
-                durationMillis = hold + 400, keyTimes = listOf(hold))
+        val automatic = compose.mainClock.autoAdvance
+        try {
+            compose.mainClock.autoAdvance = false
+            compose.onNodeWithTag("progression_list").performTouchInput {
+                down(start)
+                moveTo(start, delayMillis = viewConfiguration.longPressTimeoutMillis + 100)
+                moveTo(end, delayMillis = 200)
+            }
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            diagnostic("drag_neighbors_start")
+            compose.mainClock.advanceTimeBy(32)
+            compose.waitForIdle()
+            diagnostic("drag_neighbors_mid")
+            compose.onNodeWithTag("progression_list").performTouchInput { up() }
+        } finally {
+            compose.mainClock.autoAdvance = automatic
         }
     }
     private fun beginDrag(origin: Int, end: Offset) {
