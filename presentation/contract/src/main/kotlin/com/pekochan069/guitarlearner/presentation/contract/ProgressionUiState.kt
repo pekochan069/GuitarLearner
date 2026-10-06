@@ -5,7 +5,7 @@ enum class ProgressionNotice { InvalidInput, InvalidName, EmptyShape, InvalidTie
     ReadFailed, WriteFailed, FocusDenied, ServiceUnavailable, AudioUnavailable, ShapeChanged }
 enum class ProgressionTransportUi { Stopped, Preparing, Playing, Paused, Failed }
 enum class ProgressionSheetUi { None, Step, Chord, Settings, Save, Collection }
-enum class ProgressionChordSourceUi { Named, Saved, Manual }
+enum class ProgressionChordSourceUi { Named, Manual }
 sealed interface ProgressionReplacementUi {
     data object NewDraft : ProgressionReplacementUi
     data class Load(val id: String, val name: String) : ProgressionReplacementUi

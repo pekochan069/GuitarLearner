@@ -113,9 +113,7 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
         lookupStrings = if (namedShape == null) emptyList() else editorDraft.strings(),
         lookupNotes = editorDraft.strings().mapNotNull { it.note }.distinct().joinToString(" · "),
         lookupOmitted = candidate?.omitted?.joinToString(", ") { it.symbol }.orEmpty(),
-        representativeIndex = ready?.selectedIndex ?: 0, representativeCount = ready?.shapes?.size ?: 0).let {
-            if (source == ProgressionChordSourceUi.Saved) it.copy(canSave = false) else it
-        }
+        representativeIndex = ready?.selectedIndex ?: 0, representativeCount = ready?.shapes?.size ?: 0)
     val bpmInput = tempo ?: content.timing.bpm.toString()
     val numeratorInput = numerator ?: content.timing.numerator.toString()
     val bpmError = bpmInput.toIntOrNull()?.let { it !in 40..240 } ?: true
@@ -202,7 +200,6 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
                 val accepted = when (ProgressionChordSourceUi.valueOf(sourceName)) {
                     ProgressionChordSourceUi.Named -> currentReady?.shapes?.getOrNull(currentReady.selectedIndex)
                     ProgressionChordSourceUi.Manual -> stops.chordShape()
-                    ProgressionChordSourceUi.Saved -> null
                 }
                 if (sheetName == ProgressionSheetUi.Chord.name && accepted != null && editor.canSave && !invalidSettings) {
                     val request = sheetGeneration

@@ -1,14 +1,13 @@
 package com.pekochan069.guitarlearner.ui.demo
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -22,35 +21,26 @@ import java.math.BigDecimal
 fun ProgressionTool(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit, metronomeStatus: @Composable () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val shortViewport = maxHeight < 300.dp
+        val wideViewport = maxWidth >= 600.dp
+        val playbackHeight = maxHeight * 0.5f
+        val showingPlayback = state.transport in listOf(ProgressionTransportUi.Playing, ProgressionTransportUi.Paused)
         Column(Modifier.fillMaxSize().padding(16.dp).testTag("progression_tool"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (!shortViewport) ProgressionAddActions(state, eventSink)
-            LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("progression_list"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (shortViewport) item { ProgressionAddActions(state, eventSink) }
-                item { metronomeStatus() }
-                item { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { ProgressionWarnings(state, eventSink) } }
-                if (state.name.isNotBlank()) item { Text(state.name, Modifier.testTag("progression_draft_name"), style = MaterialTheme.typography.titleSmall) }
-                if (state.steps.isEmpty()) item {
-                    Text(stringResource(R.string.progression_empty), Modifier.testTag("progression_empty"), style = MaterialTheme.typography.bodyMedium)
-                }
-                items(state.steps) { step ->
-                    val highlighted = step.index == state.playingIndex
-                    val playing = highlighted && state.transport == ProgressionTransportUi.Playing
-                    val playingDescription = stringResource(R.string.progression_playing)
-                    Surface(shape = MaterialTheme.shapes.large,
-                        color = if (highlighted) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
-                        ListItem(headlineContent = { Text(step.title()) },
-                            supportingContent = { Text(listOfNotNull(step.name.takeIf { it.isNotBlank() },
-                                step.sounding?.takeIf { it != step.shape }?.let { stringResource(R.string.progression_sounding, it) },
-                                step.durationLabel(state.denominator), if (step.tied) stringResource(R.string.progression_tie) else null).joinToString(" · ")) },
-                            leadingContent = { Text((step.index + 1).toString(), style = MaterialTheme.typography.labelLarge) },
-                            trailingContent = { Icon(painterResource(R.drawable.ic_arrow_forward), null) },
-                            modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { eventSink(ProgressionEvent.OpenStep(step.index)) }
-                                .testTag("progression_step_${step.index}").semantics {
-                                    selected = step.index == state.selectedIndex
-                                    if (playing) stateDescription = playingDescription
-                                },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent))
+            if (!shortViewport) ProgressionSequenceHeader(state, eventSink)
+            if (showingPlayback && wideViewport) {
+                Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    ProgressionSequence(state, eventSink, Modifier.weight(1f).fillMaxHeight()) {
+                        if (shortViewport) ProgressionSequenceHeader(state, eventSink)
+                        metronomeStatus()
+                        ProgressionWarnings(state, eventSink)
                     }
+                    ProgressionPlaybackPane(state, Modifier.weight(1f).fillMaxHeight())
+                }
+            } else {
+                if (showingPlayback) ProgressionPlaybackPane(state, Modifier.fillMaxWidth().height(playbackHeight))
+                ProgressionSequence(state, eventSink, Modifier.fillMaxWidth().weight(1f)) {
+                    if (shortViewport) ProgressionSequenceHeader(state, eventSink)
+                    metronomeStatus()
+                    ProgressionWarnings(state, eventSink)
                 }
             }
         }
@@ -59,12 +49,37 @@ fun ProgressionTool(state: ProgressionUiState, eventSink: (ProgressionEvent) -> 
 }
 
 @Composable
-private fun ProgressionAddActions(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit) {
+private fun ProgressionSequenceHeader(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit) {
+    TextButton(onClick = { eventSink(ProgressionEvent.OpenSheet(ProgressionSheetUi.Settings)) }, modifier = Modifier.testTag("progression_settings")) {
+        Text(if (state.invalidSettings) stringResource(R.string.progression_settings_error)
+            else "${stringResource(R.string.progression_bpm_summary, state.bpm)} · ${state.numerator}/${state.denominator.denominator}",
+            color = if (state.invalidSettings) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(8.dp))
+        Icon(painterResource(R.drawable.ic_settings), stringResource(R.string.progression_settings), Modifier.size(18.dp))
+    }
     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         FilledTonalButton(onClick = { eventSink(ProgressionEvent.OpenEditor()) }, enabled = !state.busy && !state.readFailed,
             modifier = Modifier.heightIn(min = 48.dp).testTag("progression_add_chord")) { Text(stringResource(R.string.progression_add_chord)) }
         OutlinedButton(onClick = { eventSink(ProgressionEvent.AddRest) }, enabled = !state.busy && !state.readFailed,
             modifier = Modifier.heightIn(min = 48.dp).testTag("progression_add_rest")) { Text(stringResource(R.string.progression_add_rest)) }
+    }
+}
+
+@Composable
+private fun ProgressionPlaybackPane(state: ProgressionUiState, modifier: Modifier) {
+    val step = state.steps.getOrNull(state.playingIndex)
+    Surface(modifier.testTag("progression_playback_pane"), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            when {
+                step == null -> Text(stringResource(R.string.progression_count_in, (state.countInBeat ?: 0) + 1, state.numerator),
+                    Modifier.testTag("progression_active_count_in"), style = MaterialTheme.typography.titleLarge)
+                step.rest -> Text(step.title(), Modifier.testTag("progression_active_rest"), style = MaterialTheme.typography.titleLarge)
+                else -> Column(Modifier.testTag("progression_active_chord"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(step.title(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("progression_active_name"))
+                    ChordFretboard(step.strings, "progression_active", state.editor.capo, showLegend = false)
+                }
+            }
+        }
     }
 }
 
@@ -96,8 +111,10 @@ internal fun ProgressionAppBarActions(state: ProgressionUiState, eventSink: (Pro
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProgressionTransportBar(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit) {
+    val height = with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() * 2 + 32.dp }.coerceAtLeast(80.dp)
     Column {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         when {
@@ -107,29 +124,24 @@ internal fun ProgressionTransportBar(state: ProgressionUiState, eventSink: (Prog
         }
         if (state.pendingChange) ProgressionStatus(stringResource(R.string.progression_pending), "progression_pending")
         }
-        BottomAppBar(modifier = Modifier.testTag("progression_transport"), contentPadding = PaddingValues(horizontal = 16.dp)) {
-            TextButton(onClick = { eventSink(ProgressionEvent.OpenSheet(ProgressionSheetUi.Settings)) },
-                modifier = Modifier.weight(1f).testTag("progression_settings")) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.progression_bpm_summary, state.bpm), style = MaterialTheme.typography.labelLarge)
-                    Text(if (state.invalidSettings) stringResource(R.string.progression_settings_error) else "${state.numerator}/${state.denominator.denominator}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (state.invalidSettings) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
-                }
-            }
+        FlexibleBottomAppBar(modifier = Modifier.testTag("progression_transport"), expandedHeight = height,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val paused = state.transport == ProgressionTransportUi.Paused
             val playing = state.transport == ProgressionTransportUi.Playing
             val tag = when { playing -> "progression_pause"; paused -> "progression_resume"; else -> "progression_play" }
-            FilledIconButton(onClick = { eventSink(when { playing -> ProgressionEvent.Pause; paused -> ProgressionEvent.Resume; else -> ProgressionEvent.Play() }) },
-                enabled = playing || (state.canPlay && state.transport != ProgressionTransportUi.Preparing), modifier = Modifier.size(48.dp).testTag(tag)) {
-                Icon(painterResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play),
-                    stringResource(when { playing -> R.string.progression_pause; paused -> R.string.progression_resume; else -> R.string.progression_play }))
+            Button(onClick = { eventSink(when { playing -> ProgressionEvent.Pause; paused -> ProgressionEvent.Resume; else -> ProgressionEvent.Play() }) },
+                enabled = playing || (state.canPlay && state.transport != ProgressionTransportUi.Preparing),
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag(tag), contentPadding = PaddingValues(8.dp)) {
+                Text(stringResource(when { playing -> R.string.progression_pause; paused -> R.string.progression_resume; else -> R.string.progression_play }),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
-            IconButton(onClick = { eventSink(ProgressionEvent.Stop) },
+            OutlinedButton(onClick = { eventSink(ProgressionEvent.Stop) },
                 enabled = state.transport in listOf(ProgressionTransportUi.Playing, ProgressionTransportUi.Paused, ProgressionTransportUi.Preparing),
-                modifier = Modifier.size(48.dp).testTag("progression_stop")) { Icon(painterResource(R.drawable.ic_stop), stringResource(R.string.progression_stop)) }
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("progression_stop"), contentPadding = PaddingValues(8.dp)) {
+                Text(stringResource(R.string.progression_stop), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
             FilterChip(state.loop, { eventSink(ProgressionEvent.SetLoop(!state.loop)) }, label = { Text(stringResource(R.string.progression_loop_short)) },
-                enabled = !state.busy && !state.readFailed, modifier = Modifier.heightIn(min = 48.dp).testTag("progression_loop"))
+                enabled = !state.busy && !state.readFailed, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("progression_loop"))
         }
     }
 }
@@ -158,8 +170,11 @@ private fun ProgressionWarnings(state: ProgressionUiState, eventSink: (Progressi
     }
 }
 
-@Composable internal fun ProgressionStepUi.title(): String = if (rest) stringResource(R.string.progression_rest)
-    else shape ?: sounding ?: name.ifBlank { stringResource(R.string.chord_unrecognized) }
+@Composable internal fun ProgressionStepUi.title(): String = when {
+    rest -> stringResource(R.string.progression_rest)
+    shape != null && sounding != null && shape != sounding -> "$shape → $sounding"
+    else -> shape ?: sounding ?: name.ifBlank { stringResource(R.string.chord_unrecognized) }
+}
 
 @Composable internal fun NoteValueUi.label(): String = stringResource(when (this) {
     NoteValueUi.Whole -> R.string.progression_whole; NoteValueUi.Half -> R.string.beat_half; NoteValueUi.Quarter -> R.string.beat_quarter
@@ -170,6 +185,7 @@ private fun ProgressionWarnings(state: ProgressionUiState, eventSink: (Progressi
     val note = if (dotted) stringResource(R.string.progression_dotted_note, duration.label()) else duration.label()
     return stringResource(R.string.progression_duration_summary, count.stripTrailingZeros().toPlainString(), note)
 }
+@Composable internal fun ProgressionStepUi.noteLabel(): String = if (dotted) stringResource(R.string.progression_dotted_note, duration.label()) else duration.label()
 @Composable internal fun ProgressionStatus(value: String, tag: String, error: Boolean = false) {
     Text(value, Modifier.testTag(tag).semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium,
         color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)

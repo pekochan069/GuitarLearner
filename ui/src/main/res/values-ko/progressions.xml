@@ -13,12 +13,12 @@
     <string name="progression_playing">재생 중</string>
     <string name="progression_step_details">코드 및 쉼표 편집</string>
     <string name="progression_named_chord">코드 모양</string>
-    <string name="progression_saved_chord">복사</string>
+    <string name="progression_shapes">모양 불러오기</string>
     <string name="progression_manual_chord">직접 편집</string>
     <string name="progression_personal_chord_name">개인 이름 (선택)</string>
     <string name="progression_customize_shape">이 모양 직접 편집</string>
-    <string name="progression_shape_search">카포 없이 %1$s에서 잡는 모양입니다. 실제 코드는 코드 진행의 카포를 적용합니다.</string>
-    <string name="progression_sounding">실제 코드 %1$s</string>
+    <string name="progression_reordering">%1$s 이동 중</string>
+    <string name="progression_remove_named">%2$d번째 항목 %1$s 삭제</string>
     <string name="progression_whole">온음표</string>
     <string name="progression_thirty_second">32분음표</string>
     <string name="progression_dotted_note">점%1$s</string>
@@ -60,7 +60,7 @@
         <item quantity="other">%1$d개 항목</item>
     </plurals>
     <string name="progression_chord_editor">코드 모양</string>
-    <string name="progression_copy_current">코드 도구의 초안 복사</string>
+    <string name="progression_copy_current">코드 도구 초안</string>
     <string name="progression_apply_chord">코드 모양 적용</string>
     <string name="progression_delete_title">코드 진행을 삭제할까요?</string>
     <string name="progression_unsynced">수정한 초안이 기기에 저장되지 않았습니다. 다시 시도하여 재시작 후에도 유지하세요.</string>

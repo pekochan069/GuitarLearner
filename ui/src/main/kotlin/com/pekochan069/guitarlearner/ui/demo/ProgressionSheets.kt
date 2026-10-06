@@ -104,7 +104,6 @@ internal fun ProgressionSheets(state: ProgressionUiState, eventSink: (Progressio
 private fun ProgressionStepDetails(step: ProgressionStepUi, state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit) {
     Text(step.title(), style = MaterialTheme.typography.headlineSmall)
     if (step.name.isNotBlank()) Text(step.name, style = MaterialTheme.typography.bodyMedium)
-    step.sounding?.takeIf { it != step.shape }?.let { Text(stringResource(R.string.progression_sounding, it)) }
     ChordDropdown(stringResource(R.string.progression_duration), step.duration.label(), NoteValueUi.entries.map { it.label() },
         "progression_duration_${step.index}") { eventSink(ProgressionEvent.SetDuration(step.index, NoteValueUi.entries[it], step.dotted)) }
     Text(step.durationLabel(state.denominator), style = MaterialTheme.typography.bodyMedium)
@@ -114,7 +113,7 @@ private fun ProgressionStepDetails(step: ProgressionStepUi, state: ProgressionUi
         if (!step.rest) FilterChip(step.tied, { eventSink(ProgressionEvent.SetTie(step.index, !step.tied)) }, enabled = step.canTie || step.tied,
             label = { Text(stringResource(R.string.progression_tie)) }, modifier = Modifier.heightIn(min = 48.dp).testTag("progression_tie_${step.index}"))
     }
-    if (!step.rest) ChordFretboard(step.strings, "progression_step_${step.index}", state.editor.capo)
+    if (!step.rest) ChordFretboard(step.strings, "progression_step_${step.index}", state.editor.capo, showLegend = false)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (!step.rest) OutlinedButton(onClick = { eventSink(ProgressionEvent.OpenEditor(step.index)) }, modifier = Modifier.heightIn(min = 48.dp).testTag("progression_edit_${step.index}")) { Text(stringResource(R.string.chord_edit)) }
         TextButton(onClick = { eventSink(ProgressionEvent.Move(step.index, -1)) }, enabled = step.index > 0, modifier = Modifier.heightIn(min = 48.dp).testTag("progression_up_${step.index}")) { Text(stringResource(R.string.progression_up)) }
@@ -152,7 +151,7 @@ private fun ProgressionChordPicker(state: ProgressionUiState, eventSink: (Progre
             Tab(state.chordSource == source, onClick = { eventSink(ProgressionEvent.SetChordSource(source)) },
                 modifier = Modifier.heightIn(min = 48.dp).testTag("progression_source_${source.name}"),
                 text = { Text(stringResource(when (source) { ProgressionChordSourceUi.Named -> R.string.progression_named_chord
-                    ProgressionChordSourceUi.Saved -> R.string.progression_saved_chord; ProgressionChordSourceUi.Manual -> R.string.progression_manual_chord })) })
+                    ProgressionChordSourceUi.Manual -> R.string.progression_manual_chord })) })
         }
     }
     when (state.chordSource) {
@@ -162,19 +161,21 @@ private fun ProgressionChordPicker(state: ProgressionUiState, eventSink: (Progre
                 ChordDropdown(stringResource(R.string.chord_root), editor.roots[editor.root], editor.roots, "progression_root", Modifier.width(fieldWidth).weight(1f)) { input(ChordEvent.SetRoot(it)) }
                 ChordDropdown(stringResource(R.string.chord_quality), editor.quality.label(), ChordQualityUi.entries.map { it.label() }, "progression_quality", Modifier.width(fieldWidth).weight(1f)) { input(ChordEvent.SetQuality(ChordQualityUi.entries[it])) }
             }
-            Text(stringResource(R.string.progression_shape_search, editor.preset?.let { stringResource(it.label) } ?: stringResource(R.string.chord_custom_tuning)), style = MaterialTheme.typography.bodySmall)
             when (editor.lookup) {
                 ChordLookupUi.Searching -> LinearProgressIndicator(Modifier.fillMaxWidth().testTag("progression_searching"))
                 ChordLookupUi.NoShapes -> ProgressionStatus(stringResource(R.string.chord_no_shapes, editor.lookupShapeSymbol.orEmpty()), "progression_lookup_status")
                 ChordLookupUi.Ready -> {
-                    Text(stringResource(R.string.chord_shape_symbol, editor.lookupShapeSymbol.orEmpty()), Modifier.testTag("progression_lookup_shape"), style = MaterialTheme.typography.titleLarge)
-                    editor.lookupSymbol?.let { Text(stringResource(R.string.progression_sounding, it), Modifier.testTag("progression_lookup_sounding")) }
-                    if (editor.lookupOmitted.isNotBlank()) Text(stringResource(R.string.chord_lookup_omitted, editor.lookupOmitted))
-                    ChordFretboard(editor.lookupStrings, "progression_lookup", editor.capo)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(editor.lookupShapeSymbol.orEmpty(), Modifier.testTag("progression_lookup_shape"), style = MaterialTheme.typography.titleLarge)
+                        editor.lookupSymbol?.takeIf { it != editor.lookupShapeSymbol }?.let {
+                            Text("→ $it", Modifier.testTag("progression_lookup_sounding"), style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                    ChordFretboard(editor.lookupStrings, "progression_lookup", editor.capo, showLegend = false)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                         IconButton(onClick = { input(ChordEvent.SelectRepresentative(editor.representativeIndex - 1)) }, enabled = editor.representativeIndex > 0,
                             modifier = Modifier.size(48.dp).testTag("progression_previous_shape")) { Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.chord_previous)) }
-                        Text(stringResource(R.string.chord_representative_count, editor.representativeIndex + 1, editor.representativeCount), style = MaterialTheme.typography.labelLarge)
+                        Text("${editor.representativeIndex + 1} / ${editor.representativeCount}", style = MaterialTheme.typography.labelLarge)
                         IconButton(onClick = { input(ChordEvent.SelectRepresentative(editor.representativeIndex + 1)) }, enabled = editor.representativeIndex + 1 < editor.representativeCount,
                             modifier = Modifier.size(48.dp).testTag("progression_next_shape")) { Icon(painterResource(R.drawable.ic_arrow_forward), stringResource(R.string.chord_next)) }
                     }
@@ -183,15 +184,26 @@ private fun ProgressionChordPicker(state: ProgressionUiState, eventSink: (Progre
                 ChordLookupUi.Idle -> Unit
             }
         }
-        ProgressionChordSourceUi.Saved -> {
-            OutlinedButton(onClick = { eventSink(ProgressionEvent.CopyCurrentChord) }, modifier = Modifier.heightIn(min = 48.dp).testTag("progression_copy_current")) { Text(stringResource(R.string.progression_copy_current)) }
-            editor.records.forEach { source ->
-                OutlinedButton(onClick = { eventSink(ProgressionEvent.CopyCustomChord(source.id)) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("progression_copy_${source.id}")) { Text(source.name) }
-            }
-        }
         ProgressionChordSourceUi.Manual -> {
-            ChordSummary(editor.analysis, editor.soundingSymbol, editor.shapeSymbol, editor.notes)
-            ChordFretboard(editor.strings, "progression_editor", editor.capo, input)
+            var shapesExpanded by remember { mutableStateOf(false) }
+            Box {
+                OutlinedButton(onClick = { shapesExpanded = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("progression_shapes")) {
+                    Text(stringResource(R.string.progression_shapes))
+                }
+                DropdownMenu(shapesExpanded, onDismissRequest = { shapesExpanded = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.progression_copy_current)) }, onClick = {
+                        shapesExpanded = false; eventSink(ProgressionEvent.CopyCurrentChord)
+                    }, modifier = Modifier.testTag("progression_copy_current"))
+                    editor.records.forEach { source ->
+                        DropdownMenuItem(text = { Text(source.name) }, onClick = {
+                            shapesExpanded = false; eventSink(ProgressionEvent.CopyCustomChord(source.id))
+                        }, modifier = Modifier.testTag("progression_copy_${source.id}"))
+                    }
+                }
+            }
+            Text(editor.shapeSymbol ?: editor.soundingSymbol ?: stringResource(R.string.chord_unrecognized), style = MaterialTheme.typography.titleLarge)
+            if (editor.soundingSymbol != null && editor.soundingSymbol != editor.shapeSymbol) Text("→ ${editor.soundingSymbol}", style = MaterialTheme.typography.titleMedium)
+            ChordFretboard(editor.strings, "progression_editor", editor.capo, input, showLegend = false)
             OutlinedTextField(editor.name, { input(ChordEvent.SetName(it)) }, modifier = Modifier.fillMaxWidth().testTag("progression_chord_name"),
                 label = { Text(stringResource(R.string.progression_personal_chord_name)) }, isError = editor.nameError)
             editor.strings.forEach { ChordStringControls(it, input) }

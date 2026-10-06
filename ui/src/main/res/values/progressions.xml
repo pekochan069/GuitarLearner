@@ -13,12 +13,12 @@
     <string name="progression_playing">Playing</string>
     <string name="progression_step_details">Step details</string>
     <string name="progression_named_chord">Chord shape</string>
-    <string name="progression_saved_chord">Copy</string>
+    <string name="progression_shapes">Load shape</string>
     <string name="progression_manual_chord">Manual</string>
     <string name="progression_personal_chord_name">Personal name (optional)</string>
     <string name="progression_customize_shape">Edit this shape</string>
-    <string name="progression_shape_search">Shape in %1$s without capo. The preview uses the progression’s capo.</string>
-    <string name="progression_sounding">Sounds %1$s</string>
+    <string name="progression_reordering">Moving %1$s</string>
+    <string name="progression_remove_named">Remove %1$s, step %2$d</string>
     <string name="progression_whole">Whole note</string>
     <string name="progression_thirty_second">Thirty-second note</string>
     <string name="progression_dotted_note">Dotted %1$s</string>
@@ -62,7 +62,7 @@
         <item quantity="other">%1$d steps</item>
     </plurals>
     <string name="progression_chord_editor">Chord shape</string>
-    <string name="progression_copy_current">Copy chord viewer draft</string>
+    <string name="progression_copy_current">Chord viewer draft</string>
     <string name="progression_apply_chord">Apply chord shape</string>
     <string name="progression_delete_title">Delete progression?</string>
     <string name="progression_unsynced">The edited draft has not been saved on this device. Retry to keep it after restart.</string>

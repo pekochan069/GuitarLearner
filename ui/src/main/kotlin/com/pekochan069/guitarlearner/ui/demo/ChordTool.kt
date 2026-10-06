@@ -351,7 +351,7 @@ internal fun ChordSummary(analysis: ChordAnalysisUi, sounding: String?, shape: S
 
 @Composable
 internal fun ChordFretboard(strings: List<ChordStringUi>, tag: String, capo: Int,
-    eventSink: ((ChordEvent) -> Unit)? = null) {
+    eventSink: ((ChordEvent) -> Unit)? = null, showLegend: Boolean = true) {
     val colors = MaterialTheme.colorScheme
     val focusManager = LocalFocusManager.current
     val labelStyle = MaterialTheme.typography.labelMedium
@@ -368,7 +368,7 @@ internal fun ChordFretboard(strings: List<ChordStringUi>, tag: String, capo: Int
     val frets = listOf(0) + (firstFret..lastFret)
     val visibleStrings = strings.reversed()
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(if (eventSink == null) R.string.chord_fretboard_help else R.string.chord_fretboard_edit_help),
+        if (showLegend) Text(stringResource(if (eventSink == null) R.string.chord_fretboard_help else R.string.chord_fretboard_edit_help),
             style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
         Row(Modifier.fillMaxWidth().testTag(tag + "_fretboard")) {
             Column(Modifier.width(labelWidth)) {
