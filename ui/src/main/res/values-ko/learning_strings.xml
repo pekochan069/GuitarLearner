@@ -1,0 +1,84 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="learning_title">학습</string>
+    <string name="learning_topics">주제</string>
+    <string name="learning_courses">코스</string>
+    <string name="learning_explore">자유 탐색</string>
+    <string name="learning_theory_course">음악 이론</string>
+    <string name="learning_technique_course">기타 테크닉</string>
+    <string name="learning_resume">이어서 학습: %1$s</string>
+    <string name="learning_completed">완료</string>
+    <string name="learning_not_completed">미완료</string>
+    <string name="learning_mark_complete">학습 완료 표시</string>
+    <string name="learning_completion_meaning">완료 표시는 직접 선택한 기록이며 연주 실력을 평가한 결과가 아닙니다.</string>
+    <string name="learning_previous">이전 학습</string>
+    <string name="learning_next">다음 학습</string>
+    <string name="learning_root">근음 / 조성</string>
+    <string name="learning_interval">음정</string>
+    <string name="learning_chord_quality">코드 종류</string>
+    <string name="learning_progression">코드 진행</string>
+    <string name="learning_major_scale">장음계</string>
+    <string name="learning_natural_minor">자연단음계</string>
+    <string name="learning_tonic">으뜸 기능</string>
+    <string name="learning_predominant">딸림 준비 기능</string>
+    <string name="learning_dominant">딸림 기능</string>
+    <string name="learning_degrees">숫자는 표시된 근음에서 센 음의 도수입니다. ♭은 반음 낮추고 ♯은 반음 높입니다.</string>
+    <string name="learning_standard_tuning">표준 튜닝입니다. 1번 줄은 높은 E, 6번 줄은 낮은 E이며 0프렛은 개방현입니다.</string>
+    <string name="learning_fret_description">%1$d번 줄, %2$d프렛, %3$s, 도수 %4$s</string>
+    <string name="learning_circle_description">시계 방향은 완전5도 위, 반시계 방향은 완전4도 위의 조성입니다. 이웃한 장조는 음 여섯 개를 공유합니다. 안쪽 이름은 같은 음을 쓰는 관계단조입니다.</string>
+    <string name="learning_circle_key">%1$s 장조, 관계단조 %2$s</string>
+    <string name="learning_listen">예시 듣기</string>
+    <string name="learning_stop">예시 정지</string>
+    <string name="learning_playing">이론 예시 재생 중</string>
+    <string name="learning_retry_audio">재생 다시 시도</string>
+    <string name="learning_practice_links">관련 연습</string>
+    <string name="learning_saving">진도 저장 중…</string>
+    <string name="learning_read_failed">저장된 진도를 읽지 못했습니다. 학습은 계속할 수 있습니다. 다시 시도해 진도를 복구하면 새 진도를 저장할 수 있습니다.</string>
+    <string name="learning_write_failed">진도를 저장하지 못했습니다. 현재 학습과 완료 표시는 유지됩니다. 다시 시도해 저장하세요.</string>
+    <string name="learning_playback_failed">예시를 재생하지 못했습니다. 설명과 시각화는 계속 사용할 수 있습니다.</string>
+    <string name="learning_retry_save">진도 저장 다시 시도</string>
+    <string name="learning_back">학습으로 돌아가기</string>
+    <string name="learning_back_topics">학습 주제로 돌아가기</string>
+    <string name="learning_tab_help">TAB은 왼쪽에서 오른쪽으로 읽습니다. e는 1번 줄, B는 2번, G는 3번, D는 4번, A는 5번, E는 6번 줄입니다. 숫자는 프렛이고 0은 개방현입니다. 예시는 표준 튜닝을 사용합니다.</string>
+
+    <string name="learning_notes_title">음 이름과 음정</string>
+    <string name="learning_notes_text">오선보를 몰라도 시작할 수 있습니다. 음 이름 A–G는 반복됩니다. 같은 이름의 음이 반음 열두 개 높아지면 한 옥타브입니다. ♯은 반음 높이고 ♭은 반음 낮춥니다.\n\n기타의 같은 줄에서 한 프렛은 반음, 두 프렛은 온음입니다. 자연음 E–F와 B–C 사이는 반음이고 나머지 이웃한 자연음 사이는 온음입니다. 음정은 두 음의 거리를 나타냅니다. C–D는 반음 두 개인 장2도, C–E는 반음 네 개인 장3도입니다.\n\n근음과 음정을 고르세요. 지판의 음 이름과 도수를 비교한 뒤 두 음을 들어 보세요.</string>
+    <string name="learning_scales_title">장음계와 자연단음계</string>
+    <string name="learning_scales_text">음계는 중심이 되는 으뜸음 주위의 음을 순서대로 나열한 것입니다. 장음계는 으뜸음부터 온음, 온음, 반음, 온음, 온음, 온음, 반음 간격입니다. C 장음계는 C D E F G A B C입니다.\n\n자연단음계는 온음, 반음, 온음, 온음, 반음, 온음, 온음 간격입니다. A 자연단음계는 A B C D E F G A입니다. 같은 으뜸음의 장음계와 비교하면 3도, 6도, 7도가 낮습니다.\n\n일곱 음은 서로 다른 알파벳 이름을 한 번씩 씁니다. G 장음계에는 F♯, F 장음계에는 B♭이 필요합니다. 조성을 바꾸고 달라진 이름을 찾은 뒤 들어 보세요.</string>
+    <string name="learning_chords_title">3화음과 7화음</string>
+    <string name="learning_chords_text">3화음은 근음 위에 3도와 5도를 쌓습니다. 장3화음은 1–3–5, 단3화음은 1–♭3–5, 감3화음은 1–♭3–♭5, 증3화음은 1–3–♯5입니다. C 장3화음은 C E G, D 장3화음은 D F♯ A입니다. 3도의 차이가 장화음과 단화음을 구분합니다.\n\n7도를 더하면 네 음의 7화음이 됩니다. 장7화음은 1–3–5–7, 딸림7화음은 1–3–5–♭7, 단7화음은 1–♭3–5–♭7입니다. 반감7화음은 1–♭3–♭5–♭7, 감7화음은 1–♭3–♭5–♭♭7이며 겹내림표는 반음 두 개를 낮춥니다.\n\n종류를 골라 음 이름과 도수를 확인하고 모든 구성음을 함께 들어 보세요. 지판은 각 음의 위치를 보여 주며 정해진 운지법을 지시하지 않습니다.</string>
+    <string name="learning_diatonic_title">다이어토닉 코드와 기능</string>
+    <string name="learning_diatonic_text">다이어토닉 코드는 조성 안의 음만 사용합니다. 장음계 각 음에서 한 음씩 건너뛰어 3화음을 만들면 I, ii, iii, IV, V, vi, vii°가 됩니다. 대문자는 장화음, 소문자는 단화음, °는 감화음입니다. C 장조에서는 C, Dm, Em, F, G, Am, Bdim입니다.\n\n기능은 진행 안에서 코드가 맡는 역할입니다. I는 돌아올 중심인 으뜸 코드입니다. ii와 IV는 흔히 딸림 코드 V를 준비하고 V와 vii°는 중심으로 향합니다. iii와 vi는 으뜸 기능을 도울 수 있지만 맥락에 따라 역할이 달라집니다.\n\n조성과 코드를 골라 로마 숫자, 기능, 구성음을 읽어 보세요. 표시된 구성음 도수는 해당 코드의 근음을 기준으로 합니다.</string>
+    <string name="learning_progressions_title">기본 코드 진행</string>
+    <string name="learning_progressions_text">코드 진행은 코드를 순서대로 이어 놓은 것입니다. 로마 숫자로 쓰면 같은 관계를 다른 조성으로 옮길 수 있습니다. C 장조의 I–IV–V–I는 C–F–G–C이며 중심, 준비, 딸림, 중심의 흐름입니다.\n\nI–V–vi–IV는 C–G–Am–F로 자주 반복되는 형태입니다. ii–V–I는 Dm–G–C이며 준비, 딸림, 중심의 움직임을 분명하게 보여 줍니다. 순서뿐 아니라 리듬도 들리는 느낌에 영향을 줍니다.\n\n진행과 조성을 고르세요. 한 코드를 선택해 구성음을 보고 전체 진행을 들어 보세요. 코드 도구를 열기 전에 각 코드의 역할을 설명해 보세요.</string>
+    <string name="learning_circle_title">5도권</string>
+    <string name="learning_circle_text">5도권은 완전5도 간격으로 장조를 배치합니다. C부터 시계 방향으로 G, D, A, E, B, F♯을 지나 내림표 쪽 D♭, A♭, E♭, B♭, F로 이어집니다. F♯ 장조와 G♭ 장조는 소리가 같지만 적는 음 이름이 다릅니다.\n\nC 장조에는 올림표와 내림표가 없습니다. G 장조는 F♯을 더하고 F 장조는 B♭을 더합니다. 이웃한 조성은 보통 일곱 음 중 여섯 음을 공유하므로 가까운 조성 관계를 이해하는 데 도움이 됩니다.\n\n장조와 관계단조는 같은 음을 쓰지만 으뜸음이 다릅니다. C 장조는 A 단조, G 장조는 E 단조와 짝입니다. 원에서 조성을 선택하고 장음계 구성음을 확인하세요.</string>
+
+    <string name="learning_strumming_title">스트로크</string>
+    <string name="learning_strumming_text">피크를 가볍게 잡고 편안한 손목 움직임으로 여러 줄을 지나갑니다. 다운스트로크는 낮은 줄에서 높은 줄로, 업스트로크는 반대로 움직입니다. 피크를 줄 사이에 깊이 넣지 말고 움직임을 작게 유지하세요.\n\n스트로크는 코드의 음을 짧게 훑는 소리를 냅니다. 다운은 낮은 줄, 가벼운 업은 높은 줄이 더 두드러질 수 있습니다. 각 음을 따로 피킹할 때와 비교해 보세요.</string>
+    <string name="learning_strumming_tab" tools:ignore="TypographyDashes">"e|--0--0--0--0--|\nB|--0--0--0--0--|\nG|--0--0--0--0--|\nD|--2--2--2--2--|\nA|--2--2--2--2--|\nE|--0--0--0--0--|\n    D  D  D  D"</string>
+    <string name="learning_strumming_practice">Em을 잡으세요. 5번 줄과 4번 줄은 2프렛이며 나머지는 개방현입니다. 60 BPM에서 한 박마다 다운스트로크로 네 번 연주합니다. D는 다운입니다. 다음에는 박 사이에 업스트로크를 넣어 손목이 고르게 왕복하도록 해 보세요.</string>
+    <string name="learning_picking_title">얼터네이트 피킹</string>
+    <string name="learning_picking_text">한 줄을 다운과 업으로 번갈아 피킹합니다. 피크를 줄 가까이에 두고 각 피킹과 누르는 손가락의 타이밍을 맞추세요. 편안한 범위에서 움직임을 최소화합니다.\n\n피킹한 음마다 분명한 시작 소리가 납니다. 왕복 피킹은 연속된 음을 고르게 연주하는 데 도움이 되며 모든 다운을 세게 강조할 필요는 없습니다. 다운만 반복할 때와 비교하고 음량이 뜻하지 않게 바뀌는지 들어 보세요.</string>
+    <string name="learning_picking_tab" tools:ignore="TypographyDashes">"e|--0--1--2--3--2--1--|\n    D  U  D  U  D  U"</string>
+    <string name="learning_picking_practice">1번 줄의 개방현, 1, 2, 3, 2, 1프렛을 연주합니다. 손가락은 검지, 중지, 약지, 중지, 검지를 씁니다. 60 BPM에서 한 박에 한 음씩 연주하세요. D는 다운, U는 업입니다. 여섯 음의 시작 소리가 비슷해진 뒤 속도를 높이세요.</string>
+    <string name="learning_hammer_title">해머온과 풀오프</string>
+    <string name="learning_hammer_text">해머온은 낮은 음을 피킹한 뒤 울리는 줄의 높은 프렛에 다른 손가락을 단단히 내려놓습니다. 풀오프는 낮은 프렛을 계속 누른 채 높은 손가락을 떼면서 줄을 가볍게 튕깁니다. 단순히 들어 올리기만 하면 낮은 음이 너무 작을 수 있습니다.\n\n두 번째 음은 새 피킹 없이 납니다. 두 음을 각각 피킹하는 것보다 연결이 부드럽게 들립니다. 풀오프할 때 줄이 지판 바깥으로 빠지지 않도록 하세요.</string>
+    <string name="learning_hammer_tab" tools:ignore="TypographyDashes">"e|--5h7--7p5--|"</string>
+    <string name="learning_hammer_practice">1번 줄 5프렛을 검지로 누릅니다. 피킹한 뒤 약지를 7프렛에 내려 해머온합니다. 다음에는 7프렛을 피킹한 뒤 풀오프하여 계속 누른 5프렛을 냅니다. h는 해머온, p는 풀오프입니다. 60 BPM에서 각 음을 한 박씩 내며 두 번째 음도 분명하게 들리도록 연습하세요.</string>
+    <string name="learning_slide_title">슬라이드</string>
+    <string name="learning_slide_text">프렛을 누른 음을 피킹한 뒤 같은 손가락을 줄을 따라 움직입니다. 음이 유지될 만큼 압력을 주고 도착 프렛 바로 뒤에서 멈춥니다. 도착한 뒤 과도한 힘을 풀어 주세요.\n\n슬라이드는 손가락을 떼어 두 음을 따로 피킹할 때와 달리 줄을 따라 이동하는 소리로 음을 연결합니다. 약간의 마찰음은 자연스럽습니다. 도착 음을 정확히 하고 옆 줄이 움직이지 않게 하세요.</string>
+    <string name="learning_slide_tab" tools:ignore="TypographyDashes">"G|--5/7--5/7--|"</string>
+    <string name="learning_slide_practice">3번 줄 5프렛을 약지로 누르고 한 번 피킹한 뒤 7프렛으로 이동합니다. /는 올라가는 슬라이드입니다. 60 BPM에서 한 박에 출발하고 다음 박에 도착하세요. 잠시 쉬고 5프렛으로 돌아가 반복합니다. 5프렛과 7프렛을 각각 피킹할 때와 비교해 보세요.</string>
+    <string name="learning_bending_title">벤딩</string>
+    <string name="learning_bending_text">음을 누른 채 줄을 지판의 옆 방향으로 밀어 올립니다. 주변 손가락으로 누르는 손가락을 받치고 손목을 조절해 움직입니다. 줄의 장력이 커지면 음높이가 올라갑니다.\n\n벤딩은 손가락을 같은 프렛에 둔 채 더 높은 음으로 연속적으로 이동합니다. 목표 음을 높은 프렛에서 직접 연주할 때와 비교해 보세요. 작은 움직임부터 시작하고 손이 아프면 멈추세요.</string>
+    <string name="learning_bending_tab" tools:ignore="TypographyDashes">"B|--7b9--7--|"</string>
+    <string name="learning_bending_practice">2번 줄 9프렛을 먼저 연주해 목표 음을 듣습니다. 약지로 7프렛을 누르고 검지와 중지로 받칩니다. 피킹한 뒤 온음 높은 9프렛의 음에 맞을 때까지 벤딩하세요. 7b9는 시작 프렛과 목표 음을 뜻하며 9프렛으로 슬라이드하는 표기가 아닙니다. 부드럽게 풀고 비교하세요.</string>
+    <string name="learning_vibrato_title">비브라토</string>
+    <string name="learning_vibrato_text">누른 음이 울리는 동안 편안한 손목으로 작은 벤딩과 복귀를 반복합니다. 각 움직임을 조절하며 원래 음높이로 돌아오세요. 좁고 느린 움직임으로 시작합니다.\n\n비브라토는 유지되는 음의 높이를 반복해서 변화시킵니다. 한 번의 벤딩은 다른 음을 목표로 하고 비브라토는 계속 돌아옵니다. 불규칙하게 흔들기보다 일정한 맥박으로 들리는지 확인하세요.</string>
+    <string name="learning_vibrato_tab" tools:ignore="TypographyDashes">"B|--7~~~--7~~~--|"</string>
+    <string name="learning_vibrato_practice">약지로 2번 줄 7프렛을 누르고 주변 손가락으로 받친 뒤 피킹합니다. ~는 비브라토입니다. 60 BPM에서 네 박 동안 음을 유지하고 한 박마다 작게 벤딩했다 돌아옵니다. 비브라토 없이도 반복해 일정한 음과 높이가 변하는 음을 비교하세요.</string>
+    <string name="learning_palm_title">팜뮤트</string>
+    <string name="learning_palm_text">피킹하는 손의 옆면을 브리지 가까운 줄에 가볍게 대고 평소처럼 피킹합니다. 닿는 위치를 브리지 쪽이나 반대쪽으로 조금 옮겨 울림을 조절하세요. 피크가 움직일 여유는 유지합니다.\n\n팜뮤트는 자유롭게 울리는 음보다 짧고 눌린 소리를 냅니다. 너무 세게 누르거나 브리지에서 멀리 대면 음높이를 알아볼 수 없을 정도로 소리가 멈출 수 있습니다. 음이 분명하게 남도록 조절하세요.</string>
+    <string name="learning_palm_tab" tools:ignore="TypographyDashes">"E|--0--0--0--0--|\n    PM----------"</string>
+    <string name="learning_palm_practice">60 BPM에서 낮은 E 개방현을 한 박마다 다운으로 네 번 피킹합니다. PM은 팜뮤트입니다. 손을 떼고 다시 연주하여 음의 길이와 시작 소리를 비교하세요. 손을 브리지 가까이에 다시 놓고 소리를 짧게 할 만큼만 가볍게 닿게 합니다.</string>
+</resources>

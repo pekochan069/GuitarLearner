@@ -65,6 +65,7 @@ private val FoundationDestination.title: Int? get() = when (this) {
         FeatureId.Chords -> R.string.chord_title
         FeatureId.Tuner -> R.string.tuner_title
         FeatureId.Training -> R.string.training_title
+        FeatureId.Learning -> R.string.learning_title
     }
     is FoundationDestination.Sample -> id.title
 }
@@ -126,7 +127,10 @@ fun DesignFoundationApp(
                             Icon(painterResource(R.drawable.ic_arrow_back), stringResource(if (
                                 destination == FoundationDestination.Feature(FeatureId.Training) &&
                                     state.training.stage !is TrainingStageUi.Navigation
-                            ) R.string.training_back else R.string.back_to_home))
+                            ) R.string.training_back else if (state.returningToLesson) R.string.learning_back
+                            else if (destination == FoundationDestination.Feature(FeatureId.Learning) &&
+                                (state.learning.lesson != null || state.learning.concept != null)) R.string.learning_back_topics
+                            else R.string.back_to_home))
                         }
                     }
                 },
@@ -143,7 +147,7 @@ fun DesignFoundationApp(
             Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
             contentAlignment = Alignment.TopCenter,
         ) {
-            key(destination, trainingPage) {
+            key(destination, trainingPage, state.learning.lesson, state.learning.concept, state.learning.mode) {
                 Column(
                     Modifier.widthIn(max = 680.dp).fillMaxWidth()
                         .verticalScroll(if (destination == FoundationDestination.Home) homeScroll else rememberScrollState())
@@ -194,6 +198,7 @@ fun DesignFoundationApp(
                             FeatureId.Chords -> ChordTool(state.chords) { state.eventSink(FoundationEvent.Chord(it)) }
                             FeatureId.Tuner -> TunerScreen(state.tuner, state.eventSink)
                             FeatureId.Training -> TrainingScreen(state.training) { state.eventSink(FoundationEvent.Training(it)) }
+                            FeatureId.Learning -> LearningScreen(state.learning) { state.eventSink(FoundationEvent.Learning(it)) }
                         }
                         is FoundationDestination.Sample -> when (destination.id) {
                             DevelopmentSample.Gallery -> ComponentGallery(
@@ -358,12 +363,14 @@ private fun HomeCatalog(state: FoundationState) {
                                     FeatureId.Tuner -> R.drawable.ic_tuner
                                     FeatureId.Chords -> R.drawable.ic_chords
                                     FeatureId.Training -> R.drawable.ic_play
+                                    FeatureId.Learning -> R.drawable.ic_staff
                                 }), null, Modifier.size(32.dp))
                                 Text(stringResource(when (feature) {
                                     FeatureId.Metronome -> R.string.metronome_title
                                     FeatureId.Tuner -> R.string.tuner_title
                                     FeatureId.Chords -> R.string.chord_title
                                     FeatureId.Training -> R.string.training_title
+                                    FeatureId.Learning -> R.string.learning_title
                                 }), Modifier.weight(1f),
                                     style = MaterialTheme.typography.titleMedium)
                             }

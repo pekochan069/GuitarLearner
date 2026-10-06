@@ -1,0 +1,84 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="learning_title">Learning</string>
+    <string name="learning_topics">Topics</string>
+    <string name="learning_courses">Courses</string>
+    <string name="learning_explore">Free exploration</string>
+    <string name="learning_theory_course">Music theory</string>
+    <string name="learning_technique_course">Guitar techniques</string>
+    <string name="learning_resume">Continue: %1$s</string>
+    <string name="learning_completed">Completed</string>
+    <string name="learning_not_completed">Not completed</string>
+    <string name="learning_mark_complete">Mark lesson complete</string>
+    <string name="learning_completion_meaning">Completion records your choice. Your playing has not been assessed.</string>
+    <string name="learning_previous">Previous lesson</string>
+    <string name="learning_next">Next lesson</string>
+    <string name="learning_root">Root / key</string>
+    <string name="learning_interval">Interval</string>
+    <string name="learning_chord_quality">Chord type</string>
+    <string name="learning_progression">Progression</string>
+    <string name="learning_major_scale">Major scale</string>
+    <string name="learning_natural_minor">Natural minor scale</string>
+    <string name="learning_tonic">Tonic</string>
+    <string name="learning_predominant">Predominant</string>
+    <string name="learning_dominant">Dominant</string>
+    <string name="learning_degrees">The numbers show each note\'s degree from the displayed root. ♭ lowers a degree by a half step; ♯ raises it.</string>
+    <string name="learning_standard_tuning">Standard tuning. String 1 is high E; string 6 is low E. Fret 0 is an open string.</string>
+    <string name="learning_fret_description">String %1$d, fret %2$d, %3$s, degree %4$s</string>
+    <string name="learning_circle_description">Clockwise moves up a perfect fifth, counterclockwise up a perfect fourth. Neighboring major keys share six notes. Each inner label is the relative minor, which shares the major key\'s notes.</string>
+    <string name="learning_circle_key">%1$s major, relative minor %2$s</string>
+    <string name="learning_listen">Listen to example</string>
+    <string name="learning_stop">Stop example</string>
+    <string name="learning_playing">Playing theory example</string>
+    <string name="learning_retry_audio">Retry playback</string>
+    <string name="learning_practice_links">Practice this lesson</string>
+    <string name="learning_saving">Saving progress…</string>
+    <string name="learning_read_failed">Saved progress could not be read. You can keep learning. Retry to recover it before saving new progress.</string>
+    <string name="learning_write_failed">Progress was not saved. Your current lesson and completion remain here. Retry to save them.</string>
+    <string name="learning_playback_failed">The example could not play. The explanation and diagram are still available.</string>
+    <string name="learning_retry_save">Retry progress saving</string>
+    <string name="learning_back">Back to lesson</string>
+    <string name="learning_back_topics">Back to learning topics</string>
+    <string name="learning_tab_help">TAB reads left to right. e is string 1, B string 2, G string 3, D string 4, A string 5, and E string 6. Numbers are frets; 0 is open. These examples use standard tuning.</string>
+
+    <string name="learning_notes_title">Note names and intervals</string>
+    <string name="learning_notes_text">You can start without reading staff notation. The letters A–G repeat. An octave keeps the same letter name, twelve half steps higher. ♯ raises a note by one half step and ♭ lowers it.\n\nOn one guitar string, one fret is a half step and two frets are a whole step. E–F and B–C are half steps; the other adjacent natural letters are whole steps. An interval describes the distance between notes. C–D is a major second, two half steps; C–E is a major third, four half steps.\n\nChoose a root and interval. Compare their names and degrees on the fretboard, then listen to the two notes.</string>
+    <string name="learning_scales_title">Major and natural minor scales</string>
+    <string name="learning_scales_text">A scale orders notes around a home note, the tonic. Starting from that note, a major scale follows whole, whole, half, whole, whole, whole, half steps. C major is C D E F G A B C.\n\nNatural minor follows whole, half, whole, whole, half, whole, whole steps. A natural minor is A B C D E F G A. Compared with a major scale on the same tonic, its third, sixth, and seventh degrees are lowered.\n\nEach seven-note scale uses each letter once. G major needs F♯; F major needs B♭. Change the key and find the changed note names before listening.</string>
+    <string name="learning_chords_title">Triads and seventh chords</string>
+    <string name="learning_chords_text">A triad stacks a third and a fifth above a root. Major uses 1–3–5, minor 1–♭3–5, diminished 1–♭3–♭5, and augmented 1–3–♯5. C major is C E G; D major is D F♯ A. The third is what distinguishes major from minor.\n\nAdding a seventh makes a four-note chord. Major seventh uses 1–3–5–7; dominant seventh 1–3–5–♭7; minor seventh 1–♭3–5–♭7. Half-diminished uses 1–♭3–♭5–♭7, and diminished seventh 1–♭3–♭5–♭♭7. A double flat lowers the degree twice.\n\nChoose a type, inspect its note names and degrees, and listen to all its tones together. The fretboard shows where each tone occurs, not a prescribed fingering.</string>
+    <string name="learning_diatonic_title">Diatonic chords and functions</string>
+    <string name="learning_diatonic_text">Diatonic chords use only notes from the key. Build a triad on each note of a major scale by taking alternate scale notes. The result is I, ii, iii, IV, V, vi, vii°. Capitals indicate major, lowercase minor, and ° diminished. In C major these are C, Dm, Em, F, G, Am, Bdim.\n\nA chord\'s function describes its role in a progression. I is the tonic, the home chord. ii and IV commonly prepare the dominant V; V and vii° tend toward home. iii and vi can support tonic harmony, though context can change a chord\'s role.\n\nChoose a key and a chord. Read its Roman numeral, function, and constituent notes. The displayed tone degrees are relative to that chord\'s root.</string>
+    <string name="learning_progressions_title">Basic chord progressions</string>
+    <string name="learning_progressions_text">A progression is an ordered series of chords. Roman numerals let the same relationships move to another key. In C major, I–IV–V–I is C–F–G–C: home, preparation, dominant, home.\n\nI–V–vi–IV is C–G–Am–F, a common repeating pattern. ii–V–I is Dm–G–C and makes the preparation, dominant, home motion clear. Chord order and rhythm both affect what you hear.\n\nChoose a progression and key. Select a chord to inspect its tones, then listen to the whole sequence. Try describing each chord\'s role before opening the chord tool.</string>
+    <string name="learning_circle_title">Circle of fifths</string>
+    <string name="learning_circle_text">The circle places major keys a perfect fifth apart. Starting at C, clockwise gives G, D, A, E, B, F♯, then the flat-spelled side D♭, A♭, E♭, B♭, F. F♯ major and G♭ major sound alike, but their written notes differ.\n\nC major has no sharps or flats. G adds F♯; F adds B♭. Adjacent keys usually share six of seven scale notes, so the circle helps explain close key relationships.\n\nA major key and its relative natural minor share their notes but have different home notes. C major pairs with A minor, G major with E minor. Select a key on the circle and inspect its major-scale notes.</string>
+
+    <string name="learning_strumming_title">Strumming</string>
+    <string name="learning_strumming_text">Hold the pick lightly and let a relaxed wrist carry it across the strings. A downstroke moves from low strings toward high strings; an upstroke moves back. Keep the motion small and avoid digging the pick deeply between strings.\n\nA strum produces a brief sweep of chord tones. Downstrokes often emphasize lower strings; lighter upstrokes may emphasize upper strings. Compare that sweep with separately picking each note.</string>
+    <string name="learning_strumming_tab" tools:ignore="TypographyDashes">"e|--0--0--0--0--|\nB|--0--0--0--0--|\nG|--0--0--0--0--|\nD|--2--2--2--2--|\nA|--2--2--2--2--|\nE|--0--0--0--0--|\n    D  D  D  D"</string>
+    <string name="learning_strumming_practice">Fret Em: string 5 at fret 2 and string 4 at fret 2; the other strings are open. At 60 BPM, play one downstroke per beat for four beats. D means downstroke. Then try an upstroke between beats while keeping the wrist moving evenly.</string>
+    <string name="learning_picking_title">Alternate picking</string>
+    <string name="learning_picking_text">Pick one string with alternating downstrokes and upstrokes. Keep the pick close to the string and coordinate each stroke with the fretting finger. Use the smallest comfortable movement.\n\nEach picked note has a distinct attack. Alternation can help keep successive notes even; it does not require a strong accent on every downstroke. Compare it with a series of downstrokes and listen for unwanted changes in volume.</string>
+    <string name="learning_picking_tab" tools:ignore="TypographyDashes">"e|--0--1--2--3--2--1--|\n    D  U  D  U  D  U"</string>
+    <string name="learning_picking_practice">Use string 1. Play open, then frets 1, 2, 3, 2, 1 with index, middle, ring, middle, index fingers. At 60 BPM, play one note per beat. D is downstroke and U is upstroke. Keep all six attacks similar before increasing the tempo.</string>
+    <string name="learning_hammer_title">Hammer-ons and pull-offs</string>
+    <string name="learning_hammer_text">For a hammer-on, pick a lower note and place another fretting finger firmly on a higher fret while the string rings. For a pull-off, keep a lower finger in place and gently pluck the string with the higher finger as it leaves. Simply lifting that finger may leave the lower note too quiet.\n\nThe second note sounds without a new pick attack. These connected notes usually sound smoother than picking both notes. Avoid pulling the string off the edge of the fretboard.</string>
+    <string name="learning_hammer_tab" tools:ignore="TypographyDashes">"e|--5h7--7p5--|"</string>
+    <string name="learning_hammer_practice">On string 1, keep the index finger at fret 5. Pick it and hammer the ring finger onto fret 7. Then pick fret 7 and pull off to the held fret 5. h means hammer-on; p means pull-off. At 60 BPM, let each note occupy one beat and aim for an audible second note.</string>
+    <string name="learning_slide_title">Slides</string>
+    <string name="learning_slide_text">Pick a fretted note, then move the same finger along the string while keeping enough pressure for it to ring. Stop just behind the destination fret. Release excess pressure after arriving.\n\nA slide connects the pitches with an audible movement along the string, unlike lifting the finger and picking two separate notes. Some fret noise is normal; control the arrival pitch and avoid moving neighboring strings.</string>
+    <string name="learning_slide_tab" tools:ignore="TypographyDashes">"G|--5/7--5/7--|"</string>
+    <string name="learning_slide_practice">On string 3, fret 5 with the ring finger, pick once, and slide to fret 7. / marks a rising slide. At 60 BPM, start on one beat and arrive on the next. Pause, return to fret 5, and repeat. Compare with picking frets 5 and 7 separately.</string>
+    <string name="learning_bending_title">Bending</string>
+    <string name="learning_bending_text">Fret a note and push the string sideways across the fretboard while keeping it pressed down. Support the fretting finger with nearby fingers and use a controlled wrist movement. Greater string tension raises the pitch.\n\nA bend moves continuously toward a higher pitch while the finger stays at one fret. Compare that change with playing the target at a higher fret. Start with a small movement and stop if the hand hurts.</string>
+    <string name="learning_bending_tab" tools:ignore="TypographyDashes">"B|--7b9--7--|"</string>
+    <string name="learning_bending_practice">On string 2, play fret 9 first to hear the target. Put the ring finger at fret 7 with the index and middle fingers supporting it. Pick and bend until the pitch matches fret 9, a whole step higher. 7b9 names the starting fret and target pitch, not a slide to fret 9. Release gently and compare.</string>
+    <string name="learning_vibrato_title">Vibrato</string>
+    <string name="learning_vibrato_text">Let a fretted note ring, then make repeated small bends and releases with a relaxed wrist. Keep each movement controlled and return to the original pitch. Begin with a narrow, slow motion.\n\nVibrato repeatedly varies pitch around a sustained note. A single bend aims at another pitch; vibrato returns repeatedly. Listen for a steady pulse rather than an uncontrolled wobble.</string>
+    <string name="learning_vibrato_tab" tools:ignore="TypographyDashes">"B|--7~~~--7~~~--|"</string>
+    <string name="learning_vibrato_practice">On string 2, pick fret 7 with the ring finger and support it with nearby fingers. ~ marks vibrato. Hold the note for four beats at 60 BPM and try a small bend and release on each beat. Repeat once without vibrato to compare the steady and varying pitch.</string>
+    <string name="learning_palm_title">Palm muting</string>
+    <string name="learning_palm_text">Rest the edge of the picking hand lightly on the strings near the bridge and pick normally. Move the contact point a little toward or away from the bridge to adjust the damping. Keep enough freedom to move the pick.\n\nPalm-muted notes have a shorter, more subdued sound than freely ringing notes. Too much pressure or a contact point too far from the bridge can stop the pitch completely. Adjust until the pitch is still clear.</string>
+    <string name="learning_palm_tab" tools:ignore="TypographyDashes">"E|--0--0--0--0--|\n    PM----------"</string>
+    <string name="learning_palm_practice">Pick the open low E string four times at 60 BPM, one downstroke per beat. PM marks palm muting. Repeat with the hand lifted away and compare the length and attack of each note. Return the hand near the bridge and use only enough contact to shorten the sound.</string>
+</resources>
