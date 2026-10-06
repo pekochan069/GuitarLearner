@@ -125,7 +125,7 @@ fun DesignFoundationApp(
                             modifier = Modifier.testTag("navigate_up")) {
                             Icon(painterResource(R.drawable.ic_arrow_back), stringResource(if (
                                 destination == FoundationDestination.Feature(FeatureId.Training) &&
-                                    state.training.stage != TrainingStageUi.Navigation(TrainingPageUi.Root)
+                                    state.training.stage !is TrainingStageUi.Navigation
                             ) R.string.training_back else R.string.back_to_home))
                         }
                     }
@@ -330,6 +330,11 @@ private fun HomeCatalog(state: FoundationState) {
         Column(Modifier.fillMaxWidth().testTag("category_" + group.category.name),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeading(group.category.label)
+            if (group.category == FeatureCategory.Training) {
+                TrainingScreen(state.training.copy(stage = TrainingStageUi.Navigation(TrainingPageUi.Root))) {
+                    state.eventSink(FoundationEvent.Training(it))
+                }
+            }
             group.features.chunked(2).forEach { features ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     features.forEach { feature ->

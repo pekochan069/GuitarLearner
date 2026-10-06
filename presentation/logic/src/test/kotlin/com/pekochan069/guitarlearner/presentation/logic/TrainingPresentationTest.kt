@@ -1,6 +1,8 @@
 package com.pekochan069.guitarlearner.presentation.logic
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
 import androidx.compose.runtime.saveable.SaveableStateRegistry
 import androidx.compose.runtime.withCompositionLocal
@@ -77,11 +79,13 @@ class TrainingPresentationTest {
         FoundationPresenter(TrainingAppearance(), TrainingMetronome(), ControlledTuner(), TrainingChords(), training).test {
             var state = awaitItem()
             assertEquals(listOf(FeatureCategory.Tools, FeatureCategory.Training), state.featureGroups.map { it.category })
-            assertEquals(listOf(FeatureId.Training), state.featureGroups.last().features)
+            assertTrue(state.featureGroups.last().features.isEmpty())
             state.eventSink(FoundationEvent.Training(TrainingEvent.Start))
             assertTrue(training.requests.isEmpty())
             state.eventSink(FoundationEvent.OpenFeature(FeatureId.Training))
-            state = awaitItem()
+            runCurrent()
+            expectNoEvents()
+            assertEquals(FoundationDestination.Home, state.destination)
             assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Root), state.training.stage)
             val menuSink = state.eventSink
             menuSink(FoundationEvent.Training(TrainingEvent.Start))
@@ -96,8 +100,10 @@ class TrainingPresentationTest {
             val staleSetupSink = state.eventSink
             state.eventSink(FoundationEvent.NavigateBack)
             staleSetupSink(FoundationEvent.Training(TrainingEvent.Start))
-            state = awaitItem()
+            runCurrent()
+            state = expectMostRecentItem()
             assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Root), state.training.stage)
+            assertEquals(FoundationDestination.Home, state.destination)
             assertFalse(training.requests.contains(TrainingRequest.Start))
             state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingExerciseUi.IntervalListening)))
             runCurrent()
@@ -130,25 +136,26 @@ class TrainingPresentationTest {
             state.eventSink(FoundationEvent.NavigateBack)
             state = awaitItem()
             assertEquals(FoundationDestination.Feature(FeatureId.Training), state.destination)
-            assertFalse(training.requests.contains(TrainingRequest.Exit))
+            assertEquals(activeRequestCount, training.requests.size)
             assertTrue(state.training.stage is TrainingStageUi.Question)
             state.eventSink(FoundationEvent.NavigateBack)
             state = awaitItem()
             assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Setup(TrainingExerciseUi.IntervalListening)), state.training.stage)
             state.eventSink(FoundationEvent.NavigateBack)
-            state = awaitItem()
+            runCurrent()
+            state = expectMostRecentItem()
             assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Root), state.training.stage)
-            state.eventSink(FoundationEvent.NavigateBack)
-            state = awaitItem()
             assertEquals(FoundationDestination.Home, state.destination)
-            state.eventSink(FoundationEvent.OpenFeature(FeatureId.Training))
-            state = awaitItem()
-            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Root), state.training.stage)
+            state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingExerciseUi.NoteListening)))
+            runCurrent()
+            state = expectMostRecentItem()
             state.eventSink(FoundationEvent.OpenFeature(FeatureId.Metronome))
             val countAfterNavigation = training.requests.size
             state.eventSink(FoundationEvent.Training(TrainingEvent.Start))
             assertEquals(countAfterNavigation, training.requests.size)
-            state = awaitItem()
+            runCurrent()
+            state = expectMostRecentItem()
+            assertEquals(FoundationDestination.Feature(FeatureId.Metronome), state.destination)
             assertEquals(TrainingRequest.Exit, training.requests.last())
             val count = training.requests.size
             state.eventSink(FoundationEvent.Training(TrainingEvent.Start))
@@ -162,8 +169,6 @@ class TrainingPresentationTest {
         var saved: Map<String, List<Any?>> = emptyMap()
         presenterTestOf(trainingPresenter(retained).withRegistry(registry)) {
             var state = awaitItem()
-            state.eventSink(FoundationEvent.OpenFeature(FeatureId.Training))
-            state = awaitItem()
             state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingExerciseUi.IntervalListening)))
             runCurrent()
             state = expectMostRecentItem()
@@ -208,9 +213,10 @@ class TrainingPresentationTest {
             runCurrent()
             var state = expectMostRecentItem()
             assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Root), state.training.stage)
-            assertEquals(FoundationDestination.Feature(FeatureId.Training), state.destination)
+            assertEquals(FoundationDestination.Home, state.destination)
+            val homeRequestCount = legacy.requests.size
             state.eventSink(FoundationEvent.Training(TrainingEvent.Start))
-            assertTrue(legacy.requests.isEmpty())
+            assertEquals(homeRequestCount, legacy.requests.size)
             state.eventSink(FoundationEvent.Training(TrainingEvent.OpenExercise(TrainingExerciseUi.StaffNote)))
             assertEquals(TrainingSubject.Note, legacy.current.value.settings.subject)
             runCurrent()
@@ -221,6 +227,18 @@ class TrainingPresentationTest {
             val question = state.training.stage as TrainingStageUi.Question
             assertEquals(TrainingSubjectUi.Note, question.settings.subject)
             assertEquals(TrainingRepresentationUi.Staff, question.settings.representation)
+        }
+        val oldRoot = saved.mapValues { (_, values) -> values.map { value ->
+            val page = ((value as? MutableState<*>)?.value ?: value) as? List<*>
+            if (page?.firstOrNull() == "setup") mutableStateOf(listOf("root")) else value
+        } }
+        presenterTestOf(trainingPresenter(ControlledTraining()).withRegistry(SaveableStateRegistry(oldRoot) { true })) {
+            awaitItem()
+            runCurrent()
+            val state = expectMostRecentItem()
+            assertEquals(FoundationDestination.Home, state.destination)
+            assertFalse(state.canNavigateBack)
+            assertEquals(TrainingStageUi.Navigation(TrainingPageUi.Root), state.training.stage)
         }
     }
 }

@@ -43,7 +43,7 @@ import org.junit.Test
 class TrainingLayoutTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun enlargedEnglishAndKoreanMenusKeepFiveEqualExercisesAndTheirDirectSetupAccessible() {
+    @Test fun enlargedEnglishAndKoreanExerciseCardsKeepFiveEqualChoicesAndDirectSetupAccessible() {
         val language = mutableStateOf("en")
         val dark = mutableStateOf(false)
         val state = mutableStateOf(TrainingUiState())

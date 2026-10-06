@@ -2,6 +2,7 @@ package com.pekochan069.guitarlearner
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextEquals
@@ -166,9 +167,11 @@ class TrainingSessionTest {
 
     @Test fun flatReadingExercisesOpenSetupDirectlyAndRotationBackKeepTheirIdentity() {
         for (exercise in listOf(TrainingExerciseUi.StaffNote, TrainingExerciseUi.FretboardNote, TrainingExerciseUi.TabNote)) {
-            openTrainingMenu()
+            openHome()
             compose.onNodeWithTag("training_start").assertDoesNotExist()
             TrainingExerciseUi.entries.forEach { compose.onNodeWithTag("training_exercise_${it.name}").assertExists() }
+            compose.onNodeWithTag("feature_Training").assertDoesNotExist()
+            compose.onNodeWithTag("feature_Metronome").assertExists()
             compose.onAllNodes(hasClickAction() and hasAnyAncestor(hasTestTag("training_menu"))).assertCountEquals(5)
             compose.onNodeWithTag("training_exercise_${exercise.name}").performClick()
             awaitSettings()
@@ -178,6 +181,7 @@ class TrainingSessionTest {
                 else -> UiR.string.training_tab_reading
             }
             compose.onNodeWithTag("training_exercise_title").assertTextEquals(compose.activity.getString(title))
+            compose.onNodeWithTag("navigate_up").assertContentDescriptionEquals(compose.activity.getString(UiR.string.back_to_home))
             compose.onNodeWithTag("training_exercise_Interval").assertDoesNotExist()
             compose.onNodeWithTag("training_format").assertDoesNotExist()
             compose.onNodeWithTag("training_instrument").assertDoesNotExist()
@@ -198,8 +202,8 @@ class TrainingSessionTest {
             compose.onNodeWithTag("navigate_up").performClick()
             TrainingExerciseUi.entries.forEach { compose.onNodeWithTag("training_exercise_${it.name}").assertExists() }
             compose.onNodeWithTag("training_start").assertDoesNotExist()
-            compose.onNodeWithTag("navigate_up").performClick()
-            compose.onNodeWithTag("feature_Training").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("navigate_up").assertDoesNotExist()
+            compose.onNodeWithTag("feature_Metronome").performScrollTo().assertIsDisplayed()
         }
     }
 
@@ -225,15 +229,15 @@ class TrainingSessionTest {
         }
     }
 
-    private fun openTrainingMenu() {
-        repeat(3) {
+    private fun openHome() {
+        repeat(2) {
             if (compose.onAllNodesWithTag("navigate_up").fetchSemanticsNodes().isNotEmpty()) compose.onNodeWithTag("navigate_up").performClick()
         }
-        compose.onNodeWithTag("feature_Training").performScrollTo().performClick()
+        compose.onNodeWithTag("home_scroll").assertExists()
     }
 
     private fun openTraining(exercise: TrainingExerciseUi = TrainingExerciseUi.NoteListening) {
-        openTrainingMenu()
+        openHome()
         compose.onNodeWithTag("training_exercise_${exercise.name}").performScrollTo().performClick()
         awaitSettings()
     }
