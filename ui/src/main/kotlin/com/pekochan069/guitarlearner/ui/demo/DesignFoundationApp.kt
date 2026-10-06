@@ -33,8 +33,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -103,110 +110,114 @@ fun DesignFoundationApp(
     val contentSpacing = when { metronome -> 12.dp; chords || progressions -> 16.dp; else -> 24.dp }
     val homeScroll = rememberScrollState()
     val preferencesEnabled = state.settingsStatus != SettingsStatus.Saving
+    var dragVisual by remember(destination, state.progressions.steps, state.progressions.sheet, state.settingsOpen) { mutableStateOf<ProgressionDragVisual?>(null) }
+    var overlayOrigin by remember { mutableStateOf(Offset.Zero) }
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(stringResource(when { chords -> R.string.chord_title; progressions -> R.string.progression_title; else -> R.string.app_name }),
-                        modifier = if (chords || progressions) Modifier.testTag("destination_title").semantics { heading() } else Modifier,
-                        style = MaterialTheme.typography.titleMedium)
-                },
-                navigationIcon = {
-                    if (destination != FoundationDestination.Home) {
-                        IconButton(onClick = { state.eventSink(FoundationEvent.NavigateBack) },
-                            modifier = Modifier.testTag("navigate_up")) {
-                            Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back_to_home))
+    Box(modifier.fillMaxSize().onGloballyPositioned { overlayOrigin = it.positionInRoot() }) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(stringResource(when { chords -> R.string.chord_title; progressions -> R.string.progression_title; else -> R.string.app_name }),
+                            modifier = if (chords || progressions) Modifier.testTag("destination_title").semantics { heading() } else Modifier,
+                            style = MaterialTheme.typography.titleMedium)
+                    },
+                    navigationIcon = {
+                        if (destination != FoundationDestination.Home) {
+                            IconButton(onClick = { state.eventSink(FoundationEvent.NavigateBack) },
+                                modifier = Modifier.testTag("navigate_up")) {
+                                Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back_to_home))
+                            }
                         }
-                    }
-                },
-                actions = {
-                    if (progressions) ProgressionAppBarActions(state.progressions, { state.eventSink(FoundationEvent.Progression(it)) }) {
-                        state.eventSink(FoundationEvent.SetSettingsOpen(true))
-                    } else IconButton(onClick = { state.eventSink(FoundationEvent.SetSettingsOpen(true)) },
-                        modifier = Modifier.testTag("settings")) {
-                        Icon(painterResource(R.drawable.ic_settings), stringResource(R.string.preferences))
-                    }
-                },
-            )
-        },
-        bottomBar = {
-            if (progressions) ProgressionTransportBar(state.progressions) { state.eventSink(FoundationEvent.Progression(it)) }
-        },
-    ) { padding ->
-        Box(
-            Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            key(destination) {
-                if (progressions) {
-                    Box(Modifier.widthIn(max = 680.dp).fillMaxSize()) {
-                        ProgressionTool(state.progressions, { state.eventSink(FoundationEvent.Progression(it)) }) {
-                            CompactMetronomeControl(state.metronome, state.eventSink)
+                    },
+                    actions = {
+                        if (progressions) ProgressionAppBarActions(state.progressions, { state.eventSink(FoundationEvent.Progression(it)) }) {
+                            state.eventSink(FoundationEvent.SetSettingsOpen(true))
+                        } else IconButton(onClick = { state.eventSink(FoundationEvent.SetSettingsOpen(true)) },
+                            modifier = Modifier.testTag("settings")) {
+                            Icon(painterResource(R.drawable.ic_settings), stringResource(R.string.preferences))
                         }
-                    }
-                } else Column(
-                    Modifier.widthIn(max = 680.dp).fillMaxWidth()
-                        .verticalScroll(if (destination == FoundationDestination.Home) homeScroll else rememberScrollState())
-                        .testTag(if (destination == FoundationDestination.Home) "home_scroll" else "feature_scroll")
-                        .padding(contentSpacing),
-                    verticalArrangement = Arrangement.spacedBy(contentSpacing),
-                ) {
-                    destination.title?.takeUnless { chords }?.let { title ->
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                stringResource(title),
-                                Modifier.testTag("destination_title").semantics { heading() },
-                                style = if (metronome) MaterialTheme.typography.headlineMedium
-                                    else MaterialTheme.typography.headlineLarge,
-                            )
-                            if (destination is FoundationDestination.Sample) {
+                    },
+                )
+            },
+            bottomBar = {
+                if (progressions) ProgressionTransportBar(state.progressions) { state.eventSink(FoundationEvent.Progression(it)) }
+            },
+        ) { padding ->
+            Box(
+                Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                key(destination) {
+                    if (progressions) {
+                        Box(Modifier.widthIn(max = 680.dp).fillMaxSize()) {
+                            ProgressionTool(state.progressions, { state.eventSink(FoundationEvent.Progression(it)) }, { dragVisual = it }) {
+                                CompactMetronomeControl(state.metronome, state.eventSink)
+                            }
+                        }
+                    } else Column(
+                        Modifier.widthIn(max = 680.dp).fillMaxWidth()
+                            .verticalScroll(if (destination == FoundationDestination.Home) homeScroll else rememberScrollState())
+                            .testTag(if (destination == FoundationDestination.Home) "home_scroll" else "feature_scroll")
+                            .padding(contentSpacing),
+                        verticalArrangement = Arrangement.spacedBy(contentSpacing),
+                    ) {
+                        destination.title?.takeUnless { chords }?.let { title ->
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    stringResource(when (destination.id) {
-                                        DevelopmentSample.Gallery -> R.string.gallery_subtitle
-                                    }),
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    stringResource(title),
+                                    Modifier.testTag("destination_title").semantics { heading() },
+                                    style = if (metronome) MaterialTheme.typography.headlineMedium
+                                        else MaterialTheme.typography.headlineLarge,
+                                )
+                                if (destination is FoundationDestination.Sample) {
+                                    Text(
+                                        stringResource(when (destination.id) {
+                                            DevelopmentSample.Gallery -> R.string.gallery_subtitle
+                                        }),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                        if (!metronome) CompactMetronomeControl(state.metronome, state.eventSink)
+                        if (destination is FoundationDestination.Sample) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = MaterialTheme.shapes.medium,
+                            ) {
+                                Text(
+                                    stringResource(R.string.gallery_demo_notice),
+                                    Modifier.padding(16.dp),
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
-                    }
-                    if (!metronome) CompactMetronomeControl(state.metronome, state.eventSink)
-                    if (destination is FoundationDestination.Sample) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            shape = MaterialTheme.shapes.medium,
-                        ) {
-                            Text(
-                                stringResource(R.string.gallery_demo_notice),
-                                Modifier.padding(16.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    when (destination) {
-                        FoundationDestination.Home -> HomeCatalog(state)
-                        is FoundationDestination.Feature -> when (destination.id) {
-                            FeatureId.Metronome -> MetronomeSample(
-                                state = state.metronome,
-                                eventSink = state.eventSink,
-                            )
-                            FeatureId.Progressions -> Unit
-                            FeatureId.Chords -> ChordTool(state.chords) { state.eventSink(FoundationEvent.Chord(it)) }
-                            FeatureId.Tuner -> TunerScreen(state.tuner, state.eventSink)
-                        }
-                        is FoundationDestination.Sample -> when (destination.id) {
-                            DevelopmentSample.Gallery -> ComponentGallery(
-                                selected = state.gallerySelected,
-                                onSelectedChange = { state.eventSink(FoundationEvent.SetGallerySelected(it)) },
-                            )
+                        when (destination) {
+                            FoundationDestination.Home -> HomeCatalog(state)
+                            is FoundationDestination.Feature -> when (destination.id) {
+                                FeatureId.Metronome -> MetronomeSample(
+                                    state = state.metronome,
+                                    eventSink = state.eventSink,
+                                )
+                                FeatureId.Progressions -> Unit
+                                FeatureId.Chords -> ChordTool(state.chords) { state.eventSink(FoundationEvent.Chord(it)) }
+                                FeatureId.Tuner -> TunerScreen(state.tuner, state.eventSink)
+                            }
+                            is FoundationDestination.Sample -> when (destination.id) {
+                                DevelopmentSample.Gallery -> ComponentGallery(
+                                    selected = state.gallerySelected,
+                                    onSelectedChange = { state.eventSink(FoundationEvent.SetGallerySelected(it)) },
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+        if (progressions && !state.settingsOpen) dragVisual?.let { ProgressionDragOverlay(it, overlayOrigin) }
     }
 
     if (state.settingsOpen) {

@@ -18,7 +18,8 @@ import com.pekochan069.guitarlearner.ui.R
 import java.math.BigDecimal
 
 @Composable
-fun ProgressionTool(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit, metronomeStatus: @Composable () -> Unit) {
+internal fun ProgressionTool(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit,
+    onDragVisual: (ProgressionDragVisual?) -> Unit, metronomeStatus: @Composable () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val shortViewport = maxHeight < 300.dp
         val wideViewport = maxWidth >= 600.dp
@@ -28,7 +29,7 @@ fun ProgressionTool(state: ProgressionUiState, eventSink: (ProgressionEvent) -> 
             if (!shortViewport) ProgressionSequenceHeader(state, eventSink)
             if (showingPlayback && wideViewport) {
                 Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    ProgressionSequence(state, eventSink, Modifier.weight(1f).fillMaxHeight()) {
+                    ProgressionSequence(state, eventSink, Modifier.weight(1f).fillMaxHeight(), onDragVisual) {
                         if (shortViewport) ProgressionSequenceHeader(state, eventSink)
                         metronomeStatus()
                         ProgressionWarnings(state, eventSink)
@@ -37,7 +38,7 @@ fun ProgressionTool(state: ProgressionUiState, eventSink: (ProgressionEvent) -> 
                 }
             } else {
                 if (showingPlayback) ProgressionPlaybackPane(state, Modifier.fillMaxWidth().height(playbackHeight))
-                ProgressionSequence(state, eventSink, Modifier.fillMaxWidth().weight(1f)) {
+                ProgressionSequence(state, eventSink, Modifier.fillMaxWidth().weight(1f), onDragVisual) {
                     if (shortViewport) ProgressionSequenceHeader(state, eventSink)
                     metronomeStatus()
                     ProgressionWarnings(state, eventSink)
@@ -72,7 +73,7 @@ private fun ProgressionPlaybackPane(state: ProgressionUiState, modifier: Modifie
         Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             when {
                 step == null -> Text(stringResource(R.string.progression_count_in, (state.countInBeat ?: 0) + 1, state.numerator),
-                    Modifier.testTag("progression_active_count_in"), style = MaterialTheme.typography.titleLarge)
+                    Modifier.testTag("progression_count_in"), style = MaterialTheme.typography.titleLarge)
                 step.rest -> Text(step.title(), Modifier.testTag("progression_active_rest"), style = MaterialTheme.typography.titleLarge)
                 else -> Column(Modifier.testTag("progression_active_chord"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(step.title(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("progression_active_name"))
@@ -119,7 +120,6 @@ internal fun ProgressionTransportBar(state: ProgressionUiState, eventSink: (Prog
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         when {
             state.transport == ProgressionTransportUi.Paused -> ProgressionStatus(stringResource(R.string.progression_paused), "progression_paused")
-            state.countInBeat != null -> ProgressionStatus(stringResource(R.string.progression_count_in, (state.countInBeat ?: 0) + 1, state.numerator), "progression_count_in")
             state.transport == ProgressionTransportUi.Preparing -> ProgressionStatus(stringResource(R.string.progression_preparing), "progression_preparing")
         }
         if (state.pendingChange) ProgressionStatus(stringResource(R.string.progression_pending), "progression_pending")

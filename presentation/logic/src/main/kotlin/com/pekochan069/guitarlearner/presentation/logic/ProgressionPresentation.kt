@@ -70,7 +70,7 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
     }
     val content = workspace.draft.content
     val sheet = ProgressionSheetUi.valueOf(sheetName)
-    val source = ProgressionChordSourceUi.valueOf(sourceName)
+    val source = progressionChordSource(sourceName)
     val quality = ChordQualityUi.valueOf(qualityName)
     val query = if (sheet == ProgressionSheetUi.Chord && source == ProgressionChordSourceUi.Named)
         ChordQuery(content.context.copy(capo = 0), ChordIdentity(PitchClass.entries[root], ChordQuality.valueOf(quality.name))) else null
@@ -197,7 +197,7 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
                     it.query == ChordQuery(currentContext.copy(capo = 0), ChordIdentity(PitchClass.entries[root], ChordQuality.valueOf(qualityName))) &&
                         lookupContext == currentContext
                 }
-                val accepted = when (ProgressionChordSourceUi.valueOf(sourceName)) {
+                val accepted = when (progressionChordSource(sourceName)) {
                     ProgressionChordSourceUi.Named -> currentReady?.shapes?.getOrNull(currentReady.selectedIndex)
                     ProgressionChordSourceUi.Manual -> stops.chordShape()
                 }
@@ -311,6 +311,8 @@ internal fun presentProgressions(progressions: Progressions, chords: Chords): Pr
 }
 
 private fun <T> List<T>.updated(index: Int, value: T): List<T> = mapIndexed { i, old -> if (i == index) value else old }
+private fun progressionChordSource(name: String): ProgressionChordSourceUi =
+    if (name == "Saved") ProgressionChordSourceUi.Manual else ProgressionChordSourceUi.valueOf(name)
 private fun List<Int>.chordShape(): ChordShape = ChordShape(map { when (it) {
     -1 -> StringStop.Muted; 0 -> StringStop.Open; else -> StringStop.Fretted(it)
 } })
