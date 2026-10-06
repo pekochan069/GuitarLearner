@@ -53,6 +53,8 @@ import com.pekochan069.guitarlearner.presentation.contract.FoundationState
 import com.pekochan069.guitarlearner.presentation.contract.LanguageOption
 import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
+import com.pekochan069.guitarlearner.presentation.contract.TrainingStageUi
+import com.pekochan069.guitarlearner.presentation.contract.TrainingPageUi
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 
@@ -62,6 +64,7 @@ private val FoundationDestination.title: Int? get() = when (this) {
         FeatureId.Metronome -> R.string.metronome_title
         FeatureId.Chords -> R.string.chord_title
         FeatureId.Tuner -> R.string.tuner_title
+        FeatureId.Training -> R.string.training_title
     }
     is FoundationDestination.Sample -> id.title
 }
@@ -101,6 +104,11 @@ fun DesignFoundationApp(
     val contentSpacing = when { metronome -> 12.dp; chords -> 16.dp; else -> 24.dp }
     val homeScroll = rememberScrollState()
     val preferencesEnabled = state.settingsStatus != SettingsStatus.Saving
+    val trainingPage = if (destination == FoundationDestination.Feature(FeatureId.Training)) when (val stage = state.training.stage) {
+        is TrainingStageUi.Navigation -> stage.page
+        is TrainingStageUi.Question -> stage.key
+        is TrainingStageUi.Results -> "results"
+    } else null
 
     Scaffold(
         modifier = modifier,
@@ -115,7 +123,10 @@ fun DesignFoundationApp(
                     if (destination != FoundationDestination.Home) {
                         IconButton(onClick = { state.eventSink(FoundationEvent.NavigateBack) },
                             modifier = Modifier.testTag("navigate_up")) {
-                            Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back_to_home))
+                            Icon(painterResource(R.drawable.ic_arrow_back), stringResource(if (
+                                destination == FoundationDestination.Feature(FeatureId.Training) &&
+                                    state.training.stage !is TrainingStageUi.Navigation
+                            ) R.string.training_back else R.string.back_to_home))
                         }
                     }
                 },
@@ -132,7 +143,7 @@ fun DesignFoundationApp(
             Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
             contentAlignment = Alignment.TopCenter,
         ) {
-            key(destination) {
+            key(destination, trainingPage) {
                 Column(
                     Modifier.widthIn(max = 680.dp).fillMaxWidth()
                         .verticalScroll(if (destination == FoundationDestination.Home) homeScroll else rememberScrollState())
@@ -182,6 +193,7 @@ fun DesignFoundationApp(
                             )
                             FeatureId.Chords -> ChordTool(state.chords) { state.eventSink(FoundationEvent.Chord(it)) }
                             FeatureId.Tuner -> TunerScreen(state.tuner, state.eventSink)
+                            FeatureId.Training -> TrainingScreen(state.training) { state.eventSink(FoundationEvent.Training(it)) }
                         }
                         is FoundationDestination.Sample -> when (destination.id) {
                             DevelopmentSample.Gallery -> ComponentGallery(
@@ -318,6 +330,11 @@ private fun HomeCatalog(state: FoundationState) {
         Column(Modifier.fillMaxWidth().testTag("category_" + group.category.name),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeading(group.category.label)
+            if (group.category == FeatureCategory.Training) {
+                TrainingScreen(state.training.copy(stage = TrainingStageUi.Navigation(TrainingPageUi.Root))) {
+                    state.eventSink(FoundationEvent.Training(it))
+                }
+            }
             group.features.chunked(2).forEach { features ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     features.forEach { feature ->
@@ -340,11 +357,13 @@ private fun HomeCatalog(state: FoundationState) {
                                     FeatureId.Metronome -> R.drawable.ic_tempo
                                     FeatureId.Tuner -> R.drawable.ic_tuner
                                     FeatureId.Chords -> R.drawable.ic_chords
+                                    FeatureId.Training -> R.drawable.ic_play
                                 }), null, Modifier.size(32.dp))
                                 Text(stringResource(when (feature) {
                                     FeatureId.Metronome -> R.string.metronome_title
                                     FeatureId.Tuner -> R.string.tuner_title
                                     FeatureId.Chords -> R.string.chord_title
+                                    FeatureId.Training -> R.string.training_title
                                 }), Modifier.weight(1f),
                                     style = MaterialTheme.typography.titleMedium)
                             }

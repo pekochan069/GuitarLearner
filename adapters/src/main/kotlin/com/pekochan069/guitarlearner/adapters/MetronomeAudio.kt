@@ -97,15 +97,17 @@ internal class MetronomeAudio(
         job = worker
     }
 
-    override fun stop() {
-        synchronized(trackGate) {
-            stopped = true
-            job?.cancel()
-            try {
-                track?.pause()
-                track?.flush()
-            } catch (_: IllegalStateException) {
-            }
+    override fun stop(): Boolean = synchronized(trackGate) {
+        stopped = true
+        job?.cancel()
+        try {
+            track?.pause()
+            track?.flush()
+            true
+        } catch (_: IllegalStateException) {
+            track?.release()
+            track = null
+            false
         }
     }
 
