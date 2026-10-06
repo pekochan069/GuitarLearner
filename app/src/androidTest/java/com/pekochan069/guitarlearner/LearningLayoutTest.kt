@@ -15,6 +15,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -51,6 +52,7 @@ class LearningLayoutTest {
                         LearningScreen(LearningUiState(
                             lesson = lesson.value,
                             roots = listOf("C", "G", "F"),
+                            circle = circle,
                             notes = listOf(LearningNoteUi("C", "1"), LearningNoteUi("E", "3"), LearningNoteUi("G", "5")),
                             frets = listOf(LearningFretUi(5, 3, "C", "1")),
                             audio = LearningAudioUi.Failed,
@@ -75,6 +77,14 @@ class LearningLayoutTest {
             compose.onNodeWithTag("learning_retry_audio").performScrollTo().assertHasClickAction()
                 .assertHeightIsAtLeast(48.dp).performClick()
             compose.runOnIdle { assertEquals(listOf(LearningEvent.RetrySave, LearningEvent.Listen), events.takeLast(2)) }
+            compose.runOnIdle { lesson.value = LessonUi.CircleOfFifths }
+            val controls = circle.map { compose.onNodeWithTag("learning_circle_${it.tonic}").getUnclippedBoundsInRoot() }
+            controls.forEachIndexed { index, first ->
+                controls.drop(index + 1).forEach { second ->
+                    assertFalse("$locale circle key touch targets overlap", first.left < second.right && first.right > second.left &&
+                        first.top < second.bottom && first.bottom > second.top)
+                }
+            }
             for (technique in listOf(LessonUi.Strumming, LessonUi.AlternatePicking, LessonUi.HammerOnPullOff,
                 LessonUi.Slide, LessonUi.Bending, LessonUi.Vibrato, LessonUi.PalmMute)) {
                 compose.runOnIdle { lesson.value = technique }
@@ -106,4 +116,9 @@ class LearningLayoutTest {
             setLocale(Locale.forLanguageTag(language))
         })
     }
+
+    private val circle = listOf(
+        "C" to "A", "G" to "E", "D" to "B", "A" to "F♯", "E" to "C♯", "B" to "G♯",
+        "F♯" to "D♯", "D♭" to "B♭", "A♭" to "F", "E♭" to "C", "B♭" to "G", "F" to "D",
+    ).map { (major, minor) -> LearningCircleKeyUi(major, minor) }
 }

@@ -276,7 +276,7 @@ private fun LearningCircle(state: LearningUiState, eventSink: (LearningEvent) ->
             state.circle.forEachIndexed { index, key ->
                 val angle = Math.PI * 2 * index / state.circle.size - Math.PI / 2
                 val center = diameter / 2
-                val radius = diameter * 0.38f
+                val radius = diameter * 0.40f
                 val x = center + radius * cos(angle).toFloat() - nodeSize / 2
                 val y = center + radius * sin(angle).toFloat() - nodeSize / 2
                 val rootIndex = state.roots.indexOf(key.tonic)
