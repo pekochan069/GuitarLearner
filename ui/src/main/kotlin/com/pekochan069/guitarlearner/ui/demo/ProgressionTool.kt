@@ -87,16 +87,25 @@ private fun ProgressionPlaybackPane(state: ProgressionUiState, modifier: Modifie
 @Composable
 internal fun ProgressionAppBarActions(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit, preferences: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val failedDraft = state.unsynced && state.notice == ProgressionNotice.WriteFailed
+    val draftDescription = stringResource(if (state.unsynced) R.string.progression_draft_unsaved else R.string.progression_draft_saved)
     IconButton(onClick = { eventSink(ProgressionEvent.OpenSheet(ProgressionSheetUi.Save)) },
         enabled = state.steps.isNotEmpty() && !state.busy && !state.readFailed && !state.invalidSettings,
-        modifier = Modifier.testTag("progression_open_save")) {
-        Icon(painterResource(R.drawable.ic_save), stringResource(R.string.progression_save))
+        modifier = Modifier.size(48.dp).testTag("progression_open_save").semantics { stateDescription = draftDescription }) {
+        BadgedBox(badge = {
+            if (state.unsynced) Badge(Modifier.testTag("progression_draft_badge"),
+                containerColor = if (failedDraft) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+        }) { Icon(painterResource(R.drawable.ic_save), stringResource(R.string.progression_save)) }
     }
     Box {
         IconButton(onClick = { expanded = true }, modifier = Modifier.testTag("progression_actions")) {
             Icon(painterResource(R.drawable.ic_more), stringResource(R.string.progression_actions))
         }
         DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
+            if (state.unsynced) DropdownMenuItem(text = { Text(stringResource(R.string.chord_retry_draft)) },
+                enabled = !state.readFailed && !state.busy, onClick = {
+                    expanded = false; eventSink(ProgressionEvent.RetryDraftWrite)
+                }, modifier = Modifier.testTag("progression_retry_draft"))
             DropdownMenuItem(text = { Text(stringResource(R.string.progression_settings)) }, onClick = {
                 expanded = false; eventSink(ProgressionEvent.OpenSheet(ProgressionSheetUi.Settings))
             }, modifier = Modifier.testTag("progression_context"))
@@ -148,7 +157,8 @@ internal fun ProgressionTransportBar(state: ProgressionUiState, eventSink: (Prog
 
 @Composable
 private fun ProgressionWarnings(state: ProgressionUiState, eventSink: (ProgressionEvent) -> Unit) {
-    state.notice?.let { ProgressionStatus(stringResource(it.label), "progression_error", true) }
+    state.notice?.takeUnless { state.unsynced && it == ProgressionNotice.WriteFailed }
+        ?.let { ProgressionStatus(stringResource(it.label), "progression_error", true) }
     state.stopReason?.takeUnless { it == MetronomeStopUi.User }?.let {
         ProgressionStatus(stringResource(when (it) { MetronomeStopUi.FocusLoss -> R.string.progression_focus_lost
             MetronomeStopUi.OutputDisconnected -> R.string.progression_output_removed; else -> R.string.progression_service_ended }), "progression_interruption", true)
@@ -162,11 +172,6 @@ private fun ProgressionWarnings(state: ProgressionUiState, eventSink: (Progressi
     if (state.readFailed) {
         ProgressionStatus(stringResource(R.string.progression_read_failed), "progression_read_failed", true)
         FilledTonalButton(onClick = { eventSink(ProgressionEvent.RetryStorageRead) }, modifier = Modifier.testTag("progression_retry_read")) { Text(stringResource(R.string.chord_retry_read)) }
-    }
-    if (state.unsynced) {
-        ProgressionStatus(stringResource(R.string.progression_unsynced), "progression_unsynced", true)
-        FilledTonalButton(onClick = { eventSink(ProgressionEvent.RetryDraftWrite) }, enabled = !state.readFailed && !state.busy,
-            modifier = Modifier.testTag("progression_retry_draft")) { Text(stringResource(R.string.chord_retry_draft)) }
     }
 }
 

@@ -7,6 +7,7 @@ import android.view.ContextThemeWrapper
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
@@ -172,6 +173,8 @@ class ProgressionUiTest {
         compose.onNodeWithTag("progression_sheet").assertExists()
         compose.onNodeWithTag("progression_name").assertTextContains("연습")
         assertTrue(host.current.value.records.isEmpty())
+        compose.waitUntil(5_000) { compose.onAllNodes(hasTestTag("progression_save") and isEnabled()).fetchSemanticsNodes().size == 1 &&
+            compose.onNodeWithTag("progression_save").isDisplayed() }
         click("progression_save")
         compose.waitUntil(5_000) { host.current.value.records.size == 1 }
         awaitSheetClosed()
@@ -295,6 +298,60 @@ class ProgressionUiTest {
         click("progression_stop")
     }
 
+    @Test fun failedDraftEditUsesTheSaveBadgeAndMenuRetryWithoutMovingTheMusic(): Unit {
+        runBlocking {
+            host.execute(ProgressionCommand.Insert(ProgressionStep.Chord("", chords.current.value.draft.shape)))
+            host.execute(ProgressionCommand.Insert(ProgressionStep.Rest()))
+        }
+        show(Locale.ENGLISH, false, 1f)
+        click("feature_Progressions")
+        val viewport = compose.onNodeWithTag("progression_list").getUnclippedBoundsInRoot()
+        val rows = (0..1).map { compose.onNodeWithTag("progression_step_$it").getUnclippedBoundsInRoot() }
+        val timing = compose.onNodeWithTag("progression_settings").getUnclippedBoundsInRoot()
+        val save = compose.onNodeWithTag("progression_open_save").getUnclippedBoundsInRoot()
+        compose.onNodeWithTag("progression_open_save").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Draft saved"))
+        step(0)
+        val gate = preferences.blockNextCommit()
+        preferences.failNext = true
+        click("progression_dot_0", scroll = true)
+        compose.waitUntil(5_000) { gate.entered.isCompleted && host.current.value.persistence == DraftPersistence.Unsynced }
+        val edited = host.current.value.draft.content
+        assertTrue(edited.steps[0].duration.dotted)
+        closeSheet()
+        compose.onNodeWithTag("progression_draft_badge", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("progression_open_save").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Draft not saved"))
+        assertEquals(rows, (0..1).map { compose.onNodeWithTag("progression_step_$it").getUnclippedBoundsInRoot() })
+        assertEquals(timing, compose.onNodeWithTag("progression_settings").getUnclippedBoundsInRoot())
+        assertEquals(save, compose.onNodeWithTag("progression_open_save").getUnclippedBoundsInRoot())
+        gate.open()
+        compose.waitUntil(5_000) { host.current.value.persistence == DraftPersistence.Unsynced && host.current.value.actionFailure == ProgressionFailure.WriteFailed }
+        compose.onNodeWithTag("progression_draft_badge", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("progression_open_save").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Draft not saved"))
+        compose.onNodeWithTag("progression_unsynced").assertDoesNotExist()
+        compose.onNodeWithTag("progression_error").assertDoesNotExist()
+        assertEquals(viewport, compose.onNodeWithTag("progression_list").getUnclippedBoundsInRoot())
+        assertEquals(rows, (0..1).map { compose.onNodeWithTag("progression_step_$it").getUnclippedBoundsInRoot() })
+        assertEquals(timing, compose.onNodeWithTag("progression_settings").getUnclippedBoundsInRoot())
+        assertEquals(save, compose.onNodeWithTag("progression_open_save").getUnclippedBoundsInRoot())
+        diagnostic("draft_badge_unsaved")
+        click("progression_play")
+        compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Playing }
+        assertEquals(DraftPersistence.Unsynced, host.current.value.persistence)
+        assertNull(host.current.value.actionFailure)
+        compose.onNodeWithTag("progression_draft_badge", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("progression_open_save").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Draft not saved"))
+        click("progression_stop")
+        compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Stopped }
+        menu("progression_retry_draft")
+        compose.waitUntil(5_000) { host.current.value.persistence == DraftPersistence.Synced && host.current.value.actionFailure == null }
+        compose.onNodeWithTag("progression_draft_badge", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("progression_open_save").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Draft saved"))
+        assertEquals(edited, host.current.value.draft.content)
+        assertTrue(host.current.value.records.isEmpty())
+        assertEquals(rows, (0..1).map { compose.onNodeWithTag("progression_step_$it").getUnclippedBoundsInRoot() })
+        assertEquals(timing, compose.onNodeWithTag("progression_settings").getUnclippedBoundsInRoot())
+    }
+
     @Test fun longDragRendersAboveTheFooterCancelsAndScrollsToTheEndBeforeOneDrop(): Unit {
         runBlocking {
             host.execute(ProgressionCommand.Insert(ProgressionStep.Chord("", chords.current.value.draft.shape)))
@@ -340,7 +397,7 @@ class ProgressionUiTest {
         try {
             val node = compose.onNodeWithTag(tag)
             if (scroll) node.performScrollTo()
-            node.assertIsDisplayed().assertHasClickAction().performClick()
+            node.assertIsDisplayed().assertIsEnabled().assertHasClickAction().performClick()
         }
         catch (failure: AssertionError) { diagnostic("failed_$tag"); throw failure }
     }

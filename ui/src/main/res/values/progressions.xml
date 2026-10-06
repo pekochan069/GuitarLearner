@@ -65,7 +65,8 @@
     <string name="progression_copy_current">Chord viewer draft</string>
     <string name="progression_apply_chord">Apply chord shape</string>
     <string name="progression_delete_title">Delete progression?</string>
-    <string name="progression_unsynced">The edited draft has not been saved on this device. Retry to keep it after restart.</string>
+    <string name="progression_draft_unsaved">Draft not saved</string>
+    <string name="progression_draft_saved">Draft saved</string>
     <string name="progression_read_failed">Saved progressions could not be read. Existing data has been preserved.</string>
     <string name="progression_write_failed">Save failed. Your edited progression is still available. Retry saving.</string>
     <string name="progression_invalid_tie">A tie needs the same shape in the next chord.</string>
