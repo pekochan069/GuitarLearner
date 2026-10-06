@@ -211,19 +211,45 @@ class ProgressionPresentationTest {
             assertEquals(shape, chords.current.value.draft.shape)
         }
     }
-    @Test fun copyTabRequiresAChosenShapeAndClosingNamedLookupCannotApplyIt() = runTest {
+    @Test fun manualTabKeepsTheCopiedShapeAndClosingNamedLookupCannotApplyIt() = runTest {
         val port = ControlledProgressions()
-        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+        val chords = ProgressionSourceChords(ChordDraft("Viewer C", shape = shape))
+        val viewer = chords.current.value
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), chords, port).test {
             var state = awaitItem()
             state.progression(ProgressionEvent.OpenEditor())
             state = stateWhere { it.progressions.editor.lookup == ChordLookupUi.Ready }
-            state.progression(ProgressionEvent.SetChordSource(ProgressionChordSourceUi.Saved))
-            state = stateWhere { it.progressions.chordSource == ProgressionChordSourceUi.Saved }
-            assertFalse(state.progressions.editor.canSave)
-            state.progression(ProgressionEvent.CommitEditor)
-            state.progression(ProgressionEvent.CloseSheet)
-            stateWhere { it.progressions.sheet == ProgressionSheetUi.None && it.progressions.editor.lookup == ChordLookupUi.Idle && !it.progressions.busy }
+            state.progression(ProgressionEvent.SetChordSource(ProgressionChordSourceUi.Manual))
+            state = stateWhere { it.progressions.chordSource == ProgressionChordSourceUi.Manual && it.progressions.editor.lookup == ChordLookupUi.Idle }
             assertTrue(port.commands.isEmpty())
+            state.progression(ProgressionEvent.CopyCurrentChord)
+            state = stateWhere { it.progressions.editor.name == "Viewer C" && it.progressions.editor.shapeSymbol == "C" }
+            assertTrue(state.progressions.editor.canSave)
+            assertEquals(ChordStopUi.Muted, state.progressions.editor.strings[0].stop)
+            assertEquals(3, state.progressions.editor.strings[1].fret)
+            state.progression(ProgressionEvent.SetChordSource(ProgressionChordSourceUi.Named))
+            state = stateWhere { it.progressions.editor.lookup == ChordLookupUi.Ready }
+            state.progression(ProgressionEvent.CloseSheet)
+            state = stateWhere { it.progressions.sheet == ProgressionSheetUi.None && it.progressions.editor.lookup == ChordLookupUi.Idle && !it.progressions.busy }
+            state.progression(ProgressionEvent.CommitEditor)
+            runCurrent()
+            assertTrue(port.commands.isEmpty())
+            assertEquals(viewer, chords.current.value)
+        }
+    }
+    @Test fun mainReorderAndRemovalSendOneAtomicCommandEachWithoutOpeningAnEditor() = runTest {
+        val port = ControlledProgressions()
+        port.current.value = ProgressionWorkspace(draft = ProgressionDraft(content = ProgressionContent(steps = List(4) { ProgressionStep.Chord("", shape) })))
+        FoundationPresenter(ProgressionAppearance(), ProgressionMetronome(), ControlledTuner(), ProgressionSourceChords(), port).test {
+            val state = awaitItem()
+            state.progression(ProgressionEvent.Move(1, 2))
+            runCurrent()
+            assertEquals(listOf(ProgressionCommand.Move(1, 3)), port.commands)
+            port.result = Either.Left(ProgressionFailure.WriteFailed)
+            state.progression(ProgressionEvent.Remove(0))
+            val failed = stateWhere { it.progressions.notice == ProgressionNotice.WriteFailed }
+            assertEquals(listOf(ProgressionCommand.Move(1, 3), ProgressionCommand.Remove(0)), port.commands)
+            assertEquals(ProgressionSheetUi.None, failed.progressions.sheet)
         }
     }
     @Test fun stepInspectionKeepsPlaybackAndSelectedStartOnlyClosesAfterAcceptance() = runTest {

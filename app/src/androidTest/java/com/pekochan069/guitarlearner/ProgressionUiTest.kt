@@ -6,6 +6,8 @@ import android.content.res.Configuration
 import android.view.ContextThemeWrapper
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
@@ -73,8 +75,9 @@ class ProgressionUiTest {
         val source = chords.current.value.records.single()
         repeat(2) {
             click("progression_add_chord")
-            click("progression_source_Saved")
-            click("progression_copy_${source.id}", scroll = true)
+            click("progression_source_Manual")
+            click("progression_shapes", scroll = true)
+            click("progression_copy_${source.id}")
             fret(5, 0).assertIsOn()
             click("progression_commit_chord")
             compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == it + 1 }
@@ -138,8 +141,9 @@ class ProgressionUiTest {
         show(Locale.KOREAN, true, 2f)
         click("feature_Progressions")
         click("progression_add_chord")
-        click("progression_source_Saved")
-        click("progression_copy_current", scroll = true)
+        click("progression_source_Manual")
+        click("progression_shapes", scroll = true)
+        click("progression_copy_current")
         fret(5, 3).performClick()
         click("progression_commit_chord")
         compose.waitUntil(5_000) { host.current.value.draft.content.steps.isNotEmpty() }
@@ -148,13 +152,13 @@ class ProgressionUiTest {
         val row = compose.onNodeWithTag("progression_step_0").getUnclippedBoundsInRoot()
         val viewport = compose.onNodeWithTag("progression_list").getUnclippedBoundsInRoot()
         assertTrue("The entire chord row must fit in the large-text landscape viewport", row.top >= viewport.top && row.bottom <= viewport.bottom)
-        click("progression_settings")
+        timing()
         compose.onNodeWithTag("chord_capo").performScrollTo().performTextReplacement("bad")
         closeSheet()
         compose.onNodeWithTag("progression_list").performScrollToNode(hasTestTag("progression_context_error"))
         compose.onNodeWithTag("progression_context_error").assertIsDisplayed()
         compose.onNodeWithTag("progression_play").assertIsDisplayed().assertIsNotEnabled()
-        click("progression_settings")
+        timing()
         compose.onNodeWithTag("chord_capo").performScrollTo().performTextReplacement("0")
         closeSheet()
         click("progression_open_save")
@@ -206,10 +210,11 @@ class ProgressionUiTest {
             }
             val symbol = identity.root.symbol + identity.quality.symbol
             compose.waitUntil(10_000) {
-                compose.onAllNodes(hasTestTag("progression_lookup_shape") and hasText("Shape name without capo · $symbol")).fetchSemanticsNodes().size == 1 &&
+                compose.onAllNodes(hasTestTag("progression_lookup_shape") and hasText(symbol)).fetchSemanticsNodes().size == 1 &&
                     compose.onAllNodes(hasTestTag("progression_commit_chord") and isEnabled()).fetchSemanticsNodes().size == 1
             }
             compose.onNodeWithTag("progression_lookup_fretboard").assertExists()
+            compose.onNodeWithTag("progression_source_Saved").assertDoesNotExist()
             compose.onNodeWithTag("progression_commit_chord").assertIsDisplayed().assertIsEnabled()
             click("progression_commit_chord")
             compose.waitUntil(5_000) { host.current.value.draft.content.steps.size == index + 1 }
@@ -229,11 +234,22 @@ class ProgressionUiTest {
         compose.onNodeWithTag("progression_play").assertIsDisplayed().assertIsEnabled()
         compose.onNodeWithTag("progression_stop").assertIsDisplayed()
         compose.onNodeWithTag("progression_loop").assertIsDisplayed()
+        val originalSteps = host.current.value.draft.content.steps
+        drag(1, 3)
+        val reordered = listOf(originalSteps[0], originalSteps[2], originalSteps[3], originalSteps[1])
+        compose.waitUntil(5_000) { host.current.value.draft.content.steps == reordered }
+        compose.onNodeWithTag("progression_sheet").assertDoesNotExist()
+        listOf("C", "F", "G", "Am").forEachIndexed { index, symbol ->
+            compose.onNodeWithTag("progression_step_$index").assertTextContains(symbol).assertTextContains("Quarter note")
+            compose.onNodeWithTag("progression_quick_remove_$index").assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+        }
         assertEquals(originalSource, chords.current.value)
         click("progression_loop")
         click("progression_play")
         compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Playing }
         compose.onNodeWithTag("progression_pause").assertIsDisplayed().assertIsEnabled()
+        compose.waitUntil(5_000) { compose.onNodeWithTag("progression_active_fretboard").isDisplayed() }
+        (0..5).forEach { compose.onNodeWithTag("progression_active_position_$it").assertIsDisplayed() }
         step(0)
         compose.onNodeWithTag("progression_step_0_fretboard").assertExists()
         assertTrue(host.current.value.playback is ProgressionPlayback.Playing)
@@ -245,9 +261,73 @@ class ProgressionUiTest {
         compose.onNodeWithTag("progression_resume").assertIsDisplayed().assertIsEnabled()
         click("progression_resume")
         compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Playing }
+        compose.onNodeWithTag("progression_list").performScrollToNode(hasTestTag("progression_quick_remove_0"))
+        click("progression_quick_remove_0")
+        compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Stopped && host.current.value.draft.content.steps == reordered.drop(1) }
+        compose.onNodeWithTag("progression_sheet").assertDoesNotExist()
+        compose.onNodeWithTag("progression_active_fretboard").assertDoesNotExist()
+        click("progression_play")
+        compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Playing }
         click("progression_stop")
         compose.waitUntil(5_000) { host.current.value.playback is ProgressionPlayback.Stopped }
         assertEquals(originalSource, chords.current.value)
+    }
+
+    @Test fun aRestClearsTheActiveFretboardWithoutMovingTheSequence(): Unit {
+        runBlocking {
+            host.execute(ProgressionCommand.Insert(ProgressionStep.Chord("", chords.current.value.draft.shape, NoteDuration(NoteValue.Whole))))
+            host.execute(ProgressionCommand.Insert(ProgressionStep.Rest(NoteDuration(NoteValue.Whole))))
+            host.execute(ProgressionCommand.SetTempo(120))
+            host.execute(ProgressionCommand.SetSignature(BeatUnit.Quarter, 1))
+            host.execute(ProgressionCommand.SetLoop(true))
+        }
+        show(Locale.ENGLISH, false, 1f)
+        click("feature_Progressions")
+        click("progression_play")
+        compose.waitUntil(5_000) { compose.onNodeWithTag("progression_active_fretboard").isDisplayed() }
+        val bounds = compose.onNodeWithTag("progression_list").getUnclippedBoundsInRoot()
+        (0..5).forEach { compose.onNodeWithTag("progression_active_position_$it").assertIsDisplayed() }
+        compose.waitUntil(5_000) { compose.onNodeWithTag("progression_active_rest").isDisplayed() }
+        compose.onNodeWithTag("progression_active_fretboard").assertDoesNotExist()
+        compose.onNodeWithTag("progression_playback_pane").assertIsDisplayed()
+        assertEquals(bounds, compose.onNodeWithTag("progression_list").getUnclippedBoundsInRoot())
+        compose.waitUntil(5_000) { compose.onNodeWithTag("progression_active_fretboard").isDisplayed() }
+        assertEquals(bounds, compose.onNodeWithTag("progression_list").getUnclippedBoundsInRoot())
+        click("progression_stop")
+    }
+
+    @Test fun longDragRendersAboveTheFooterCancelsAndScrollsToTheEndBeforeOneDrop(): Unit {
+        runBlocking {
+            host.execute(ProgressionCommand.Insert(ProgressionStep.Chord("", chords.current.value.draft.shape)))
+            repeat(9) { host.execute(ProgressionCommand.Insert(ProgressionStep.Rest(NoteDuration(if (it == 8) NoteValue.Whole else NoteValue.Half)))) }
+        }
+        show(Locale.ENGLISH, false, 1f)
+        click("feature_Progressions")
+        val original = host.current.value.draft.content.steps
+        val viewport = compose.onNodeWithTag("progression_list").fetchSemanticsNode().boundsInRoot
+        val footer = compose.onNodeWithTag("progression_transport").fetchSemanticsNode().boundsInRoot
+        beginDrag(0, Offset(24f, footer.center.y - viewport.top))
+        compose.waitUntil(5_000) { compose.onNodeWithTag("progression_drag_overlay").isDisplayed() }
+        val overlay = compose.onNodeWithTag("progression_drag_overlay").fetchSemanticsNode().boundsInRoot
+        assertTrue("The dragged card must extend beyond the list and over the footer", overlay.bottom > viewport.bottom && overlay.bottom > footer.top)
+        assertEquals(original, host.current.value.draft.content.steps)
+        compose.onNodeWithTag("progression_list").performTouchInput { cancel() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("progression_drag_overlay").fetchSemanticsNodes().isEmpty() }
+        assertEquals(original, host.current.value.draft.content.steps)
+        compose.onNodeWithTag("progression_sheet").assertDoesNotExist()
+        compose.onNodeWithTag("progression_list").performScrollToNode(hasTestTag("progression_step_0"))
+        beginDrag(0, Offset(24f, viewport.height - 2f))
+        compose.waitUntil(5_000) {
+            val last = compose.onAllNodesWithTag("progression_step_9").fetchSemanticsNodes().singleOrNull()?.boundsInRoot
+            val placeholder = compose.onAllNodesWithTag("progression_step_0", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()?.boundsInRoot
+            last != null && placeholder != null && last.top < placeholder.top && placeholder.bottom <= viewport.bottom
+        }
+        compose.onNodeWithTag("progression_drag_overlay").assertIsDisplayed()
+        assertEquals(original, host.current.value.draft.content.steps)
+        compose.onNodeWithTag("progression_list").performTouchInput { up() }
+        compose.waitUntil(5_000) { host.current.value.draft.content.steps == original.drop(1) + original.first() }
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("progression_drag_overlay").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("progression_sheet").assertDoesNotExist()
     }
 
     private fun click(tag: String, scroll: Boolean = false) {
@@ -259,6 +339,34 @@ class ProgressionUiTest {
         catch (failure: AssertionError) { diagnostic("failed_$tag"); throw failure }
     }
     private fun menu(tag: String) { click("progression_actions"); click(tag) }
+    private fun timing() {
+        if (!compose.onNodeWithTag("progression_settings").isDisplayed()) {
+            compose.onNodeWithTag("progression_list").performScrollToNode(hasTestTag("progression_settings"))
+        }
+        click("progression_settings")
+    }
+    private fun drag(origin: Int, destination: Int) {
+        val viewport = compose.onNodeWithTag("progression_list").fetchSemanticsNode().boundsInRoot
+        val first = compose.onNodeWithTag("progression_step_$origin").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val last = compose.onNodeWithTag("progression_step_$destination").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val start = Offset(first.left + first.width * 0.25f - viewport.left, first.center.y - viewport.top)
+        val end = Offset(start.x, last.center.y - viewport.top)
+        compose.onNodeWithTag("progression_list").performTouchInput {
+            val hold = viewConfiguration.longPressTimeoutMillis + 100
+            swipe(curve = { time -> if (time <= hold) start else lerp(start, end, (time - hold) / 400f) },
+                durationMillis = hold + 400, keyTimes = listOf(hold))
+        }
+    }
+    private fun beginDrag(origin: Int, end: Offset) {
+        val viewport = compose.onNodeWithTag("progression_list").fetchSemanticsNode().boundsInRoot
+        val row = compose.onNodeWithTag("progression_step_$origin").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val start = Offset(row.left + row.width * 0.25f - viewport.left, row.center.y - viewport.top)
+        compose.onNodeWithTag("progression_list").performTouchInput {
+            down(start)
+            moveTo(start, delayMillis = viewConfiguration.longPressTimeoutMillis + 100)
+            moveTo(end, delayMillis = 200)
+        }
+    }
     private fun step(index: Int) {
         compose.onNodeWithTag("progression_list").performScrollToNode(hasTestTag("progression_step_$index"))
         click("progression_step_$index")
