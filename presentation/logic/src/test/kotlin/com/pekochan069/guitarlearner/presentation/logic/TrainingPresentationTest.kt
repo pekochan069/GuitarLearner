@@ -76,7 +76,7 @@ class TrainingPresentationTest {
 
     @Test fun trainingMenuBackAndLiveStageGuardsKeepExercisePagesSeparate() = runTest {
         val training = ControlledTraining()
-        FoundationPresenter(TrainingAppearance(), TrainingMetronome(), ControlledTuner(), TrainingChords(), training).test {
+        FoundationPresenter(TrainingAppearance(), TrainingMetronome(), ControlledTuner(), TrainingChords(), ControlledProgressions(), training).test {
             var state = awaitItem()
             assertEquals(listOf(FeatureCategory.Tools, FeatureCategory.Training), state.featureGroups.map { it.category })
             assertTrue(state.featureGroups.last().features.isEmpty())
@@ -243,7 +243,7 @@ class TrainingPresentationTest {
     }
 }
 
-private fun trainingPresenter(training: Training) = FoundationPresenter(TrainingAppearance(), TrainingMetronome(), ControlledTuner(), TrainingChords(), training)
+private fun trainingPresenter(training: Training) = FoundationPresenter(TrainingAppearance(), TrainingMetronome(), ControlledTuner(), TrainingChords(), ControlledProgressions(), training)
 private fun FoundationPresenter.withRegistry(registry: SaveableStateRegistry): @Composable () -> FoundationState =
     { withCompositionLocal(LocalSaveableStateRegistry provides registry) { present() } }
 

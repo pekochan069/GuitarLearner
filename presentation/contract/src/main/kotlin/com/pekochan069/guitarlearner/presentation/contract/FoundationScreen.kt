@@ -9,7 +9,7 @@ import kotlinx.parcelize.Parcelize
 data object FoundationScreen : Screen
 
 enum class FeatureCategory { Tools, Training, Learning }
-enum class FeatureId(val savedId: String) { Metronome("metronome"), Tuner("tuner"), Chords("chords"), Training("training") }
+enum class FeatureId(val savedId: String) { Metronome("metronome"), Tuner("tuner"), Chords("chords"), Progressions("progressions"), Training("training") }
 enum class DevelopmentSample(val savedId: String) { Gallery("gallery") }
 
 sealed interface FoundationDestination {
@@ -37,6 +37,7 @@ data class FoundationState(
     val tuner: TunerUiState,
     val metronome: MetronomeUiState,
     val chords: ChordUiState,
+    val progressions: ProgressionUiState,
     val training: TrainingUiState,
     val gallerySelected: Boolean,
     val settingsOpen: Boolean,
@@ -50,6 +51,7 @@ data class FoundationState(
 }
 
 sealed interface FoundationEvent : CircuitUiEvent {
+    data class Progression(val value: ProgressionEvent) : FoundationEvent
     data class Training(val value: TrainingEvent) : FoundationEvent
     data class Chord(val value: ChordEvent) : FoundationEvent
     data class OpenFeature(val id: FeatureId) : FoundationEvent

@@ -15,6 +15,8 @@ import com.pekochan069.guitarlearner.domain.GuitarPitchDetector
 import com.pekochan069.guitarlearner.domain.Metronome
 import com.pekochan069.guitarlearner.domain.MetronomeCommand
 import com.pekochan069.guitarlearner.domain.MonotonicNanos
+import com.pekochan069.guitarlearner.domain.ProgressionCommand
+import com.pekochan069.guitarlearner.domain.Progressions
 import com.pekochan069.guitarlearner.domain.ToleranceStorageStatus
 import com.pekochan069.guitarlearner.domain.Tuner
 import com.pekochan069.guitarlearner.domain.TunerFailure
@@ -58,6 +60,7 @@ enum class TunerVisibility { Foreground, ConfigurationContinuation, Background, 
 class AndroidTunerHost internal constructor(
     private val ownedScope: CoroutineScope,
     private val metronome: Metronome,
+    private val progressions: Progressions,
     private val captureFactory: TunerCaptureFactory,
     private val storage: TunerToleranceStore,
     private val permissionGranted: () -> Boolean,
@@ -128,6 +131,10 @@ class AndroidTunerHost internal constructor(
         resetMeasurement()
         snapshot.value = snapshot.value.copy(listening = TunerListening.Starting)
         preparation = ownedScope.launch(main) {
+            val progressionStopped = progressions.execute(ProgressionCommand.Stop).fold(
+                { if (accepts(requested.id)) stop(TunerFailure.ProgressionStopFailed(it)); false }, { true },
+            )
+            if (!progressionStopped || !accepts(requested.id)) return@launch
             metronome.execute(MetronomeCommand.Stop).fold(
                 ifLeft = { if (accepts(requested.id)) stop(TunerFailure.MetronomeStopFailed(it)) },
                 ifRight = {
@@ -311,16 +318,18 @@ class AndroidTunerHost internal constructor(
     private class CaptureSession(val id: TunerStartId, val capture: TunerCapture,
         val stopRequested: CompletableDeferred<Unit> = CompletableDeferred(), var failure: TunerFailure? = null)
 
-    class Factory(private val application: Application, private val preferences: SharedPreferences, private val metronome: Metronome) {
+    class Factory(private val application: Application, private val preferences: SharedPreferences,
+        private val metronome: Metronome, private val progressions: Progressions,
+        private val onCreated: (AndroidTunerHost) -> Unit = {}) {
         private val inputFactory = ExclusiveTunerInputFactory(AndroidTunerInputFactory(application))
 
         fun create(ownedScope: CoroutineScope): AndroidTunerHost {
             val clock = { MonotonicNanos(System.nanoTime()) }
-            return AndroidTunerHost(ownedScope, metronome,
+            return AndroidTunerHost(ownedScope, metronome, progressions,
                 TunerCaptureFactory { TunerCaptureWorker(inputFactory, clock) },
                 TunerToleranceStorage(preferences),
                 { application.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED },
-                ::launchSettings, YinHarmonicDetector(), clock)
+                ::launchSettings, YinHarmonicDetector(), clock).also(onCreated)
         }
 
         private fun launchSettings(page: TunerSettingsPage): Either<TunerFailure, Unit> = try {

@@ -15,6 +15,7 @@ import arrow.core.raise.ensure
 import com.pekochan069.guitarlearner.domain.AppearanceChange
 import com.pekochan069.guitarlearner.domain.AppearanceFailure
 import com.pekochan069.guitarlearner.domain.AppearanceSettings
+import com.pekochan069.guitarlearner.domain.Progressions
 import com.pekochan069.guitarlearner.domain.Chords
 import com.pekochan069.guitarlearner.domain.Training
 import com.pekochan069.guitarlearner.domain.TrainingRequest
@@ -43,6 +44,7 @@ import com.pekochan069.guitarlearner.presentation.contract.FoundationDestination
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.FoundationScreen
 import com.pekochan069.guitarlearner.presentation.contract.FoundationState
+import com.pekochan069.guitarlearner.presentation.contract.ProgressionEvent
 import com.pekochan069.guitarlearner.presentation.contract.HeadstockLayoutUi
 import com.pekochan069.guitarlearner.presentation.contract.LanguageOption
 import com.pekochan069.guitarlearner.presentation.contract.MetronomeConfigUi
@@ -74,6 +76,7 @@ class FoundationPresenter(
     private val metronome: Metronome,
     private val tuner: Tuner,
     private val chords: Chords,
+    private val progressions: Progressions,
     private val training: Training,
     private val developmentSamplesEnabled: Boolean = false,
 ) : Presenter<FoundationState> {
@@ -88,6 +91,7 @@ class FoundationPresenter(
         val snapshot by appearance.current.collectAsState()
         val metronomeSnapshot by metronome.current.collectAsState()
         val chordPresentation = presentChords(chords)
+        val progressionPresentation = presentProgressions(progressions, chords)
         val tunerSnapshot by tuner.current.collectAsState()
         val trainingSnapshot by training.current.collectAsState()
         var presetName by rememberSaveable { mutableStateOf("") }
@@ -116,6 +120,7 @@ class FoundationPresenter(
         }
 
         fun navigate(next: FoundationDestination) {
+            progressionPresentation.eventSink(ProgressionEvent.CloseSheet)
             if (destinationId == "feature:training" && next != FoundationDestination.Feature(FeatureId.Training)) {
                 training.submit(TrainingRequest.Exit)
                 trainingPage = TrainingPageUi.Root
@@ -262,6 +267,7 @@ class FoundationPresenter(
             ),
             gallerySelected = gallerySelected,
             chords = chordPresentation.state,
+            progressions = progressionPresentation.state,
             training = trainingSnapshot.toUi().let { ui ->
                 if (ui.stage is TrainingStageUi.Navigation) ui.copy(stage = TrainingStageUi.Navigation(trainingPage)) else ui
             },
@@ -271,6 +277,7 @@ class FoundationPresenter(
             settingsStatus = settingsStatus,
             eventSink = { event ->
                 when (event) {
+                    is FoundationEvent.Progression -> progressionPresentation.eventSink(event.value)
                     is FoundationEvent.Training -> if (destinationId == "home" || destinationId == "feature:training") {
                         val live = training.current.value
                         val setup = live.stage == TrainingStage.Setup
@@ -360,7 +367,10 @@ class FoundationPresenter(
                     }
                     is FoundationEvent.SetGallerySelected -> if (developmentSamplesEnabled) gallerySelected = event.value
                     is FoundationEvent.SetSettingsOpen -> {
-                        if (event.value) overlay = Overlay.Settings
+                        if (event.value) {
+                            progressionPresentation.eventSink(ProgressionEvent.CloseSheet)
+                            overlay = Overlay.Settings
+                        }
                         else if (overlay == Overlay.Settings) overlay = Overlay.None
                     }
                     is FoundationEvent.SelectTheme -> select(AppearanceChange.Theme(event.value.toPreference()))
@@ -376,10 +386,11 @@ class FoundationPresenter(
         private val metronome: Metronome,
         private val tuner: Tuner,
         private val chords: Chords,
+        private val progressions: Progressions,
         private val training: Training,
         private val developmentSamplesEnabled: Boolean = false,
     ) : Presenter.Factory {
-        fun create(): FoundationPresenter = FoundationPresenter(appearance, metronome, tuner, chords, training, developmentSamplesEnabled)
+        fun create(): FoundationPresenter = FoundationPresenter(appearance, metronome, tuner, chords, progressions, training, developmentSamplesEnabled)
 
         override fun create(screen: Screen, navigator: Navigator, context: CircuitContext): Presenter<*>? =
             if (screen == FoundationScreen) create() else null
@@ -387,7 +398,7 @@ class FoundationPresenter(
 }
 
 private val featureCatalog = listOf(
-    FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome, FeatureId.Tuner, FeatureId.Chords)),
+    FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome, FeatureId.Tuner, FeatureId.Chords, FeatureId.Progressions)),
     FeatureGroup(FeatureCategory.Training, emptyList()),
 )
 

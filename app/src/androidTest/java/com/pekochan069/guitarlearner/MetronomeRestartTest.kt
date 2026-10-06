@@ -53,7 +53,7 @@ class MetronomeRestartTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private lateinit var application: GuitarLearnerApplication
     private lateinit var host: AndroidMetronomeHost
-    private lateinit var preferences: ControlledMetronomePreferences
+    private lateinit var preferences: ControlledCommitPreferences
     private lateinit var outputs: ControlledMetronomeOutputs
 
     @Before
@@ -63,11 +63,11 @@ class MetronomeRestartTest {
         awaitServiceRemoved()
         val stored = application.getSharedPreferences("metronome_restart_test", Application.MODE_PRIVATE)
         assertTrue(stored.edit().clear().commit())
-        preferences = ControlledMetronomePreferences(stored)
+        preferences = ControlledCommitPreferences(stored)
         outputs = ControlledMetronomeOutputs()
         host = AndroidMetronomeHost(application, MetronomePlaybackService::class.java, MainActivity::class.java,
             preferences, outputFactory = outputs)
-        application.graphOverride = createGraphFactory<AppGraph.Factory>().create(application, host)
+        application.graphOverride = createGraphFactory<AppGraph.Factory>().create(application, host, application.graph.progressionsHost)
     }
 
     @After
@@ -437,38 +437,4 @@ private class ControlledMetronomeOutput(
     fun nextBeat(): ScheduledBeat = sequencer.nextBeat().also(onBeat)
     fun fail() = onFailure()
     fun disconnect() = onDisconnect()
-}
-
-private class ControlledMetronomePreferences(private val delegate: SharedPreferences) : SharedPreferences by delegate {
-    @Volatile var failNext = false
-    @Volatile private var nextGate: CommitGate? = null
-    private var activeGate: CommitGate? = null
-    fun blockNextCommit(): CommitGate = CommitGate().also { nextGate = it; activeGate = it }
-    fun releaseCommit() { activeGate?.open() }
-
-    override fun edit(): SharedPreferences.Editor {
-        val editor = delegate.edit()
-        return object : SharedPreferences.Editor by editor {
-            override fun putString(key: String?, value: String?): SharedPreferences.Editor {
-                editor.putString(key, value)
-                return this
-            }
-            override fun remove(key: String?): SharedPreferences.Editor { editor.remove(key); return this }
-            override fun commit(): Boolean {
-                nextGate?.let { gate -> nextGate = null; gate.waitForRelease() }
-                val saved = editor.commit()
-                return if (failNext) { failNext = false; false } else saved
-            }
-        }
-    }
-}
-
-private class CommitGate {
-    val entered = CompletableDeferred<Unit>()
-    private val released = CountDownLatch(1)
-    fun open() = released.countDown()
-    fun waitForRelease() {
-        entered.complete(Unit)
-        check(released.await(10, TimeUnit.SECONDS)) { "Test did not release the preference commit" }
-    }
 }

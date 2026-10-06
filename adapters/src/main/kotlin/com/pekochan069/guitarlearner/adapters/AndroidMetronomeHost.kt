@@ -60,6 +60,8 @@ class AndroidMetronomeHost(
     private val io: CoroutineDispatcher = Dispatchers.IO,
     private val main: CoroutineDispatcher = Dispatchers.Main.immediate,
     private val outputFactory: MetronomeOutputFactory = MetronomeOutputFactory(::MetronomeAudio),
+    private val startGate: Mutex = Mutex(),
+    private val beforeStart: suspend () -> Unit = {},
 ) : Metronome {
     private val storage = MetronomeStorage(preferences)
     private var document = storage.initial.getOrNull() ?: MetronomeDocument()
@@ -166,22 +168,28 @@ class AndroidMetronomeHost(
         }
     }
 
-    private fun requestStart(): Either<MetronomeFailure, Unit> {
+    private suspend fun requestStart(): Either<MetronomeFailure, Unit> {
         if (requestedRunId != null) return Unit.right()
         if (!retryPendingStops()) return MetronomeFailure.AudioUnavailable.left()
         val id = ++nextRunId
         requestedRunId = id
         snapshot.value = snapshot.value.copy(playback = PlaybackState.Preparing)
-        return try {
-            application.startForegroundService(serviceIntent(ACTION_START, id))
-            Unit.right()
-        } catch (_: IllegalStateException) {
-            fail(id, MetronomeFailure.ServiceUnavailable)
-            MetronomeFailure.ServiceUnavailable.left()
-        } catch (_: SecurityException) {
-            fail(id, MetronomeFailure.ServiceUnavailable)
-            MetronomeFailure.ServiceUnavailable.left()
-        }
+        return withContext(NonCancellable) { startGate.withLock {
+            if (requestedRunId != id) return@withLock Unit.right()
+            try {
+                beforeStart()
+                if (requestedRunId != id) return@withLock Unit.right()
+                application.startForegroundService(serviceIntent(ACTION_START, id))
+                Unit.right()
+            } catch (failure: IllegalStateException) {
+                if (failure is kotlinx.coroutines.CancellationException) throw failure
+                fail(id, MetronomeFailure.ServiceUnavailable)
+                MetronomeFailure.ServiceUnavailable.left()
+            } catch (_: SecurityException) {
+                fail(id, MetronomeFailure.ServiceUnavailable)
+                MetronomeFailure.ServiceUnavailable.left()
+            }
+        } }
     }
 
     fun onServiceCommand(service: Service, scope: CoroutineScope, intent: Intent?, startId: Int) {

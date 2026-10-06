@@ -39,6 +39,7 @@ sealed interface TunerFailure {
     data object ShutdownFailed : TunerFailure
     data object SettingsUnavailable : TunerFailure
     data class MetronomeStopFailed(val cause: MetronomeFailure) : TunerFailure
+    data class ProgressionStopFailed(val cause: ProgressionFailure) : TunerFailure
     data object ToleranceReadFailed : TunerFailure
     data object ToleranceWriteFailed : TunerFailure
 }

@@ -87,6 +87,7 @@ private fun TunerFailure.toNotice(): TunerNoticeUi = when (this) {
     TunerFailure.ShutdownFailed -> TunerNoticeUi.ShutdownFailed
     TunerFailure.SettingsUnavailable -> TunerNoticeUi.SettingsFailed
     is TunerFailure.MetronomeStopFailed -> TunerNoticeUi.MetronomeStopFailed
+    is TunerFailure.ProgressionStopFailed -> TunerNoticeUi.ProgressionStopFailed
     TunerFailure.ToleranceReadFailed -> TunerNoticeUi.ReadFailed
     TunerFailure.ToleranceWriteFailed -> TunerNoticeUi.SaveFailed
 }

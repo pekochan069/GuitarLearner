@@ -28,13 +28,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -50,6 +58,7 @@ import com.pekochan069.guitarlearner.presentation.contract.FeatureId
 import com.pekochan069.guitarlearner.presentation.contract.FoundationDestination
 import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.FoundationState
+import com.pekochan069.guitarlearner.presentation.contract.ProgressionEvent
 import com.pekochan069.guitarlearner.presentation.contract.LanguageOption
 import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
@@ -62,6 +71,7 @@ private val FoundationDestination.title: Int? get() = when (this) {
     FoundationDestination.Home -> null
     is FoundationDestination.Feature -> when (id) {
         FeatureId.Metronome -> R.string.metronome_title
+        FeatureId.Progressions -> R.string.progression_title
         FeatureId.Chords -> R.string.chord_title
         FeatureId.Tuner -> R.string.tuner_title
         FeatureId.Training -> R.string.training_title
@@ -101,7 +111,8 @@ fun DesignFoundationApp(
     val destination = state.destination
     val metronome = destination == FoundationDestination.Feature(FeatureId.Metronome)
     val chords = destination == FoundationDestination.Feature(FeatureId.Chords)
-    val contentSpacing = when { metronome -> 12.dp; chords -> 16.dp; else -> 24.dp }
+    val progressions = destination == FoundationDestination.Feature(FeatureId.Progressions)
+    val contentSpacing = when { metronome -> 12.dp; chords || progressions -> 16.dp; else -> 24.dp }
     val homeScroll = rememberScrollState()
     val preferencesEnabled = state.settingsStatus != SettingsStatus.Saving
     val trainingPage = if (destination == FoundationDestination.Feature(FeatureId.Training)) when (val stage = state.training.stage) {
@@ -109,102 +120,128 @@ fun DesignFoundationApp(
         is TrainingStageUi.Question -> stage.key
         is TrainingStageUi.Results -> "results"
     } else null
+    var dragVisual by remember(destination, state.progressions.steps, state.progressions.sheet, state.settingsOpen) { mutableStateOf<ProgressionDragVisual?>(null) }
+    var overlayOrigin by remember { mutableStateOf(Offset.Zero) }
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(stringResource(if (chords) R.string.chord_title else R.string.app_name),
-                        modifier = if (chords) Modifier.testTag("destination_title").semantics { heading() } else Modifier,
-                        style = MaterialTheme.typography.titleMedium)
-                },
-                navigationIcon = {
-                    if (destination != FoundationDestination.Home) {
-                        IconButton(onClick = { state.eventSink(FoundationEvent.NavigateBack) },
-                            modifier = Modifier.testTag("navigate_up")) {
-                            Icon(painterResource(R.drawable.ic_arrow_back), stringResource(if (
-                                destination == FoundationDestination.Feature(FeatureId.Training) &&
-                                    state.training.stage !is TrainingStageUi.Navigation
-                            ) R.string.training_back else R.string.back_to_home))
+    Box(modifier.fillMaxSize().onGloballyPositioned { overlayOrigin = it.positionInRoot() }) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(stringResource(when { chords -> R.string.chord_title; progressions -> R.string.progression_title; else -> R.string.app_name }),
+                            modifier = if (chords || progressions) Modifier.testTag("destination_title").semantics { heading() } else Modifier,
+                            style = MaterialTheme.typography.titleMedium)
+                    },
+                    navigationIcon = {
+                        if (destination != FoundationDestination.Home) {
+                            IconButton(onClick = { state.eventSink(FoundationEvent.NavigateBack) },
+                                modifier = Modifier.testTag("navigate_up")) {
+                                Icon(painterResource(R.drawable.ic_arrow_back), stringResource(if (
+                                    destination == FoundationDestination.Feature(FeatureId.Training) &&
+                                        state.training.stage !is TrainingStageUi.Navigation
+                                ) R.string.training_back else R.string.back_to_home))
+                            }
                         }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { state.eventSink(FoundationEvent.SetSettingsOpen(true)) },
-                        modifier = Modifier.testTag("settings")) {
-                        Icon(painterResource(R.drawable.ic_settings), stringResource(R.string.preferences))
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Box(
-            Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            key(destination, trainingPage) {
-                Column(
-                    Modifier.widthIn(max = 680.dp).fillMaxWidth()
-                        .verticalScroll(if (destination == FoundationDestination.Home) homeScroll else rememberScrollState())
-                        .testTag(if (destination == FoundationDestination.Home) "home_scroll" else "feature_scroll")
-                        .padding(contentSpacing),
-                    verticalArrangement = Arrangement.spacedBy(contentSpacing),
-                ) {
-                    destination.title?.takeUnless { chords }?.let { title ->
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                stringResource(title),
-                                Modifier.testTag("destination_title").semantics { heading() },
-                                style = if (metronome) MaterialTheme.typography.headlineMedium
-                                    else MaterialTheme.typography.headlineLarge,
-                            )
-                            if (destination is FoundationDestination.Sample) {
+                    },
+                    actions = {
+                        if (progressions) ProgressionAppBarActions(state.progressions, { state.eventSink(FoundationEvent.Progression(it)) }) {
+                            state.eventSink(FoundationEvent.SetSettingsOpen(true))
+                        } else IconButton(onClick = { state.eventSink(FoundationEvent.SetSettingsOpen(true)) },
+                            modifier = Modifier.testTag("settings")) {
+                            Icon(painterResource(R.drawable.ic_settings), stringResource(R.string.preferences))
+                        }
+                    },
+                )
+            },
+            bottomBar = {
+                if (progressions) ProgressionTransportBar(state.progressions) { state.eventSink(FoundationEvent.Progression(it)) }
+            },
+            snackbarHost = {
+                if (progressions) state.progressions.removedStep?.let { removed ->
+                    Snackbar(Modifier.padding(16.dp).testTag("progression_removal_feedback").semantics { liveRegion = LiveRegionMode.Polite }, dismissAction = {
+                        IconButton(onClick = { state.eventSink(FoundationEvent.Progression(ProgressionEvent.DismissRemoval)) },
+                            modifier = Modifier.testTag("progression_dismiss_removal")) {
+                            Icon(painterResource(R.drawable.ic_close), stringResource(R.string.dismiss_notice))
+                        }
+                    }) { Text(stringResource(R.string.progression_removed, removed.title())) }
+                }
+            },
+        ) { padding ->
+            Box(
+                Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                key(destination, trainingPage) {
+                    if (progressions) {
+                        Box(Modifier.widthIn(max = 680.dp).fillMaxSize()) {
+                            ProgressionTool(state.progressions, { state.eventSink(FoundationEvent.Progression(it)) }, { dragVisual = it }) {
+                                CompactMetronomeControl(state.metronome, state.eventSink)
+                            }
+                        }
+                    } else Column(
+                        Modifier.widthIn(max = 680.dp).fillMaxWidth()
+                            .verticalScroll(if (destination == FoundationDestination.Home) homeScroll else rememberScrollState())
+                            .testTag(if (destination == FoundationDestination.Home) "home_scroll" else "feature_scroll")
+                            .padding(contentSpacing),
+                        verticalArrangement = Arrangement.spacedBy(contentSpacing),
+                    ) {
+                        destination.title?.takeUnless { chords }?.let { title ->
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    stringResource(when (destination.id) {
-                                        DevelopmentSample.Gallery -> R.string.gallery_subtitle
-                                    }),
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    stringResource(title),
+                                    Modifier.testTag("destination_title").semantics { heading() },
+                                    style = if (metronome) MaterialTheme.typography.headlineMedium
+                                        else MaterialTheme.typography.headlineLarge,
+                                )
+                                if (destination is FoundationDestination.Sample) {
+                                    Text(
+                                        stringResource(when (destination.id) {
+                                            DevelopmentSample.Gallery -> R.string.gallery_subtitle
+                                        }),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                        if (!metronome) CompactMetronomeControl(state.metronome, state.eventSink)
+                        if (destination is FoundationDestination.Sample) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = MaterialTheme.shapes.medium,
+                            ) {
+                                Text(
+                                    stringResource(R.string.gallery_demo_notice),
+                                    Modifier.padding(16.dp),
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
-                    }
-                    if (!metronome) CompactMetronomeControl(state.metronome, state.eventSink)
-                    if (destination is FoundationDestination.Sample) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            shape = MaterialTheme.shapes.medium,
-                        ) {
-                            Text(
-                                stringResource(R.string.gallery_demo_notice),
-                                Modifier.padding(16.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    when (destination) {
-                        FoundationDestination.Home -> HomeCatalog(state)
-                        is FoundationDestination.Feature -> when (destination.id) {
-                            FeatureId.Metronome -> MetronomeSample(
-                                state = state.metronome,
-                                eventSink = state.eventSink,
-                            )
-                            FeatureId.Chords -> ChordTool(state.chords) { state.eventSink(FoundationEvent.Chord(it)) }
-                            FeatureId.Tuner -> TunerScreen(state.tuner, state.eventSink)
-                            FeatureId.Training -> TrainingScreen(state.training) { state.eventSink(FoundationEvent.Training(it)) }
-                        }
-                        is FoundationDestination.Sample -> when (destination.id) {
-                            DevelopmentSample.Gallery -> ComponentGallery(
-                                selected = state.gallerySelected,
-                                onSelectedChange = { state.eventSink(FoundationEvent.SetGallerySelected(it)) },
-                            )
+                        when (destination) {
+                            FoundationDestination.Home -> HomeCatalog(state)
+                            is FoundationDestination.Feature -> when (destination.id) {
+                                FeatureId.Metronome -> MetronomeSample(
+                                    state = state.metronome,
+                                    eventSink = state.eventSink,
+                                )
+                                FeatureId.Progressions -> Unit
+                                FeatureId.Chords -> ChordTool(state.chords) { state.eventSink(FoundationEvent.Chord(it)) }
+                                FeatureId.Tuner -> TunerScreen(state.tuner, state.eventSink)
+                                FeatureId.Training -> TrainingScreen(state.training) { state.eventSink(FoundationEvent.Training(it)) }
+                            }
+                            is FoundationDestination.Sample -> when (destination.id) {
+                                DevelopmentSample.Gallery -> ComponentGallery(
+                                    selected = state.gallerySelected,
+                                    onSelectedChange = { state.eventSink(FoundationEvent.SetGallerySelected(it)) },
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+        if (progressions && !state.settingsOpen) dragVisual?.let { ProgressionDragOverlay(it, overlayOrigin) }
     }
 
     if (state.settingsOpen) {
@@ -356,12 +393,14 @@ private fun HomeCatalog(state: FoundationState) {
                                 Icon(painterResource(when (feature) {
                                     FeatureId.Metronome -> R.drawable.ic_tempo
                                     FeatureId.Tuner -> R.drawable.ic_tuner
+                                    FeatureId.Progressions -> R.drawable.ic_chords
                                     FeatureId.Chords -> R.drawable.ic_chords
                                     FeatureId.Training -> R.drawable.ic_play
                                 }), null, Modifier.size(32.dp))
                                 Text(stringResource(when (feature) {
                                     FeatureId.Metronome -> R.string.metronome_title
                                     FeatureId.Tuner -> R.string.tuner_title
+                                    FeatureId.Progressions -> R.string.progression_title
                                     FeatureId.Chords -> R.string.chord_title
                                     FeatureId.Training -> R.string.training_title
                                 }), Modifier.weight(1f),

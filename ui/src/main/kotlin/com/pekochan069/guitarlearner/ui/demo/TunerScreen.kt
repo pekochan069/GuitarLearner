@@ -355,6 +355,7 @@ private val TunerNoticeUi.label: Int get() = when (this) {
     TunerNoticeUi.NoInput -> R.string.tuner_no_input
     TunerNoticeUi.ShutdownFailed -> R.string.tuner_shutdown_failed
     TunerNoticeUi.MetronomeStopFailed -> R.string.tuner_metronome_stop_failed
+    TunerNoticeUi.ProgressionStopFailed -> R.string.tuner_progression_stop_failed
     TunerNoticeUi.SettingsFailed -> R.string.tuner_settings_failed
     TunerNoticeUi.ReadFailed -> R.string.tuner_read_failed
     TunerNoticeUi.SaveFailed -> R.string.tuner_save_failed
