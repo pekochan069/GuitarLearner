@@ -316,7 +316,9 @@ class ProgressionUiTest {
         compose.onNodeWithText("C 삭제됨").assertIsDisplayed()
         compose.onNodeWithTag("progression_empty").assertIsDisplayed()
         compose.onNodeWithTag("progression_play").assertIsNotEnabled()
-        compose.waitUntil(6_000) { compose.onAllNodesWithTag("progression_removal_feedback").fetchSemanticsNodes().isEmpty() }
+        compose.mainClock.advanceTimeBy(4_000)
+        compose.waitForIdle()
+        compose.onNodeWithTag("progression_removal_feedback").assertDoesNotExist()
         assertEquals(transport, compose.onNodeWithTag("progression_transport").getUnclippedBoundsInRoot())
     }
 
