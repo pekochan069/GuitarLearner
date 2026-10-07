@@ -4,7 +4,7 @@ enum class LessonUi {
     NotesIntervals, Scales, ChordConstruction, DiatonicFunctions, BasicProgressions, CircleOfFifths,
     Strumming, AlternatePicking, HammerOnPullOff, Slide, Bending, Vibrato, PalmMute,
 }
-enum class LearningModeUi { Topics, Courses, Explore }
+enum class CourseUi { Theory, Technique }
 enum class LearningConceptUi { NotesIntervals, Scales, Chords, DiatonicFunctions, Progressions, CircleOfFifths }
 enum class LearningScaleUi { Major, NaturalMinor }
 enum class LearningProgressionUi { OneFourFiveOne, OneFiveSixFour, TwoFiveOne }
@@ -13,6 +13,23 @@ enum class LearningNoticeUi { ReadFailed, WriteFailed, PlaybackFailed, ShutdownF
 enum class LearningAudioUi { Idle, Preparing, Playing, Failed }
 
 data class LearningLessonRowUi(val id: LessonUi, val theory: Boolean, val completed: Boolean)
+data class LearningCourseUi(val id: CourseUi, val lessons: List<LearningLessonRowUi>, val entryLesson: LessonUi) {
+    val completed: Int get() = lessons.count { it.completed }
+    val total: Int get() = lessons.size
+    val reviewing: Boolean get() = completed == total
+}
+sealed interface LearningLessonContextUi {
+    data object Topics : LearningLessonContextUi
+    data class Course(val id: CourseUi, val step: Int, val total: Int,
+        val previous: LessonUi?, val next: LessonUi?) : LearningLessonContextUi
+}
+sealed interface LearningUiPage {
+    data class Topics(val lessons: List<LearningLessonRowUi>, val lastViewed: LessonUi? = null) : LearningUiPage
+    data class Courses(val courses: List<LearningCourseUi>) : LearningUiPage
+    data class CourseOverview(val course: LearningCourseUi) : LearningUiPage
+    data class Lesson(val id: LessonUi, val completed: Boolean = false,
+        val context: LearningLessonContextUi = LearningLessonContextUi.Topics) : LearningUiPage
+}
 data class LearningNoteUi(val name: String, val degree: String)
 data class LearningFretUi(val stringNumber: Int, val fret: Int, val name: String, val degree: String)
 data class LearningChordUi(val symbol: String, val roman: String, val function: LearningFunctionUi,
@@ -20,14 +37,7 @@ data class LearningChordUi(val symbol: String, val roman: String, val function: 
 data class LearningCircleKeyUi(val tonic: String, val relativeMinor: String)
 
 data class LearningUiState(
-    val mode: LearningModeUi = LearningModeUi.Topics,
-    val lessons: List<LearningLessonRowUi> = emptyList(),
-    val lesson: LessonUi? = null,
-    val concept: LearningConceptUi? = null,
-    val lastViewed: LessonUi? = null,
-    val previousLesson: LessonUi? = null,
-    val nextLesson: LessonUi? = null,
-    val completed: Boolean = false,
+    val page: LearningUiPage = LearningUiPage.Topics(emptyList()),
     val roots: List<String> = emptyList(),
     val root: String = "C",
     val scale: LearningScaleUi = LearningScaleUi.Major,
@@ -50,9 +60,9 @@ data class LearningUiState(
 )
 
 sealed interface LearningEvent {
-    data class SetMode(val value: LearningModeUi) : LearningEvent
+    data class OpenCourse(val id: CourseUi) : LearningEvent
+    data class ContinueCourse(val id: CourseUi) : LearningEvent
     data class OpenLesson(val id: LessonUi) : LearningEvent
-    data class OpenConcept(val value: LearningConceptUi) : LearningEvent
     data object Resume : LearningEvent
     data object Complete : LearningEvent
     data object RetrySave : LearningEvent

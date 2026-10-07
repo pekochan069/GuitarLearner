@@ -25,6 +25,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -60,12 +61,6 @@ import kotlin.math.sin
 @Composable
 fun LearningScreen(state: LearningUiState, eventSink: (LearningEvent) -> Unit) {
     Column(Modifier.fillMaxWidth().testTag("learning_screen"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            LearningModeUi.entries.forEach { mode ->
-                FilterChip(selected = state.mode == mode, onClick = { eventSink(LearningEvent.SetMode(mode)) },
-                    modifier = Modifier.testTag("learning_mode_${mode.name}"), label = { Text(stringResource(mode.label)) })
-            }
-        }
         if (state.saving) LearningStatus(stringResource(R.string.learning_saving), "learning_save_status")
         state.saveNotice?.let { notice ->
             LearningStatus(stringResource(notice.label), "learning_save_error", error = true)
@@ -73,65 +68,34 @@ fun LearningScreen(state: LearningUiState, eventSink: (LearningEvent) -> Unit) {
                 Text(stringResource(R.string.learning_retry_save))
             }
         }
-        if (state.lesson == null && state.concept == null) {
-            LearningCatalog(state, eventSink)
-        } else {
-            state.lesson?.let { lesson ->
-                Text(stringResource(lesson.title), Modifier.testTag("learning_lesson_title").semantics { heading() },
-                    style = MaterialTheme.typography.headlineSmall)
-                Text(stringResource(lesson.explanation), Modifier.testTag("learning_explanation"), style = MaterialTheme.typography.bodyLarge)
-                if (lesson.tab != null) {
-                    Text(stringResource(R.string.learning_tab_help), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(stringResource(lesson.tab!!), Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-                        .testTag("learning_tab").padding(vertical = 8.dp), fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.bodyLarge)
-                    Text(stringResource(lesson.practice!!), Modifier.testTag("learning_practice"), style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-            state.concept?.let { concept ->
-                Text(stringResource(concept.title), Modifier.testTag("learning_exploration_title").semantics { heading() },
-                    style = MaterialTheme.typography.headlineSmall)
-            }
-            val concept = state.concept ?: state.lesson?.concept
-            if (concept != null) LearningTheory(state, concept, eventSink)
-            state.lesson?.let { lesson ->
-                if (state.completed) Text(stringResource(R.string.learning_completed), Modifier.testTag("learning_completed"),
-                    style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                else Button(onClick = { eventSink(LearningEvent.Complete) }, modifier = Modifier.fillMaxWidth().testTag("learning_complete")) {
-                    Text(stringResource(R.string.learning_mark_complete))
-                }
-                Text(stringResource(R.string.learning_completion_meaning), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                LearningLinks(state, eventSink)
-                if (state.mode == LearningModeUi.Courses) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.previousLesson?.let { previous ->
-                            OutlinedButton(onClick = { eventSink(LearningEvent.OpenLesson(previous)) }, modifier = Modifier.testTag("learning_previous")) {
-                                Text(stringResource(R.string.learning_previous))
-                            }
+        when (val page = state.page) {
+            is LearningUiPage.Topics -> LearningTopics(page, eventSink)
+            is LearningUiPage.Courses -> page.courses.forEach { course ->
+                Card(onClick = { eventSink(LearningEvent.OpenCourse(course.id)) },
+                    modifier = Modifier.fillMaxWidth().testTag("learning_course_${course.id.name}"), shape = MaterialTheme.shapes.large) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(stringResource(course.id.title), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+                        Text(stringResource(course.id.goal), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.learning_course_progress, course.completed, course.total), style = MaterialTheme.typography.bodyMedium)
+                        FilledTonalButton(onClick = { eventSink(LearningEvent.ContinueCourse(course.id)) },
+                            modifier = Modifier.fillMaxWidth().testTag("learning_course_continue_${course.id.name}")) {
+                            Text(stringResource(course.action, stringResource(course.entryLesson.title)))
                         }
-                        state.nextLesson?.let { next ->
-                            FilledTonalButton(onClick = { eventSink(LearningEvent.OpenLesson(next)) }, modifier = Modifier.testTag("learning_next")) {
-                                Text(stringResource(R.string.learning_next))
-                            }
+                        OutlinedButton(onClick = { eventSink(LearningEvent.OpenCourse(course.id)) }, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.learning_course_view))
                         }
                     }
                 }
             }
+            is LearningUiPage.CourseOverview -> LearningCourseOverview(page.course, eventSink)
+            is LearningUiPage.Lesson -> LearningLesson(state, page, eventSink)
         }
     }
 }
 
 @Composable
-private fun LearningCatalog(state: LearningUiState, eventSink: (LearningEvent) -> Unit) {
-    if (state.mode == LearningModeUi.Explore) {
-        LearningConceptUi.entries.forEach { concept ->
-            LearningRow(stringResource(concept.title), "learning_concept_${concept.name}") { eventSink(LearningEvent.OpenConcept(concept)) }
-        }
-        return
-    }
-    state.lastViewed?.let { lesson ->
+private fun LearningTopics(page: LearningUiPage.Topics, eventSink: (LearningEvent) -> Unit) {
+    page.lastViewed?.let { lesson ->
         FilledTonalButton(onClick = { eventSink(LearningEvent.Resume) }, modifier = Modifier.fillMaxWidth().testTag("learning_resume")) {
             Text(stringResource(R.string.learning_resume, stringResource(lesson.title)))
         }
@@ -139,26 +103,95 @@ private fun LearningCatalog(state: LearningUiState, eventSink: (LearningEvent) -
     listOf(true, false).forEach { theory ->
         Text(stringResource(if (theory) R.string.learning_theory_course else R.string.learning_technique_course),
             Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
-        state.lessons.filter { it.theory == theory }.forEachIndexed { index, row ->
-            val title = (if (state.mode == LearningModeUi.Courses) "${index + 1}. " else "") + stringResource(row.id.title)
-            LearningRow(title, "learning_lesson_${row.id.name}", row.completed) { eventSink(LearningEvent.OpenLesson(row.id)) }
+        page.lessons.filter { it.theory == theory }.forEach { row ->
+            LearningRow(stringResource(row.id.title), "learning_lesson_${row.id.name}", row.completed,
+                goal = stringResource(row.id.goal)) { eventSink(LearningEvent.OpenLesson(row.id)) }
         }
     }
 }
 
 @Composable
-private fun LearningRow(title: String, tag: String, completed: Boolean? = null, onClick: () -> Unit) {
-    val completion = completed?.let { stringResource(if (it) R.string.learning_completed else R.string.learning_not_completed) }
+private fun LearningRow(title: String, tag: String, completed: Boolean, goal: String, onClick: () -> Unit) {
+    val completion = stringResource(if (completed) R.string.learning_completed else R.string.learning_not_completed)
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth().testTag(tag).semantics {
-        if (completion != null) stateDescription = completion
+        stateDescription = completion
     }, shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
-            if (completed == true) Text(stringResource(R.string.learning_completed), style = MaterialTheme.typography.labelLarge,
+            Text(goal, style = MaterialTheme.typography.bodyMedium)
+            if (completed) Text(stringResource(R.string.learning_completed), style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary)
         }
     }
+}
+
+@Composable
+private fun LearningCourseOverview(course: LearningCourseUi, eventSink: (LearningEvent) -> Unit) {
+    Text(stringResource(course.id.title), Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineSmall)
+    Text(stringResource(course.id.goal), Modifier.testTag("learning_course_goal"), style = MaterialTheme.typography.bodyLarge)
+    Text(stringResource(R.string.learning_course_progress, course.completed, course.total),
+        Modifier.testTag("learning_course_progress"), style = MaterialTheme.typography.titleMedium)
+    LinearProgressIndicator(progress = { if (course.total == 0) 0f else course.completed.toFloat() / course.total }, modifier = Modifier.fillMaxWidth())
+    Button(onClick = { eventSink(LearningEvent.ContinueCourse(course.id)) },
+        modifier = Modifier.fillMaxWidth().testTag("learning_course_continue")) {
+        Text(stringResource(course.action, stringResource(course.entryLesson.title)))
+    }
+    Text(stringResource(R.string.learning_course_unlocked), style = MaterialTheme.typography.bodyMedium)
+    course.lessons.forEachIndexed { index, row ->
+        LearningRow(stringResource(R.string.learning_course_lesson, index + 1, stringResource(row.id.title)),
+            "learning_lesson_${row.id.name}", row.completed, stringResource(row.id.goal)) { eventSink(LearningEvent.OpenLesson(row.id)) }
+    }
+}
+
+@Composable
+private fun LearningLesson(state: LearningUiState, page: LearningUiPage.Lesson, eventSink: (LearningEvent) -> Unit) {
+    val lesson = page.id
+    val course = page.context as? LearningLessonContextUi.Course
+    course?.let {
+        Text(stringResource(R.string.learning_course_step, stringResource(it.id.title), it.step, it.total),
+            Modifier.testTag("learning_course_step"), style = MaterialTheme.typography.titleMedium)
+    }
+    Text(stringResource(lesson.title), Modifier.testTag("learning_lesson_title").semantics { heading() },
+        style = MaterialTheme.typography.headlineSmall)
+    Text(stringResource(lesson.goal), Modifier.testTag("learning_lesson_goal"), style = MaterialTheme.typography.titleMedium)
+    Text(stringResource(lesson.explanation), Modifier.testTag("learning_explanation"), style = MaterialTheme.typography.bodyLarge)
+    lesson.tab?.let { tab ->
+        Text(stringResource(R.string.learning_tab_help), style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(tab), Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("learning_tab").padding(vertical = 8.dp),
+            fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(lesson.practice!!), Modifier.testTag("learning_practice"), style = MaterialTheme.typography.bodyLarge)
+    }
+    lesson.concept?.let { LearningTheory(state, it, eventSink) }
+    if (page.completed) Text(stringResource(R.string.learning_completed), Modifier.testTag("learning_completed"),
+        style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+    else Button(onClick = { eventSink(LearningEvent.Complete) }, modifier = Modifier.fillMaxWidth().testTag("learning_complete")) {
+        Text(stringResource(R.string.learning_mark_complete))
+    }
+    Text(stringResource(R.string.learning_completion_meaning), style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (course != null) {
+        course.next?.let { next ->
+            val label = stringResource(R.string.learning_next_lesson, stringResource(next.title))
+            if (page.completed) Button(onClick = { eventSink(LearningEvent.OpenLesson(next)) },
+                modifier = Modifier.fillMaxWidth().testTag("learning_next")) { Text(label) }
+            else OutlinedButton(onClick = { eventSink(LearningEvent.OpenLesson(next)) },
+                modifier = Modifier.fillMaxWidth().testTag("learning_next")) { Text(label) }
+        }
+        if (course.next == null) {
+            if (page.completed) Button(onClick = { eventSink(LearningEvent.OpenCourse(course.id)) },
+                modifier = Modifier.fillMaxWidth().testTag("learning_course_overview")) { Text(stringResource(R.string.learning_course_overview)) }
+            else OutlinedButton(onClick = { eventSink(LearningEvent.OpenCourse(course.id)) },
+                modifier = Modifier.fillMaxWidth().testTag("learning_course_overview")) { Text(stringResource(R.string.learning_course_overview)) }
+        }
+        course.previous?.let { previous ->
+            OutlinedButton(onClick = { eventSink(LearningEvent.OpenLesson(previous)) }, modifier = Modifier.fillMaxWidth().testTag("learning_previous")) {
+                Text(stringResource(R.string.learning_previous_lesson, stringResource(previous.title)))
+            }
+        }
+    }
+    LearningLinks(state, eventSink)
 }
 
 @Composable
@@ -326,7 +359,8 @@ private fun LearningLinks(state: LearningUiState, eventSink: (LearningEvent) -> 
                     FeatureId.Chords -> R.string.chord_title
                     FeatureId.Progressions -> R.string.progression_title
                     FeatureId.Training -> R.string.training_title
-                    FeatureId.Learning -> R.string.learning_title
+                    FeatureId.Learning -> R.string.learning_topics
+                    FeatureId.LearningCourses -> R.string.learning_courses
                 }))
             }
         }
@@ -339,8 +373,12 @@ private fun LearningStatus(message: String, tag: String, error: Boolean = false)
         color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-private val LearningModeUi.label: Int get() = when (this) {
-    LearningModeUi.Topics -> R.string.learning_topics; LearningModeUi.Courses -> R.string.learning_courses; LearningModeUi.Explore -> R.string.learning_explore
+private val CourseUi.title: Int get() = when (this) { CourseUi.Theory -> R.string.learning_theory_course; CourseUi.Technique -> R.string.learning_technique_course }
+private val CourseUi.goal: Int get() = when (this) { CourseUi.Theory -> R.string.learning_theory_course_goal; CourseUi.Technique -> R.string.learning_technique_course_goal }
+private val LearningCourseUi.action: Int get() = when {
+    reviewing -> R.string.learning_course_review
+    completed == 0 -> R.string.learning_course_start
+    else -> R.string.learning_course_continue
 }
 private val LearningScaleUi.label: Int get() = when (this) {
     LearningScaleUi.Major -> R.string.learning_major_scale; LearningScaleUi.NaturalMinor -> R.string.learning_natural_minor
@@ -363,11 +401,6 @@ private val LessonUi.concept: LearningConceptUi? get() = when (this) {
     LessonUi.BasicProgressions -> LearningConceptUi.Progressions; LessonUi.CircleOfFifths -> LearningConceptUi.CircleOfFifths
     else -> null
 }
-private val LearningConceptUi.title: Int get() = when (this) {
-    LearningConceptUi.NotesIntervals -> R.string.learning_notes_title; LearningConceptUi.Scales -> R.string.learning_scales_title
-    LearningConceptUi.Chords -> R.string.learning_chords_title; LearningConceptUi.DiatonicFunctions -> R.string.learning_diatonic_title
-    LearningConceptUi.Progressions -> R.string.learning_progressions_title; LearningConceptUi.CircleOfFifths -> R.string.learning_circle_title
-}
 private val LessonUi.title: Int get() = when (this) {
     LessonUi.NotesIntervals -> R.string.learning_notes_title; LessonUi.Scales -> R.string.learning_scales_title
     LessonUi.ChordConstruction -> R.string.learning_chords_title; LessonUi.DiatonicFunctions -> R.string.learning_diatonic_title
@@ -383,6 +416,14 @@ private val LessonUi.explanation: Int get() = when (this) {
     LessonUi.Strumming -> R.string.learning_strumming_text; LessonUi.AlternatePicking -> R.string.learning_picking_text
     LessonUi.HammerOnPullOff -> R.string.learning_hammer_text; LessonUi.Slide -> R.string.learning_slide_text
     LessonUi.Bending -> R.string.learning_bending_text; LessonUi.Vibrato -> R.string.learning_vibrato_text; LessonUi.PalmMute -> R.string.learning_palm_text
+}
+private val LessonUi.goal: Int get() = when (this) {
+    LessonUi.NotesIntervals -> R.string.learning_notes_goal; LessonUi.Scales -> R.string.learning_scales_goal
+    LessonUi.ChordConstruction -> R.string.learning_chords_goal; LessonUi.DiatonicFunctions -> R.string.learning_diatonic_goal
+    LessonUi.BasicProgressions -> R.string.learning_progressions_goal; LessonUi.CircleOfFifths -> R.string.learning_circle_goal
+    LessonUi.Strumming -> R.string.learning_strumming_goal; LessonUi.AlternatePicking -> R.string.learning_picking_goal
+    LessonUi.HammerOnPullOff -> R.string.learning_hammer_goal; LessonUi.Slide -> R.string.learning_slide_goal
+    LessonUi.Bending -> R.string.learning_bending_goal; LessonUi.Vibrato -> R.string.learning_vibrato_goal; LessonUi.PalmMute -> R.string.learning_palm_goal
 }
 private val LessonUi.tab: Int? get() = when (this) {
     LessonUi.Strumming -> R.string.learning_strumming_tab; LessonUi.AlternatePicking -> R.string.learning_picking_tab

@@ -4,19 +4,32 @@ import androidx.compose.runtime.saveable.Saver
 import com.pekochan069.guitarlearner.domain.*
 import com.pekochan069.guitarlearner.presentation.contract.*
 
+internal enum class LessonOrigin { Topics, Course }
 internal sealed interface LearningPage {
-    val mode: LearningModeUi
-    data class Catalog(override val mode: LearningModeUi = LearningModeUi.Topics) : LearningPage
-    data class Lesson(val id: LessonId, override val mode: LearningModeUi) : LearningPage
-    data class Exploration(val concept: ExplorationConcept) : LearningPage {
-        override val mode: LearningModeUi get() = LearningModeUi.Explore
-    }
+    data object Topics : LearningPage
+    data object Courses : LearningPage
+    data class CourseOverview(val family: LessonFamily) : LearningPage
+    data class Lesson(val id: LessonId, val origin: LessonOrigin) : LearningPage
 }
 
-internal val LearningPage.target: LearningTarget? get() = when (this) {
-    is LearningPage.Catalog -> null
-    is LearningPage.Lesson -> LearningTarget.Lesson(id)
-    is LearningPage.Exploration -> LearningTarget.Explore(concept)
+internal val FeatureId.isLearning: Boolean get() = this == FeatureId.Learning || this == FeatureId.LearningCourses
+internal val LearningPage.feature: FeatureId get() = when (this) {
+    LearningPage.Topics -> FeatureId.Learning
+    LearningPage.Courses, is LearningPage.CourseOverview -> FeatureId.LearningCourses
+    is LearningPage.Lesson -> if (origin == LessonOrigin.Course) FeatureId.LearningCourses else FeatureId.Learning
+}
+internal val LearningPage.parent: LearningPage? get() = when (this) {
+    LearningPage.Topics, LearningPage.Courses -> null
+    is LearningPage.CourseOverview -> LearningPage.Courses
+    is LearningPage.Lesson -> if (origin == LessonOrigin.Course) LearningPage.CourseOverview(id.family) else LearningPage.Topics
+}
+internal val LearningPage.target: LearningTarget? get() = (this as? LearningPage.Lesson)?.let { LearningTarget.Lesson(it.id) }
+
+internal fun CourseUi.toDomain(): LessonFamily = when (this) { CourseUi.Theory -> LessonFamily.Theory; CourseUi.Technique -> LessonFamily.Technique }
+private fun LessonFamily.toUi(): CourseUi = when (this) { LessonFamily.Theory -> CourseUi.Theory; LessonFamily.Technique -> CourseUi.Technique }
+internal fun LearningProgress.courseEntry(family: LessonFamily): LessonId {
+    val lessons = LessonId.entries.filter { it.family == family }
+    return lessons.firstOrNull { it !in completed } ?: lessons.first()
 }
 
 internal data class LinkedLessonReturn(val page: LearningPage.Lesson, val selection: LearningSelection,
@@ -25,17 +38,23 @@ internal data class LinkedLessonReturn(val page: LearningPage.Lesson, val select
 internal fun LearningSnapshot.toUi(page: LearningPage, selection: LearningSelection, instrument: TrainingInstrumentUi): LearningUiState {
     val lesson = (page as? LearningPage.Lesson)?.id
     val model = page.target?.let { LearningRelations.describe(it, selection) } ?: LearningModel()
-    val course = lesson?.let { current -> LessonId.entries.filter { it.family == current.family } }.orEmpty()
-    val index = course.indexOf(lesson)
+    val rows = LessonId.entries.map { LearningLessonRowUi(it.toUi(), it.family == LessonFamily.Theory, it in progress.completed) }
+    fun course(family: LessonFamily) = LearningCourseUi(family.toUi(), rows.filter { it.theory == (family == LessonFamily.Theory) },
+        progress.courseEntry(family).toUi())
+    val uiPage = when (page) {
+        LearningPage.Topics -> LearningUiPage.Topics(rows, progress.lastViewed?.toUi())
+        LearningPage.Courses -> LearningUiPage.Courses(LessonFamily.entries.map(::course))
+        is LearningPage.CourseOverview -> LearningUiPage.CourseOverview(course(page.family))
+        is LearningPage.Lesson -> {
+            val lessons = LessonId.entries.filter { it.family == page.id.family }
+            val index = lessons.indexOf(page.id)
+            LearningUiPage.Lesson(page.id.toUi(), page.id in progress.completed, if (page.origin == LessonOrigin.Course)
+                LearningLessonContextUi.Course(page.id.family.toUi(), index + 1, lessons.size,
+                    lessons.getOrNull(index - 1)?.toUi(), lessons.getOrNull(index + 1)?.toUi()) else LearningLessonContextUi.Topics)
+        }
+    }
     return LearningUiState(
-        mode = page.mode,
-        lessons = LessonId.entries.map { LearningLessonRowUi(it.toUi(), it.family == LessonFamily.Theory, it in progress.completed) },
-        lesson = lesson?.toUi(),
-        concept = (page as? LearningPage.Exploration)?.concept?.toUi(),
-        lastViewed = progress.lastViewed?.toUi(),
-        previousLesson = course.getOrNull(index - 1)?.toUi(),
-        nextLesson = course.getOrNull(index + 1)?.toUi(),
-        completed = lesson in progress.completed,
+        page = uiPage,
         roots = LearningRelations.tonics.map { it.symbol }, root = selection.tonic.symbol,
         scale = when (selection.scale) { BeginnerScale.Major -> LearningScaleUi.Major; BeginnerScale.NaturalMinor -> LearningScaleUi.NaturalMinor },
         chord = ChordQualityUi.valueOf(selection.chord.name),
@@ -96,17 +115,6 @@ internal fun LessonUi.toDomain(): LessonId = when (this) {
     LessonUi.HammerOnPullOff -> LessonId.HammerOnPullOff; LessonUi.Slide -> LessonId.Slide
     LessonUi.Bending -> LessonId.Bending; LessonUi.Vibrato -> LessonId.Vibrato; LessonUi.PalmMute -> LessonId.PalmMute
 }
-private fun ExplorationConcept.toUi(): LearningConceptUi = when (this) {
-    ExplorationConcept.NotesIntervals -> LearningConceptUi.NotesIntervals; ExplorationConcept.Scales -> LearningConceptUi.Scales
-    ExplorationConcept.ChordConstruction -> LearningConceptUi.Chords; ExplorationConcept.DiatonicFunctions -> LearningConceptUi.DiatonicFunctions
-    ExplorationConcept.BasicProgressions -> LearningConceptUi.Progressions; ExplorationConcept.CircleOfFifths -> LearningConceptUi.CircleOfFifths
-}
-internal fun LearningConceptUi.toDomain(): ExplorationConcept = when (this) {
-    LearningConceptUi.NotesIntervals -> ExplorationConcept.NotesIntervals; LearningConceptUi.Scales -> ExplorationConcept.Scales
-    LearningConceptUi.Chords -> ExplorationConcept.ChordConstruction; LearningConceptUi.DiatonicFunctions -> ExplorationConcept.DiatonicFunctions
-    LearningConceptUi.Progressions -> ExplorationConcept.BasicProgressions; LearningConceptUi.CircleOfFifths -> ExplorationConcept.CircleOfFifths
-}
-
 internal fun LessonId.trainingLinks(): List<TrainingExerciseUi> = when (this) {
     LessonId.NotesIntervals -> listOf(TrainingExerciseUi.NoteListening, TrainingExerciseUi.IntervalListening, TrainingExerciseUi.FretboardNote)
     LessonId.Scales, LessonId.ChordConstruction -> listOf(TrainingExerciseUi.FretboardNote)
@@ -121,23 +129,25 @@ internal fun LessonId.toolLinks(): List<FeatureId> = when (this) {
 }
 
 private fun LearningPage.saved(): List<String> = when (this) {
-    is LearningPage.Catalog -> listOf("catalog", mode.name)
-    is LearningPage.Lesson -> listOf("lesson", id.savedId, mode.name)
-    is LearningPage.Exploration -> listOf("exploration", concept.name)
+    LearningPage.Topics -> listOf("topics")
+    LearningPage.Courses -> listOf("courses")
+    is LearningPage.CourseOverview -> listOf("course", family.name)
+    is LearningPage.Lesson -> listOf("lesson", id.savedId, origin.name)
 }
-private fun restoreLearningPage(saved: Any?): LearningPage {
+internal fun restoreLearningPage(saved: Any?): LearningPage {
     val values = saved as? List<*>
     return when (values?.firstOrNull()) {
         "lesson" -> {
             val id = LessonId.entries.firstOrNull { it.savedId == values.getOrNull(1) }
-            val mode = LearningModeUi.entries.firstOrNull { it.name == values.getOrNull(2) && it != LearningModeUi.Explore }
-            if (id != null && mode != null) LearningPage.Lesson(id, mode) else LearningPage.Catalog()
+            val origin = when (values.getOrNull(2)) { "Topics" -> LessonOrigin.Topics; "Course", "Courses" -> LessonOrigin.Course; else -> null }
+            if (id != null && origin != null) LearningPage.Lesson(id, origin) else LearningPage.Topics
         }
         "exploration" -> ExplorationConcept.entries.firstOrNull { it.name == values.getOrNull(1) }
-            ?.let(LearningPage::Exploration) ?: LearningPage.Catalog()
-        "catalog" -> LearningModeUi.entries.firstOrNull { it.name == values.getOrNull(1) }
-            ?.let(LearningPage::Catalog) ?: LearningPage.Catalog()
-        else -> LearningPage.Catalog()
+            ?.let { LearningPage.Lesson(it.lesson, LessonOrigin.Topics) } ?: LearningPage.Topics
+        "catalog" -> if (values.getOrNull(1) == "Courses") LearningPage.Courses else LearningPage.Topics
+        "courses" -> LearningPage.Courses
+        "course" -> LessonFamily.entries.firstOrNull { it.name == values.getOrNull(1) }?.let(LearningPage::CourseOverview) ?: LearningPage.Topics
+        else -> LearningPage.Topics
     }
 }
 internal val LearningPageSaver = Saver<LearningPage, Any>(save = { it.saved() }, restore = { restoreLearningPage(it) })
@@ -164,7 +174,7 @@ internal val LinkedLessonReturnSaver = Saver<LinkedLessonReturn?, Any>(
         val values = saved as? List<*>
         val page = restoreLearningPage(values?.getOrNull(0)) as? LearningPage.Lesson
         val instrument = TrainingInstrumentUi.entries.firstOrNull { it.name == values?.getOrNull(2) }
-        val feature = FeatureId.entries.firstOrNull { it.name == values?.getOrNull(3) && it != FeatureId.Learning }
+        val feature = FeatureId.entries.firstOrNull { it.name == values?.getOrNull(3) && !it.isLearning }
         if (page != null && instrument != null && feature != null) LinkedLessonReturn(page,
             restoreLearningSelection(values?.getOrNull(1)), instrument, feature) else null
     },

@@ -2,6 +2,7 @@ package com.pekochan069.guitarlearner
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -43,9 +44,12 @@ class LearningJourneyTest {
         ViewModelProvider(compose.activity)[LearningSessionOwner::class.java].host
     }
 
-    @Test fun unrestrictedTopicsCoursesAndExplorationShareProgressAndContextualMusic() {
+    @Test fun directTopicsAndCoursesShareProgressAndGuideTheNextLesson() {
         openLearning()
+        compose.onNodeWithTag("learning_mode_Topics").assertDoesNotExist()
+        compose.onNodeWithTag("learning_mode_Explore").assertDoesNotExist()
         click("learning_lesson_CircleOfFifths")
+        compose.onNodeWithTag("learning_lesson_goal").assertExists()
         compose.onNodeWithTag("learning_circle").assertExists()
         click("learning_complete")
         val active = host
@@ -54,24 +58,38 @@ class LearningJourneyTest {
                 active.current.value.storage == LearningStorageState.Saved
         }
         back()
-        click("learning_mode_Courses")
+        back()
+        click("feature_LearningCourses")
+        click("learning_course_Theory")
+        compose.onNodeWithTag("learning_course_goal").assertExists()
+        compose.onNodeWithTag("learning_course_progress").assertTextEquals(compose.activity.getString(UiR.string.learning_course_progress, 1, 6))
         val completed = compose.onNodeWithTag("learning_lesson_CircleOfFifths")
             .fetchSemanticsNode().config[SemanticsProperties.StateDescription]
         assertEquals(compose.activity.getString(UiR.string.learning_completed), completed)
         click("learning_lesson_CircleOfFifths")
         compose.onNodeWithTag("learning_circle").assertExists()
         back()
-        click("learning_mode_Explore")
-        click("learning_concept_CircleOfFifths")
-        compose.onNodeWithTag("learning_circle").assertExists()
+        click("learning_course_continue")
+        compose.onNodeWithTag("learning_lesson_title").assertTextEquals(compose.activity.getString(UiR.string.learning_notes_title))
+        click("learning_complete")
+        compose.waitUntil(5_000) { LessonId.NotesIntervals in active.current.value.progress.completed }
+        click("learning_next")
+        compose.onNodeWithTag("learning_lesson_title").assertTextEquals(compose.activity.getString(UiR.string.learning_scales_title))
         back()
-        click("learning_concept_Scales")
+        compose.onNodeWithTag("learning_course_progress").assertTextEquals(compose.activity.getString(UiR.string.learning_course_progress, 2, 6))
+        click("learning_course_continue")
+        compose.onNodeWithTag("learning_lesson_title").assertTextEquals(compose.activity.getString(UiR.string.learning_scales_title))
+        back()
+        back()
+        back()
+        openLearning()
+        click("learning_lesson_Scales")
         selectRoot("G")
         compose.onNodeWithTag("learning_notes").assertTextContains("F♯", substring = true)
         selectRoot("F")
         compose.onNodeWithTag("learning_notes").assertTextContains("B♭", substring = true)
         back()
-        click("learning_concept_Chords")
+        click("learning_lesson_ChordConstruction")
         selectRoot("D")
         compose.onNodeWithTag("learning_notes").assertTextContains("D", substring = true)
             .assertTextContains("F♯", substring = true).assertTextContains("A", substring = true)
@@ -114,7 +132,8 @@ class LearningJourneyTest {
     }
 
     @Test fun linkedToolsAndTrainingReturnToTheSameLessonAcrossRecreation() {
-        openLearning()
+        click("feature_LearningCourses")
+        click("learning_course_Theory")
         click("learning_lesson_NotesIntervals")
         click("learning_link_NoteListening")
         compose.onNodeWithTag("training_start").assertExists()
@@ -130,8 +149,14 @@ class LearningJourneyTest {
         compose.onNodeWithTag("training_start").assertExists()
         back()
         compose.onNodeWithTag("learning_lesson_title").assertExists()
+        compose.onNodeWithTag("learning_next").assertExists()
         assertEquals(LessonId.NotesIntervals, host.current.value.progress.lastViewed)
         back()
+        compose.onNodeWithTag("learning_course_goal").assertExists()
+        back()
+        compose.onNodeWithTag("learning_course_Theory").assertExists()
+        back()
+        openLearning()
         click("learning_lesson_Strumming")
         click("learning_link_Metronome")
         compose.onNodeWithTag("bpm_value").assertExists()
@@ -145,6 +170,31 @@ class LearningJourneyTest {
         back()
         compose.onNodeWithTag("learning_lesson_title").assertExists()
         assertEquals(LessonId.BasicProgressions, host.current.value.progress.lastViewed)
+    }
+
+    @Test fun finishingEveryTheoryLessonOffersReviewWithoutLockingLessons() {
+        click("feature_LearningCourses")
+        click("learning_course_Theory")
+        val theory = listOf(LessonId.NotesIntervals, LessonId.Scales, LessonId.ChordConstruction,
+            LessonId.DiatonicFunctions, LessonId.BasicProgressions, LessonId.CircleOfFifths)
+        for (lesson in theory.reversed()) {
+            click("learning_lesson_${lesson.name}")
+            click("learning_complete")
+            val active = host
+            compose.waitUntil(5_000) { lesson in active.current.value.progress.completed }
+            if (lesson == LessonId.CircleOfFifths) click("learning_course_overview") else back()
+        }
+        assertEquals(theory.toSet(), host.current.value.progress.completed)
+        compose.onNodeWithTag("learning_course_progress").assertTextEquals(compose.activity.getString(UiR.string.learning_course_progress, 6, 6))
+        compose.onNodeWithTag("learning_course_continue").assertTextEquals(compose.activity.getString(UiR.string.learning_course_review,
+            compose.activity.getString(UiR.string.learning_notes_title)))
+        click("learning_course_continue")
+        compose.onNodeWithTag("learning_lesson_title").assertTextEquals(compose.activity.getString(UiR.string.learning_notes_title))
+        compose.onNodeWithTag("learning_completed").assertExists()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("learning_next").assertExists()
+        back()
+        compose.onNodeWithTag("learning_course_goal").assertExists()
     }
 
     private fun openLearning() = click("feature_Learning")

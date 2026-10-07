@@ -75,7 +75,6 @@ import com.pekochan069.guitarlearner.presentation.contract.TrainingPageUi
 import com.pekochan069.guitarlearner.presentation.contract.TrainingExerciseUi
 import com.pekochan069.guitarlearner.presentation.contract.TrainingEvent
 import com.pekochan069.guitarlearner.presentation.contract.LearningEvent
-import com.pekochan069.guitarlearner.presentation.contract.LearningModeUi
 import com.pekochan069.guitarlearner.presentation.contract.LearningScaleUi
 import com.pekochan069.guitarlearner.presentation.contract.LearningProgressionUi
 import com.pekochan069.guitarlearner.presentation.contract.TrainingInstrumentUi
@@ -101,7 +100,7 @@ class FoundationPresenter(
     override fun present(): FoundationState {
         var destinationId by rememberSaveable { mutableStateOf("home") }
         var trainingPage by rememberSaveable(stateSaver = TrainingPageSaver) { mutableStateOf<TrainingPageUi>(TrainingPageUi.Root) }
-        var learningPage by rememberSaveable(stateSaver = LearningPageSaver) { mutableStateOf<LearningPage>(LearningPage.Catalog()) }
+        var learningPage by rememberSaveable(stateSaver = LearningPageSaver) { mutableStateOf<LearningPage>(LearningPage.Topics) }
         var learningSelection by rememberSaveable(stateSaver = LearningSelectionSaver) { mutableStateOf(LearningSelection()) }
         var learningInstrument by rememberSaveable { mutableStateOf(TrainingInstrumentUi.Piano) }
         var linkedLesson by rememberSaveable(stateSaver = LinkedLessonReturnSaver) { mutableStateOf<LinkedLessonReturn?>(null) }
@@ -123,19 +122,21 @@ class FoundationPresenter(
         val commands = remember { Mutex() }
         val scope = rememberCoroutineScope()
         val samples = if (developmentSamplesEnabled) DevelopmentSample.entries else emptyList()
-        val destination = restoreDestination(destinationId, samples, trainingPage)
+        val destination = restoreDestination(destinationId, samples, trainingPage, learningPage)
+        val effectiveDestinationId = destination.savedId()
+        val inLearning = (destination as? FoundationDestination.Feature)?.id?.isLearning == true
         val visibleOverlay = when {
             overlay == Overlay.Settings -> overlay
             destination == FoundationDestination.Feature(FeatureId.Metronome) -> overlay
             else -> Overlay.None
         }
 
-        LaunchedEffect(destinationId, learningPage, learningSelection) {
+        LaunchedEffect(effectiveDestinationId, learningPage, learningSelection) {
             learning.submit(LearningRequest.Deactivate)
-            if (destinationId == "feature:learning") {
+            if (inLearning) {
                 learningPage.target?.let { learning.submit(LearningRequest.Activate(it, learningSelection)) }
             }
-            if (linkedLesson?.feature?.savedId?.let { "feature:$it" } != destinationId) linkedLesson = null
+            if (linkedLesson?.feature?.savedId?.let { "feature:$it" } != effectiveDestinationId) linkedLesson = null
         }
 
         LaunchedEffect(trainingSnapshot.storage, trainingSnapshot.settings, trainingSnapshot.stage, trainingPage, destinationId) {
@@ -150,8 +151,8 @@ class FoundationPresenter(
         }
 
         fun navigate(next: FoundationDestination, lessonLink: Boolean = false) {
-            if (!lessonLink && next.savedId() != destinationId) linkedLesson = null
-            if (destinationId == "feature:learning" && next != FoundationDestination.Feature(FeatureId.Learning)) {
+            if (!lessonLink && next.savedId() != effectiveDestinationId) linkedLesson = null
+            if (inLearning && next != destination) {
                 learning.submit(LearningRequest.Deactivate)
             }
             progressionPresentation.eventSink(ProgressionEvent.CloseSheet)
@@ -169,8 +170,8 @@ class FoundationPresenter(
         fun openLearningPage(next: LearningPage) {
             learning.submit(LearningRequest.Deactivate)
             learningPage = next
+            navigate(FoundationDestination.Feature(next.feature))
             next.target?.let { learning.submit(LearningRequest.Activate(it, learningSelection)) }
-            navigate(FoundationDestination.Feature(FeatureId.Learning))
         }
 
         fun selectLearning(next: LearningSelection) {
@@ -181,7 +182,7 @@ class FoundationPresenter(
 
         fun openExercise(exercise: TrainingExerciseUi, fromLesson: Boolean = false) {
             val live = training.current.value
-            if (!(destinationId == "home" || fromLesson && destinationId == "feature:learning") ||
+            if (!(effectiveDestinationId == "home" || fromLesson && inLearning) ||
                 live.stage != TrainingStage.Setup || trainingPage != TrainingPageUi.Root || live.storage is TrainingStorageStatus.Saving ||
                 (live.storage as? TrainingStorageStatus.Failed)?.failure == TrainingFailure.SettingsReadFailed) return
             val page = learningPage as? LearningPage.Lesson
@@ -195,11 +196,11 @@ class FoundationPresenter(
 
         fun returnToLesson(): Boolean {
             val link = linkedLesson ?: return false
-            if (destinationId != "feature:${link.feature.savedId}") { linkedLesson = null; return false }
+            if (effectiveDestinationId != "feature:${link.feature.savedId}") { linkedLesson = null; return false }
             learningSelection = link.selection
             learningInstrument = link.instrument
             learningPage = link.page
-            navigate(FoundationDestination.Feature(FeatureId.Learning))
+            navigate(FoundationDestination.Feature(link.page.feature))
             learning.submit(LearningRequest.Activate(link.page.target!!, link.selection))
             return true
         }
@@ -225,8 +226,8 @@ class FoundationPresenter(
                         if (training.current.value.stage != TrainingStage.Setup) {
                             exitTraining()
                         } else if (!returnToLesson()) navigate(FoundationDestination.Home)
-                    } else if (destinationId == "feature:learning" && learningPage !is LearningPage.Catalog) {
-                        openLearningPage(LearningPage.Catalog(learningPage.mode))
+                    } else if (inLearning && learningPage.parent != null) {
+                        openLearningPage(learningPage.parent!!)
                     } else if (!returnToLesson()) navigate(FoundationDestination.Home)
                     Overlay.None
                 }
@@ -346,21 +347,38 @@ class FoundationPresenter(
                 if (ui.stage is TrainingStageUi.Navigation) ui.copy(stage = TrainingStageUi.Navigation(trainingPage)) else ui
             },
             learning = learningSnapshot.toUi(learningPage, learningSelection, learningInstrument),
-            returningToLesson = linkedLesson?.feature?.savedId?.let { "feature:$it" } == destinationId,
+            returningToLesson = linkedLesson?.feature?.savedId?.let { "feature:$it" } == effectiveDestinationId,
             settingsOpen = visibleOverlay == Overlay.Settings,
             theme = snapshot.theme.toOption(),
             language = snapshot.language?.toOption(),
             settingsStatus = settingsStatus,
             eventSink = { event ->
                 when (event) {
-                    is FoundationEvent.Learning -> if (destinationId == "feature:learning") {
+                    is FoundationEvent.Learning -> if (inLearning) {
                         when (val request = event.value) {
-                            is LearningEvent.SetMode -> openLearningPage(LearningPage.Catalog(request.value))
-                            is LearningEvent.OpenLesson -> openLearningPage(LearningPage.Lesson(request.id.toDomain(),
-                                learningPage.mode.takeUnless { it == LearningModeUi.Explore } ?: LearningModeUi.Topics))
-                            is LearningEvent.OpenConcept -> openLearningPage(LearningPage.Exploration(request.value.toDomain()))
-                            LearningEvent.Resume -> learning.current.value.progress.lastViewed?.let {
-                                openLearningPage(LearningPage.Lesson(it, learningPage.mode.takeUnless { mode -> mode == LearningModeUi.Explore } ?: LearningModeUi.Topics))
+                            is LearningEvent.OpenCourse -> {
+                                val family = request.id.toDomain()
+                                if (learningPage == LearningPage.Courses || learningPage == LearningPage.CourseOverview(family) ||
+                                    (learningPage as? LearningPage.Lesson)?.let { it.origin == LessonOrigin.Course && it.id.family == family } == true)
+                                    openLearningPage(LearningPage.CourseOverview(family))
+                            }
+                            is LearningEvent.ContinueCourse -> {
+                                val family = request.id.toDomain()
+                                if (learningPage == LearningPage.Courses || learningPage == LearningPage.CourseOverview(family))
+                                    openLearningPage(LearningPage.Lesson(learning.current.value.progress.courseEntry(family), LessonOrigin.Course))
+                            }
+                            is LearningEvent.OpenLesson -> {
+                                val id = request.id.toDomain()
+                                val origin = when (val page = learningPage) {
+                                    LearningPage.Topics -> LessonOrigin.Topics
+                                    is LearningPage.CourseOverview -> if (id.family == page.family) LessonOrigin.Course else null
+                                    is LearningPage.Lesson -> if (page.origin == LessonOrigin.Topics || id.family == page.id.family) page.origin else null
+                                    LearningPage.Courses -> null
+                                }
+                                if (origin != null) openLearningPage(LearningPage.Lesson(id, origin))
+                            }
+                            LearningEvent.Resume -> if (learningPage == LearningPage.Topics) learning.current.value.progress.lastViewed?.let {
+                                openLearningPage(LearningPage.Lesson(it, LessonOrigin.Topics))
                             }
                             LearningEvent.Complete -> (learningPage as? LearningPage.Lesson)?.let { learning.submit(LearningRequest.Complete(it.id)) }
                             LearningEvent.RetrySave -> learning.submit(if ((learning.current.value.storage as? LearningStorageState.Failed)
@@ -421,8 +439,11 @@ class FoundationPresenter(
                     }
                     is FoundationEvent.Chord -> chordPresentation.eventSink(event.value)
                     is FoundationEvent.OpenFeature -> if (featureCatalog.any { event.id in it.features }) {
-                        if (event.id == FeatureId.Learning) learningPage = LearningPage.Catalog()
-                        navigate(FoundationDestination.Feature(event.id))
+                        when (event.id) {
+                            FeatureId.Learning -> openLearningPage(LearningPage.Topics)
+                            FeatureId.LearningCourses -> openLearningPage(LearningPage.Courses)
+                            else -> navigate(FoundationDestination.Feature(event.id))
+                        }
                     }
                     is FoundationEvent.OpenSample -> if (event.id in samples) {
                         navigate(FoundationDestination.Sample(event.id))
@@ -514,7 +535,7 @@ class FoundationPresenter(
 private val featureCatalog = listOf(
     FeatureGroup(FeatureCategory.Tools, listOf(FeatureId.Metronome, FeatureId.Tuner, FeatureId.Chords, FeatureId.Progressions)),
     FeatureGroup(FeatureCategory.Training, emptyList()),
-    FeatureGroup(FeatureCategory.Learning, listOf(FeatureId.Learning)),
+    FeatureGroup(FeatureCategory.Learning, listOf(FeatureId.Learning, FeatureId.LearningCourses)),
 )
 
 private fun FoundationDestination.savedId(): String = when (this) {
@@ -523,12 +544,14 @@ private fun FoundationDestination.savedId(): String = when (this) {
     is FoundationDestination.Sample -> "sample:${id.savedId}"
 }
 
-private fun restoreDestination(savedId: String, samples: List<DevelopmentSample>, trainingPage: TrainingPageUi): FoundationDestination =
-    if (savedId == "feature:training" && trainingPage is TrainingPageUi.Setup) FoundationDestination.Feature(FeatureId.Training)
+internal fun restoreDestination(savedId: String, samples: List<DevelopmentSample>, trainingPage: TrainingPageUi, learningPage: LearningPage): FoundationDestination {
+    val destination = if (savedId == "feature:training" && trainingPage is TrainingPageUi.Setup) FoundationDestination.Feature(FeatureId.Training)
     else featureCatalog.flatMap { it.features }.firstOrNull { savedId == "feature:${it.savedId}" }
         ?.let { FoundationDestination.Feature(it) }
         ?: samples.firstOrNull { savedId == "sample:${it.savedId}" }?.let { FoundationDestination.Sample(it) }
         ?: FoundationDestination.Home
+    return if ((destination as? FoundationDestination.Feature)?.id?.isLearning == true) FoundationDestination.Feature(learningPage.feature) else destination
+}
 
 private val TrainingPageSaver = Saver<TrainingPageUi, Any>(
     save = { page -> when (page) {

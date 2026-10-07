@@ -41,7 +41,7 @@ class LearningLayoutTest {
     @Test fun enlargedKoreanAndEnglishKeepLessonReadableAndOfferBothRecoveryActions() {
         val language = mutableStateOf("en")
         val fontScale = mutableStateOf(2f)
-        val lesson = mutableStateOf(LessonUi.Scales)
+        val page = mutableStateOf<LearningUiPage>(LearningUiPage.Lesson(LessonUi.Scales))
         val events = mutableListOf<LearningEvent>()
         compose.setContent {
             CompositionLocalProvider(
@@ -51,7 +51,7 @@ class LearningLayoutTest {
                 GuitarLearnerTheme(false) {
                     Column(Modifier.width(320.dp).verticalScroll(rememberScrollState())) {
                         LearningScreen(LearningUiState(
-                            lesson = lesson.value,
+                            page = page.value,
                             roots = listOf("C", "G", "F"),
                             circle = circle,
                             notes = listOf(LearningNoteUi("C", "1"), LearningNoteUi("E", "3"), LearningNoteUi("G", "5")),
@@ -65,12 +65,16 @@ class LearningLayoutTest {
             }
         }
         for (locale in listOf("en", "ko")) {
-            compose.runOnIdle { language.value = locale; lesson.value = LessonUi.Scales }
+            compose.runOnIdle { language.value = locale; page.value = LearningUiPage.Lesson(LessonUi.Scales) }
             compose.onNodeWithTag("learning_explanation").assertExists()
             val layouts = mutableListOf<TextLayoutResult>()
             compose.onNodeWithTag("learning_explanation")
                 .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
             assertFalse("$locale explanation clips at 200% text size", layouts.single().hasVisualOverflow)
+            val goals = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithTag("learning_lesson_goal")
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(goals) }
+            assertFalse("$locale lesson goal clips at 200% text size", goals.single().hasVisualOverflow)
             compose.onNodeWithTag("learning_notes").assertTextContains("C (1)", substring = true)
                 .assertTextContains("E (3)", substring = true).assertTextContains("G (5)", substring = true)
             compose.onNodeWithTag("learning_retry_save").performScrollTo().assertHasClickAction()
@@ -78,8 +82,20 @@ class LearningLayoutTest {
             compose.onNodeWithTag("learning_retry_audio").performScrollTo().assertHasClickAction()
                 .assertHeightIsAtLeast(48.dp).performClick()
             compose.runOnIdle { assertEquals(listOf(LearningEvent.RetrySave, LearningEvent.Listen), events.takeLast(2)) }
+            compose.runOnIdle {
+                page.value = LearningUiPage.CourseOverview(LearningCourseUi(CourseUi.Theory,
+                    listOf(LessonUi.NotesIntervals, LessonUi.Scales, LessonUi.ChordConstruction,
+                        LessonUi.DiatonicFunctions, LessonUi.BasicProgressions, LessonUi.CircleOfFifths)
+                        .map { LearningLessonRowUi(it, true, it == LessonUi.NotesIntervals) }, LessonUi.Scales))
+            }
+            val courseGoals = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithTag("learning_course_goal")
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(courseGoals) }
+            assertFalse("$locale course goal clips at 200% text size", courseGoals.single().hasVisualOverflow)
+            compose.onNodeWithTag("learning_course_continue").performScrollTo().assertHeightIsAtLeast(48.dp).performClick()
+            compose.runOnIdle { assertEquals(LearningEvent.ContinueCourse(CourseUi.Theory), events.last()) }
             for (scale in listOf(1.2f, 2f)) {
-                compose.runOnIdle { fontScale.value = scale; lesson.value = LessonUi.CircleOfFifths }
+                compose.runOnIdle { fontScale.value = scale; page.value = LearningUiPage.Lesson(LessonUi.CircleOfFifths) }
                 val controls = circle.map { compose.onNodeWithTag("learning_circle_${it.tonic}").getUnclippedBoundsInRoot() }
                 controls.forEachIndexed { index, first ->
                     controls.drop(index + 1).forEach { second ->
@@ -90,7 +106,7 @@ class LearningLayoutTest {
             }
             for (technique in listOf(LessonUi.Strumming, LessonUi.AlternatePicking, LessonUi.HammerOnPullOff,
                 LessonUi.Slide, LessonUi.Bending, LessonUi.Vibrato, LessonUi.PalmMute)) {
-                compose.runOnIdle { lesson.value = technique }
+                compose.runOnIdle { page.value = LearningUiPage.Lesson(technique) }
                 compose.onNodeWithTag("learning_tab").assertExists()
                 if (technique == LessonUi.Strumming || technique == LessonUi.AlternatePicking || technique == LessonUi.PalmMute) {
                     val tabs = mutableListOf<TextLayoutResult>()

@@ -120,6 +120,7 @@ class FoundationPresentationTest {
         compose.onNodeWithTag("category_Training").assertExists()
         compose.onNodeWithTag("category_Learning").assertExists()
         compose.onNodeWithTag("feature_Learning").assertHasClickAction()
+        compose.onNodeWithTag("feature_LearningCourses").assertHasClickAction()
         compose.onNodeWithTag("sample_Tuner").assertDoesNotExist()
         compose.onNodeWithTag("sample_Gallery").assertDoesNotExist()
         compose.onNodeWithTag("navigate_up").assertDoesNotExist()

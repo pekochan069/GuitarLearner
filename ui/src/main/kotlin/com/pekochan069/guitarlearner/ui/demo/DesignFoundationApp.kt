@@ -60,6 +60,8 @@ import com.pekochan069.guitarlearner.presentation.contract.FoundationEvent
 import com.pekochan069.guitarlearner.presentation.contract.FoundationState
 import com.pekochan069.guitarlearner.presentation.contract.ProgressionEvent
 import com.pekochan069.guitarlearner.presentation.contract.LanguageOption
+import com.pekochan069.guitarlearner.presentation.contract.LearningUiPage
+import com.pekochan069.guitarlearner.presentation.contract.LearningLessonContextUi
 import com.pekochan069.guitarlearner.presentation.contract.SettingsStatus
 import com.pekochan069.guitarlearner.presentation.contract.ThemeOption
 import com.pekochan069.guitarlearner.presentation.contract.TrainingStageUi
@@ -75,7 +77,8 @@ private val FoundationDestination.title: Int? get() = when (this) {
         FeatureId.Chords -> R.string.chord_title
         FeatureId.Tuner -> R.string.tuner_title
         FeatureId.Training -> R.string.training_title
-        FeatureId.Learning -> R.string.learning_title
+        FeatureId.Learning -> R.string.learning_topics
+        FeatureId.LearningCourses -> R.string.learning_courses
     }
     is FoundationDestination.Sample -> id.title
 }
@@ -141,8 +144,12 @@ fun DesignFoundationApp(
                                     destination == FoundationDestination.Feature(FeatureId.Training) &&
                                         state.training.stage !is TrainingStageUi.Navigation
                                 ) R.string.training_back else if (state.returningToLesson) R.string.learning_back
-                                else if (destination == FoundationDestination.Feature(FeatureId.Learning) &&
-                                    (state.learning.lesson != null || state.learning.concept != null)) R.string.learning_back_topics
+                                else if (destination == FoundationDestination.Feature(FeatureId.Learning) ||
+                                    destination == FoundationDestination.Feature(FeatureId.LearningCourses)) when (val page = state.learning.page) {
+                                    is LearningUiPage.Lesson -> if (page.context is LearningLessonContextUi.Course) R.string.learning_back_course else R.string.learning_back_topics
+                                    is LearningUiPage.CourseOverview -> R.string.learning_back_courses
+                                    else -> R.string.back_to_home
+                                }
                                 else R.string.back_to_home))
                             }
                         }
@@ -175,7 +182,8 @@ fun DesignFoundationApp(
                 Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                key(destination, trainingPage, state.learning.lesson, state.learning.concept, state.learning.mode) {
+                key(destination, trainingPage, (state.learning.page as? LearningUiPage.Lesson)?.id,
+                    (state.learning.page as? LearningUiPage.CourseOverview)?.course?.id) {
                     if (progressions) {
                         Box(Modifier.widthIn(max = 680.dp).fillMaxSize()) {
                             ProgressionTool(state.progressions, { state.eventSink(FoundationEvent.Progression(it)) }, { dragVisual = it }) {
@@ -233,7 +241,7 @@ fun DesignFoundationApp(
                                 FeatureId.Chords -> ChordTool(state.chords) { state.eventSink(FoundationEvent.Chord(it)) }
                                 FeatureId.Tuner -> TunerScreen(state.tuner, state.eventSink)
                                 FeatureId.Training -> TrainingScreen(state.training) { state.eventSink(FoundationEvent.Training(it)) }
-                                FeatureId.Learning -> LearningScreen(state.learning) { state.eventSink(FoundationEvent.Learning(it)) }
+                                FeatureId.Learning, FeatureId.LearningCourses -> LearningScreen(state.learning) { state.eventSink(FoundationEvent.Learning(it)) }
                             }
                             is FoundationDestination.Sample -> when (destination.id) {
                                 DevelopmentSample.Gallery -> ComponentGallery(
@@ -384,12 +392,13 @@ private fun HomeCatalog(state: FoundationState) {
                             onClick = { state.eventSink(FoundationEvent.OpenFeature(feature)) },
                             modifier = Modifier.weight(1f).testTag("feature_" + feature.name),
                             shape = MaterialTheme.shapes.extraLarge,
-                            colors = if (feature == FeatureId.Chords) {
-                                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer)
-                            } else {
-                                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            colors = when (group.category) {
+                                FeatureCategory.Tools -> CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+                                FeatureCategory.Training -> CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer)
+                                FeatureCategory.Learning -> CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    contentColor = MaterialTheme.colorScheme.onSurface)
                             },
                         ) {
                             Row(Modifier.fillMaxWidth().padding(8.dp),
@@ -402,6 +411,7 @@ private fun HomeCatalog(state: FoundationState) {
                                     FeatureId.Chords -> R.drawable.ic_chords
                                     FeatureId.Training -> R.drawable.ic_play
                                     FeatureId.Learning -> R.drawable.ic_staff
+                                    FeatureId.LearningCourses -> R.drawable.ic_arrow_forward
                                 }), null, Modifier.size(32.dp))
                                 Text(stringResource(when (feature) {
                                     FeatureId.Metronome -> R.string.metronome_title
@@ -409,7 +419,8 @@ private fun HomeCatalog(state: FoundationState) {
                                     FeatureId.Progressions -> R.string.progression_title
                                     FeatureId.Chords -> R.string.chord_title
                                     FeatureId.Training -> R.string.training_title
-                                    FeatureId.Learning -> R.string.learning_title
+                                    FeatureId.Learning -> R.string.learning_topics
+                                    FeatureId.LearningCourses -> R.string.learning_courses
                                 }), Modifier.weight(1f),
                                     style = MaterialTheme.typography.titleMedium)
                             }

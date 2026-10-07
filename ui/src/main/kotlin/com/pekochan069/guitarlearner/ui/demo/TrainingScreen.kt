@@ -127,8 +127,8 @@ private fun TrainingMenu(state: TrainingUiState, eventSink: (TrainingEvent) -> U
                             enabled = !state.settingsSaving && state.settingsNotice != TrainingNoticeUi.SettingsReadFailed,
                             modifier = Modifier.weight(1f).height(cardHeight).testTag("training_exercise_${exercise.name}"),
                             shape = MaterialTheme.shapes.extraLarge,
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer)) {
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer)) {
                             if (stacked) {
                                 Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Icon(painterResource(exercise.icon), null, Modifier.size(32.dp))

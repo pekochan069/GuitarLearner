@@ -1,37 +1,67 @@
 # Learning verification
 
-The implementation follows [issue #36](https://github.com/pekochan069/GuitarLearner/issues/36) and its resolved decisions #33, #34 and #35. It contains six theory lessons and seven guitar technique lessons, with original bundled Korean and English explanations. Topics, Courses and Free exploration are available immediately. Courses share the same lessons and completion state as Topics.
+The implementation follows [issue #36](https://github.com/pekochan069/GuitarLearner/issues/36), resolved decisions #33, #34 and #35, and the [approved navigation revision](https://github.com/pekochan069/GuitarLearner/issues/36#issuecomment-6037798326). Home has direct Topics and Courses entries. Interactive exploration belongs inside theory lessons. All six theory lessons and seven technique lessons remain available.
+
+Courses show a goal, shared completion and the first incomplete lesson. A completed course offers Review. Each lesson has an original Korean and English explanation and an observable practice goal. Completion records the learner's choice to finish a lesson, not a mastery assessment.
+
+Home menu cards use existing Material 3 color pairs. Tools use `secondaryContainer/onSecondaryContainer`, Training uses `tertiaryContainer/onTertiaryContainer`, and Learning uses `surfaceContainerHigh/onSurface`. Chords uses the same pair as the other Tools. Training menu cards also use the Training pair.
 
 ## Acceptance evidence
 
 | Behavior | Evidence |
 | --- | --- |
-| Explore musical relationships with contextual spelling | Domain fixtures and the connected journey check G major with F♯, F major with B♭, D major with D/F♯/A and degrees 1/3/5, major diatonic chords and a I–IV–V–I sequence. The fretboard exposes string, fret, note and degree descriptions. Circle controls expose each major key and its relative minor. |
-| Read and practice all seven techniques | Both localized resources contain movement, sound, a whitespace-preserving TAB example and a short practice task. The layout check visits every technique, checks nonempty readable practice text, and checks compiled down/upstroke and palm-mute marker alignment. Technique lessons do not offer theory playback. |
-| Complete a lesson and continue later | The connected journey checks shared Topics/Courses completion. With the emulator's active default network absent, a manual force-stop and cold launch changed PID 11459 to 11662 and restored both the Continue entry and Completed state. Stored progress was `1\|circle_of_fifths\|circle_of_fifths`. |
-| Retain progress when storage fails | Adapter tests hold and fail writes, preserve optimistic completion and last-viewed state, retry the latest combined revision and recover existing stored state. Saved status follows an accepted write. |
-| Play examples explicitly with Piano or Guitar | The production native output reaches Playing and finishes normally for both instruments. Navigation and background departure stop it. The native focus check verifies Progressions and Learning interrupt one another and retain a readable lesson with retry. No autoplay occurs on return. |
-| Return from a relevant tool or exercise | The connected journey checks Metronome and Progressions return to the same lesson, and active Training → Setup → lesson across Activity recreation. Presenter coverage also checks reopening the same tool from an upstream launch input. |
-| Use enlarged text and recovery controls | At 320 dp width, Korean and English checks cover 200% text, readable explanations/practice, 48 dp retry actions and their emitted events. Circle controls are checked for non-overlap at both 120% and 200%. |
+| Enter Topics or Courses directly | `FoundationPresentationTest` checks both Home entries. `LearningJourneyTest` enters each through the installed app and checks the course overview. |
+| Share progress and recommend the next lesson | Native journeys complete a lesson through Topics, continue through its course, and complete all six theory lessons to reach Review. Presenter checks read live completion when Continue is pressed. Every lesson remains unlocked. |
+| Keep course context through Back and linked destinations | Native journeys check course overview navigation, Metronome, Progressions and active Training returns across Activity recreation. Presenter checks cover selections, instruments, notification reopening and restored pages. |
+| Read and practice the curriculum | Both languages have 13 goals and revised explanations. The seven technique practice tasks and whitespace-preserving TAB examples remain. `LearningLayoutTest` checks enlarged text, goals, overview actions and compiled TAB markers. |
+| Explore and play musical relationships | Domain fixtures and native journeys check contextual spelling, scales, chords and progressions. Both Piano and Guitar examples reach native Playing and finish. Navigation and background departure stop playback. Learning and Progressions interrupt one another through native audio focus. |
+| Keep progress across failures and cold launch | Adapter and presenter tests cover failed writes, optimistic completion and retry. With no active default network, a manual force-stop and cold launch changed PID 17667 to 18330. The theory course restored 1/6 completion and recommended Note names and intervals despite Circle of fifths being last viewed. |
+| Distinguish menu categories in both themes | The final APK's English emulator and Korean phone screens were inspected in light and dark themes. All four Tools share one color. Training and Learning each have a distinct color. |
 
-## Checks and installed artifacts
+## Final checks and APK
 
-`verifyModuleBoundaries`, product `lint`, architecture-lint tests, domain tests, adapter tests and presenter tests passed. Unit results contain 240 cases: 239 passes and one existing recorded-guitar fixture skip. The three deliberately invalid architecture fixtures were rejected.
+These commands passed for the final source:
 
-The isolated API 35 Google APIs x86_64 emulator ran with a 360 × 800 viewport, density 160, animations disabled and no active default network. The full suite at `5e61fe4` contained 98 cases: 97 passes, zero failures and one optional acoustic-recording skip. After the final coordinate clamp at `d34f6d7`, the affected Learning layout and three production journeys all passed again, along with the static and unit checks. The full suite was not repeated for that one-line clamp.
+```text
+gradlew verifyModuleBoundaries lint :architecture-lint:test :domain:test :adapters:testDebugUnitTest :presentation:logic:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+```
 
-The Samsung SM_S948N passed the production Piano/Guitar, normal completion, navigation and background journey in Korean at `550919e`, and again in English at 200% text with actual landscape rotation at `5e61fe4`. The final clamp changes only circle padding. The final APK was then installed with `adb install -r`, and its pulled `base.apk` matched SHA-256 `99B880B190440BAC59827AF79A59B76604B66894F9BD6A94E89F6900D389C05E`. The phone's existing progression document hash remained unchanged. Phone font size, portrait rotation and system locale were restored.
+The unit results contain 243 cases: 242 passes, zero failures or errors, and one existing recorded-guitar fixture skip. Architecture-lint accounts for 21 of these cases.
 
-TalkBack was bound on the final APK's emulator. Native keyboard traversal visibly focused circle keys and horizontally revealed offscreen keys; the accessible tree included major/relative-minor descriptions and fretboard string/fret/pitch/degree descriptions. Spoken-output audibility was not measured. TalkBack, enlarged text, rotation and locale overrides were removed after inspection.
+The isolated API 35 Google APIs x86_64 emulator used a 360 × 800 viewport, density 160 and disabled animations. The final affected native run passed all 35 cases:
 
-- [English Topics](screenshots/learning/topics-en.png)
-- [TalkBack focus on a circle key at 120% text](screenshots/learning/talkback-circle-en.png)
-- Korean landscape TAB at 200% text: [upper rows](screenshots/learning/strumming-ko-large-landscape.png) and [lower rows with aligned downstrokes after scrolling](screenshots/learning/strumming-ko-large-landscape-strokes.png).
+- `FoundationPresentationTest`: 21.
+- `LearningJourneyTest`: 4.
+- `LearningLayoutTest`: 1.
+- `TrainingLayoutTest`: 7.
+- The exact Progression snackbar-expiry check: 1.
+- The exact Learning/Progression native-focus check: 1.
 
-Failed attempts remain in local task artifacts: the initial presenter return-marker collision, an offscreen G picker option, the obsolete Home assertion that Learning was unavailable, TAB typography lint warnings and overlapping circle targets. Each was corrected and rechecked. The final 120% test reproduced `Padding must be non-negative` before clamping the mathematically zero top/left coordinates against floating-point rounding. A subsequent verification command used a nonexistent JVM-domain Android test task; rerunning with `:domain:test` passed.
+The final debug APK SHA-256 is `0401C1E72C558E24A814FF3521E3B61EF7A16FBE75C292466DD519F8D2DC29F6`. After USB reconnection, `adb install -r` succeeded on Samsung SM_S948N. Its pulled `base.apk` matched that hash. `MainActivity` was launched and verified in the foreground. The final phone inspection covered both Home themes and category colors.
 
-These are local results. CI, acoustic timing, physical touch performance and learner mastery have no additional claim here. Optional acoustic recording remains skipped.
+Before the color change, APK `B0A18CB0E937BDDD215C9C5956F76AE9C9CC082FF71143162D343A7E6F8405DE` was inspected on the same phone. It covered course entry, overview, lesson Back, and Korean goals/actions at 200% text in actual 2340 × 1080 landscape. These geometry checks were not repeated on the final color APK.
+
+The phone's Learning and Progressions files remained byte-identical after installation and inspection. Their SHA-256 values were `C8D5E76DCA6463D35CD2BC359CDA1008844AB4F5D75955FE42158BD08987CC24` and `DAC51609511FD3BDE624EAECACC37CF2CF78D2EDD6CEC115913017C3DEAECF3B`. Phone font size, portrait rotation, system theme and empty app-locale override were restored. Emulator accessibility, network and theme overrides were restored.
+
+TalkBack bound on the final emulator and its accessible tree contained the course goal, completion and Continue label. Final keyboard accessibility focus and spoken-output audibility were not confirmed. Earlier circle-focus and TAB screenshots below are historical checks from before this navigation revision.
+
+## Failed attempts and limits
+
+The first full native run contained 99 cases: 93 passes, five failures and one optional acoustic-recording skip. The failures were Home notification reopening, Metronome signature restart, two Progression audio-focus checks, and Progression snackbar expiry. An exact rerun passed the four Home/audio checks. The snackbar check failed again.
+
+The snackbar test waited on wall-clock time for a Compose-controlled delay. The test now advances the Compose clock by the existing 4,000 ms duration and waits for idle. Production snackbar behavior is unchanged. The [AndroidX clock contract](https://android.googlesource.com/platform/frameworks/support/+/81327c1161662d461dd4faea6a2bcca448c3db6c/compose/ui/ui-test/src/commonMain/kotlin/androidx/compose/ui/test/MainTestClock.kt) documents delayed effects on that clock. The corrected check passed in the final 35-case run. The full 99-case suite was not repeated.
+
+The first static run rejected the English progress counter with `PluralsCandidate`. Rephrasing it to `Lessons completed: %1$d / %2$d` passed lint without suppression. A manual UI dump immediately after cold launch had a null root. Inspection resumed after the actual app window appeared, and the task helper now rejects failed dumps instead of returning stale XML.
+
+Logs and XML from the failed full run, exact rerun and final run remain in the local `guitarlearner-learning-flow` task artifacts. These are local results. CI, acoustic timing, physical touch performance and learner mastery have no additional claim here.
+
+## Screenshots
+
+- Final Korean phone Home: [light](screenshots/learning/home-ko.png) and [dark](screenshots/learning/home-ko-dark.png).
+- Final English emulator: [Topics](screenshots/learning/topics-en.png) and [course overview after cold launch](screenshots/learning/course-overview-en.png).
+- Revised lesson goal on the earlier phone APK at [200% Korean landscape](screenshots/learning/lesson-goal-ko-large-landscape.png).
+- Historical circle [TalkBack focus](screenshots/learning/talkback-circle-en.png), and technique TAB [upper rows](screenshots/learning/strumming-ko-large-landscape.png) and [lower rows](screenshots/learning/strumming-ko-large-landscape-strokes.png).
 
 ## Content references
 
-The text and examples are original; reference checks used Open Music Theory's [major scales](https://viva.pressbooks.pub/openmusictheory/chapter/major-scales/), [minor scales](https://viva.pressbooks.pub/openmusictheory/chapter/minor-scales/), [triads](https://viva.pressbooks.pub/openmusictheory/chapter/triads/), [seventh chords](https://viva.pressbooks.pub/openmusictheory/chapter/seventh-chords/) and [harmonic functions](https://open-musictheory.github.io/docs/harmony/harmonicFunctions/), plus Fender's [solo techniques](https://www.fender.com/articles/techniques/how-to-guitar-solo) and [palm muting](https://www.fender.com/articles/techniques/3-keys-to-ace-your-palm-muting).
+The text and examples are original. Reference checks used Open Music Theory's [major scales](https://viva.pressbooks.pub/openmusictheory/chapter/major-scales/), [minor scales](https://viva.pressbooks.pub/openmusictheory/chapter/minor-scales/), [triads](https://viva.pressbooks.pub/openmusictheory/chapter/triads/), [seventh chords](https://viva.pressbooks.pub/openmusictheory/chapter/seventh-chords/) and [harmonic functions](https://open-musictheory.github.io/docs/harmony/harmonicFunctions/), plus Fender's [solo techniques](https://www.fender.com/articles/techniques/how-to-guitar-solo) and [palm muting](https://www.fender.com/articles/techniques/3-keys-to-ace-your-palm-muting).

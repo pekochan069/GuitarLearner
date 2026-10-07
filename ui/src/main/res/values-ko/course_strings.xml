@@ -1,0 +1,17 @@
+<resources>
+    <string name="learning_theory_course_goal">음 사이의 거리부터 음계, 코드, 조의 관계까지 이어서 익히고, 간단한 코드 진행이 어떻게 연결되는지 설명해 보세요.</string>
+    <string name="learning_technique_course_goal">자주 쓰는 일곱 가지 기타 동작이 소리를 어떻게 바꾸는지 익히고, 짧은 TAB 예제로 각 동작을 천천히 해 보세요.</string>
+    <string name="learning_course_progress">%2$d개 레슨 중 %1$d개 완료</string>
+    <string name="learning_course_start">시작: %1$s</string>
+    <string name="learning_course_continue">이어서 학습: %1$s</string>
+    <string name="learning_course_review">복습: %1$s</string>
+    <string name="learning_course_view">모든 레슨 보기</string>
+    <string name="learning_course_unlocked">이 순서대로 따라가거나 원하는 레슨을 바로 열 수 있습니다. 완료 표시는 스스로 학습을 마쳤다는 기록입니다.</string>
+    <string name="learning_course_lesson">%1$d. %2$s</string>
+    <string name="learning_course_step">%1$s · %3$d개 중 %2$d번째 레슨</string>
+    <string name="learning_next_lesson">다음: %1$s</string>
+    <string name="learning_previous_lesson">이전: %1$s</string>
+    <string name="learning_course_overview">코스로 돌아가기</string>
+    <string name="learning_back_course">코스로 돌아가기</string>
+    <string name="learning_back_courses">코스 목록으로 돌아가기</string>
+</resources>
