@@ -74,7 +74,12 @@ internal fun LearningSnapshot.toUi(page: LearningPage, selection: LearningSelect
             HarmonicFunction.Predominant -> LearningFunctionUi.Predominant
             HarmonicFunction.Dominant -> LearningFunctionUi.Dominant
         }, it.notes.map { note -> note.toUi() }) },
-        circle = model.circle.map { LearningCircleKeyUi(it.tonic.symbol, it.relativeMinor.symbol) },
+        circle = model.circle.map { key ->
+            val signature = key.keySignature
+            LearningCircleKeyUi(key.tonic.symbol, key.relativeMinor.symbol,
+                if (signature.isEmpty()) "0" else "${signature.size}${if (signature.first().accidental > 0) "♯" else "♭"}",
+                signature.map { it.symbol })
+        },
         trainingLinks = lesson?.trainingLinks().orEmpty(), toolLinks = lesson?.toolLinks().orEmpty(),
         audio = when (audio) {
             LearningAudioState.Idle -> LearningAudioUi.Idle

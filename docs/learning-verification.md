@@ -6,6 +6,18 @@ Courses show a goal, shared completion and the first incomplete lesson. A comple
 
 Home menu cards use existing Material 3 color pairs. Tools use `secondaryContainer/onSecondaryContainer`, Training uses `tertiaryContainer/onTertiaryContainer`, and Learning uses `surfaceContainerHigh/onSurface`. Chords uses the same pair as the other Tools. Training menu cards also use the Training pair.
 
+## Circle of fifths refinement
+
+The circle now has separate major and relative-minor rings, twelve radial divisions, key-signature counts and a selected sector. Native Material 3 selectable surfaces provide the major-key targets. At normal text size, the complete wheel fits the 312 dp content width of the 360 dp emulator. Larger text expands the wheel and provides a horizontal-scroll hint. Every target remains at least 48 dp and does not overlap another target.
+
+The selected key card shows its relative minor, key signature and altered notes in signature order. Adjacent-key buttons move counterclockwise by a perfect fourth or clockwise by a perfect fifth in sounding pitch. Selection uses the existing root event and updates the scale, fretboard and explicit playback example. The interactive content now precedes the longer lesson explanation.
+
+The final Korean emulator display was inspected in [light](screenshots/learning/circle-ko.png) and [dark](screenshots/learning/circle-ko-dark.png) themes. Both screenshots show the entire circle and its selected-key card.
+
+The final circle APK SHA-256 is `7908A94D3D91467CFEDA07C34966C1A09EE635F7CAE50FDD6E068CCD9534AE7D`. Module boundaries, product lint, domain tests, presenter tests and both APK builds passed. Domain fixtures verify all twelve key signatures, including E♯ in F♯ major. All five Learning native tests passed on both the intermediate APK and the final APK. The final run took 61 seconds. It includes production selection of G, F and F♯, related notes and signatures, adjacent-key actions, both instruments, course/linked returns, and non-overlapping targets in Korean and English at 100%, 120% and 200% text. The full app suite was not repeated for this refinement.
+
+The intermediate circle APK `0CA0EC3B7DD599253F30147A6A72F6064045C274344558061DF782D05CA0C622` installed successfully on Samsung SM_S948N. The phone then required its password and subsequently disappeared from ADB. Final circle APK installation and physical inspection await reconnection and user unlock. No final physical-display, touch-feel or spoken-accessibility claim is made for this refinement.
+
 ## Acceptance evidence
 
 | Behavior | Evidence |
@@ -16,11 +28,11 @@ Home menu cards use existing Material 3 color pairs. Tools use `secondaryContain
 | Read and practice the curriculum | Both languages have 13 goals and revised explanations. The seven technique practice tasks and whitespace-preserving TAB examples remain. `LearningLayoutTest` checks enlarged text, goals, overview actions and compiled TAB markers. |
 | Explore and play musical relationships | Domain fixtures and native journeys check contextual spelling, scales, chords and progressions. Both Piano and Guitar examples reach native Playing and finish. Navigation and background departure stop playback. Learning and Progressions interrupt one another through native audio focus. |
 | Keep progress across failures and cold launch | Adapter and presenter tests cover failed writes, optimistic completion and retry. With no active default network, a manual force-stop and cold launch changed PID 17667 to 18330. The theory course restored 1/6 completion and recommended Note names and intervals despite Circle of fifths being last viewed. |
-| Distinguish menu categories in both themes | The final APK's English emulator and Korean phone screens were inspected in light and dark themes. All four Tools share one color. Training and Learning each have a distinct color. |
+| Distinguish menu categories in both themes | The earlier Home/category APK `0401C1E7…` was inspected on the English emulator and Korean phone in light and dark themes. All four Tools share one color. Training and Learning each have a distinct color. |
 
-## Final checks and APK
+## Home and course revision checks
 
-These commands passed for the final source:
+These commands passed for the earlier Home, course and category-color revision:
 
 ```text
 gradlew verifyModuleBoundaries lint :architecture-lint:test :domain:test :adapters:testDebugUnitTest :presentation:logic:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
@@ -37,13 +49,13 @@ The isolated API 35 Google APIs x86_64 emulator used a 360 × 800 viewport, dens
 - The exact Progression snackbar-expiry check: 1.
 - The exact Learning/Progression native-focus check: 1.
 
-The final debug APK SHA-256 is `0401C1E72C558E24A814FF3521E3B61EF7A16FBE75C292466DD519F8D2DC29F6`. After USB reconnection, `adb install -r` succeeded on Samsung SM_S948N. Its pulled `base.apk` matched that hash. `MainActivity` was launched and verified in the foreground. The final phone inspection covered both Home themes and category colors.
+That revision's debug APK SHA-256 is `0401C1E72C558E24A814FF3521E3B61EF7A16FBE75C292466DD519F8D2DC29F6`. After USB reconnection, `adb install -r` succeeded on Samsung SM_S948N. Its pulled `base.apk` matched that hash. `MainActivity` was launched and verified in the foreground. The phone inspection covered both Home themes and category colors.
 
 Before the color change, APK `B0A18CB0E937BDDD215C9C5956F76AE9C9CC082FF71143162D343A7E6F8405DE` was inspected on the same phone. It covered course entry, overview, lesson Back, and Korean goals/actions at 200% text in actual 2340 × 1080 landscape. These geometry checks were not repeated on the final color APK.
 
 The phone's Learning and Progressions files remained byte-identical after installation and inspection. Their SHA-256 values were `C8D5E76DCA6463D35CD2BC359CDA1008844AB4F5D75955FE42158BD08987CC24` and `DAC51609511FD3BDE624EAECACC37CF2CF78D2EDD6CEC115913017C3DEAECF3B`. Phone font size, portrait rotation, system theme and empty app-locale override were restored. Emulator accessibility, network and theme overrides were restored.
 
-TalkBack bound on the final emulator and its accessible tree contained the course goal, completion and Continue label. Final keyboard accessibility focus and spoken-output audibility were not confirmed. Earlier circle-focus and TAB screenshots below are historical checks from before this navigation revision.
+TalkBack bound on that revision's emulator and its accessible tree contained the course goal, completion and Continue label. Keyboard accessibility focus and spoken-output audibility were not confirmed. Earlier circle-focus and TAB screenshots below are historical checks from before this navigation revision.
 
 ## Failed attempts and limits
 
@@ -53,12 +65,14 @@ The snackbar test waited on wall-clock time for a Compose-controlled delay. The 
 
 The first static run rejected the English progress counter with `PluralsCandidate`. Rephrasing it to `Lessons completed: %1$d / %2$d` passed lint without suppression. A manual UI dump immediately after cold launch had a null root. Inspection resumed after the actual app window appeared, and the task helper now rejects failed dumps instead of returning stale XML.
 
+The first circle-refinement compile failed because a nested Compose layout scope hid the outer `maxWidth` receiver. Capturing the scroll flag in the constraints scope fixed compilation. One emulator screenshot was empty and was rejected. The task helper now checks screenshot length and uses separate UI files for each device. Phone document copies made after disconnection were also empty and were rejected as evidence. Refinement logs remain in local `guitarlearner-learning-circle` artifacts.
+
 Logs and XML from the failed full run, exact rerun and final run remain in the local `guitarlearner-learning-flow` task artifacts. These are local results. CI, acoustic timing, physical touch performance and learner mastery have no additional claim here.
 
 ## Screenshots
 
-- Final Korean phone Home: [light](screenshots/learning/home-ko.png) and [dark](screenshots/learning/home-ko-dark.png).
-- Final English emulator: [Topics](screenshots/learning/topics-en.png) and [course overview after cold launch](screenshots/learning/course-overview-en.png).
+- Home/category revision on the Korean phone: [light](screenshots/learning/home-ko.png) and [dark](screenshots/learning/home-ko-dark.png).
+- Home/course revision on the English emulator: [Topics](screenshots/learning/topics-en.png) and [course overview after cold launch](screenshots/learning/course-overview-en.png).
 - Revised lesson goal on the earlier phone APK at [200% Korean landscape](screenshots/learning/lesson-goal-ko-large-landscape.png).
 - Historical circle [TalkBack focus](screenshots/learning/talkback-circle-en.png), and technique TAB [upper rows](screenshots/learning/strumming-ko-large-landscape.png) and [lower rows](screenshots/learning/strumming-ko-large-landscape-strokes.png).
 

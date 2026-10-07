@@ -79,7 +79,14 @@ class LearningChord(
     val symbol: String get() = root.symbol + quality.symbol
 }
 
-data class LearningCircleKey(val tonic: SpelledNote, val relativeMinor: SpelledNote)
+data class LearningCircleKey(val tonic: SpelledNote, val relativeMinor: SpelledNote) {
+    val keySignature: List<SpelledNote> = run {
+        val altered = (1..7).map { ChordTheory.spell(tonic, ChordTheory.degree(it)) }.filter { it.accidental != 0 }
+        val sharps = listOf(NoteLetter.F, NoteLetter.C, NoteLetter.G, NoteLetter.D, NoteLetter.A, NoteLetter.E, NoteLetter.B)
+        val order = if (altered.firstOrNull()?.accidental?.let { it < 0 } == true) sharps.reversed() else sharps
+        immutable(order.mapNotNull { letter -> altered.find { it.letter == letter } })
+    }
+}
 
 class ExampleStep(notes: List<LearningNote>) {
     val notes: List<LearningNote> = immutable(notes)

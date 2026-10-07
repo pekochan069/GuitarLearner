@@ -34,7 +34,8 @@ data class LearningNoteUi(val name: String, val degree: String)
 data class LearningFretUi(val stringNumber: Int, val fret: Int, val name: String, val degree: String)
 data class LearningChordUi(val symbol: String, val roman: String, val function: LearningFunctionUi,
     val notes: List<LearningNoteUi>)
-data class LearningCircleKeyUi(val tonic: String, val relativeMinor: String)
+data class LearningCircleKeyUi(val tonic: String, val relativeMinor: String,
+    val signature: String = "0", val alteredNotes: List<String> = emptyList())
 
 data class LearningUiState(
     val page: LearningUiPage = LearningUiPage.Topics(emptyList()),

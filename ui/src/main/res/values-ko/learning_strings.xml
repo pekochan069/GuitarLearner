@@ -21,7 +21,16 @@
     <string name="learning_degrees">음정과 음계에서는 선택한 기준음이 1이고 코드에서는 그 코드의 근음이 1입니다. 도수 숫자는 기준음의 장음계를 따릅니다. ♭과 ♯은 같은 번호의 음을 각각 반음 낮추거나 높입니다.</string>
     <string name="learning_standard_tuning">표준 튜닝입니다. 1번 줄은 높은 E, 6번 줄은 낮은 E이며 0프렛은 개방현입니다.</string>
     <string name="learning_fret_description">%1$d번 줄, %2$d프렛, %3$s, 도수 %4$s</string>
-    <string name="learning_circle_description">시계 방향은 완전5도 위, 반시계 방향은 완전4도 위의 조성입니다. 이웃한 장조는 소리 기준으로 음 여섯 개를 공유합니다. 안쪽 이름은 같은 음을 쓰며 으뜸음이 다른 관계단조입니다.</string>
+    <string name="learning_circle_description">바깥쪽에서 장조를 선택하세요. 안쪽은 같은 음을 쓰는 관계단조입니다. 선택한 조성의 음을 아래 지판에서 확인하고 예시를 들어 보세요.</string>
+    <string name="learning_circle_rings">바깥쪽: 장조 · 안쪽: 관계단조</string>
+    <string name="learning_circle_major">장조</string>
+    <string name="learning_circle_pair">%1$s 장조 · %2$s 단조</string>
+    <string name="learning_circle_signature">조표: %1$s</string>
+    <string name="learning_circle_naturals">일곱 음 모두 변화표가 없습니다.</string>
+    <string name="learning_circle_neighbors">이웃한 장조는 소리 기준으로 음 여섯 개를 공유합니다. 한 칸씩 이동하며 비교해 보세요.</string>
+    <string name="learning_circle_clockwise">%1$s ↷\n완전5도</string>
+    <string name="learning_circle_counterclockwise">↶ %1$s\n완전4도</string>
+    <string name="learning_circle_scroll">좌우로 밀어 모든 조성을 확인하세요.</string>
     <string name="learning_circle_key">%1$s 장조, 관계단조 %2$s</string>
     <string name="learning_listen">예시 듣기</string>
     <string name="learning_stop">예시 정지</string>
@@ -54,7 +63,7 @@
     <string name="learning_progressions_text">코드 진행은 코드를 정한 순서로 이어 연주하는 것입니다. C 장조에서 C, F, G, C를 연주하면 I–IV–V–I입니다. I는 으뜸 코드, IV는 딸림을 준비하는 코드, V는 으뜸으로 돌아가려는 딸림 코드입니다. 마지막 C가 처음의 중심으로 돌아오는지 들어 보세요.\n\n로마 숫자는 장음계에서 코드의 근음이 몇 번째 음인지 나타냅니다. I–IV–V–I를 G 장조로 옮기면 G, C, D, G입니다. 코드 이름이 바뀌어도 숫자의 관계는 유지됩니다. 순서와 각 코드를 유지하는 길이가 모두 들리는 흐름에 영향을 줍니다.\n\n다른 예시인 I–V–vi–IV는 C 장조에서 C, G, Am, F이며 자주 반복하는 형태입니다. 소문자 vi는 단화음인 Am을 뜻합니다. ii–V–I는 Dm, G, C로 딸림 준비, 딸림, 으뜸의 흐름입니다.\n\n아래에서 C 장조와 I–IV–V–I를 선택하고 각 코드를 눌러 구성음을 확인하세요. 예시 듣기는 전체 진행을 재생합니다. 이어서 조성을 G로 바꾸고 로마 숫자와 코드 이름을 비교하세요. 코드 진행 도구에서는 직접 순서와 길이를 정해 연습할 수 있습니다.</string>
     <string name="learning_circle_title">5도권</string>
     <string name="learning_circle_goal">C, G, F 장조의 음을 비교하고 C 장조의 관계단조를 찾습니다.</string>
-    <string name="learning_circle_text">5도권은 장조의 관계를 원으로 보여 줍니다. C에서 시계 방향으로 한 칸 가면 G입니다. C–G의 완전5도는 반음 일곱 개의 거리입니다. 반시계 방향의 이웃 F는 C보다 완전4도, 즉 반음 다섯 개 위입니다.\n\nC 장조는 C D E F G A B입니다. G 장조는 F만 F♯으로, F 장조는 B만 B♭으로 바뀝니다. 각각 C 장조와 여섯 음을 공유합니다. 원의 이웃한 조성이 가까운 관계인 이유를 이 예시에서 볼 수 있습니다.\n\n원 안쪽에는 관계단조가 표시됩니다. 관계단조의 자연단음계는 해당 장음계와 같은 음을 쓰지만 중심인 으뜸음은 다릅니다. C 장조와 A 자연단음계는 같은 음을 쓰며 각각 C와 A가 으뜸음입니다. G 장조의 관계단조는 E 단조입니다.\n\n아래 원에서 C, G, F를 차례로 골라 음 이름과 달라진 지판 위치를 확인하고 들어 보세요. C 안쪽의 Am도 찾아보세요. 원의 한쪽에서는 내림표 이름을 씁니다. F♯ 장조와 G♭ 장조처럼 소리는 같아도 적는 이름이 다른 경우에는 화면의 조성에 맞는 음 이름을 읽으세요.</string>
+    <string name="learning_circle_text">5도권은 장조의 관계를 원으로 보여 줍니다. C에서 시계 방향으로 한 칸 가면 G입니다. C–G의 완전5도는 반음 일곱 개의 거리입니다. 반시계 방향의 이웃 F는 C보다 완전4도, 즉 반음 다섯 개 위입니다.\n\nC 장조는 C D E F G A B입니다. G 장조는 F만 F♯으로, F 장조는 B만 B♭으로 바뀝니다. 각각 C 장조와 여섯 음을 공유합니다. 원의 이웃한 조성이 가까운 관계인 이유를 이 예시에서 볼 수 있습니다.\n\n원 안쪽에는 관계단조가 표시됩니다. 관계단조의 자연단음계는 해당 장음계와 같은 음을 쓰지만 중심인 으뜸음은 다릅니다. C 장조와 A 자연단음계는 같은 음을 쓰며 각각 C와 A가 으뜸음입니다. G 장조의 관계단조는 E 단조입니다.\n\n원에서 C, G, F를 차례로 골라 음 이름과 달라진 지판 위치를 확인하고 들어 보세요. C 안쪽의 Am도 찾아보세요. 원의 한쪽에서는 내림표 이름을 씁니다. F♯ 장조와 G♭ 장조처럼 소리는 같아도 적는 이름이 다른 경우에는 화면의 조성에 맞는 음 이름을 읽으세요.</string>
 
     <string name="learning_strumming_title">스트로크</string>
     <string name="learning_strumming_goal">Em을 한 박마다 네 번 스트로크하고 소리의 간격을 비교합니다.</string>

@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -40,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -155,6 +158,7 @@ private fun LearningLesson(state: LearningUiState, page: LearningUiPage.Lesson, 
     Text(stringResource(lesson.title), Modifier.testTag("learning_lesson_title").semantics { heading() },
         style = MaterialTheme.typography.headlineSmall)
     Text(stringResource(lesson.goal), Modifier.testTag("learning_lesson_goal"), style = MaterialTheme.typography.titleMedium)
+    if (lesson == LessonUi.CircleOfFifths) LearningTheory(state, LearningConceptUi.CircleOfFifths, eventSink)
     Text(stringResource(lesson.explanation), Modifier.testTag("learning_explanation"), style = MaterialTheme.typography.bodyLarge)
     lesson.tab?.let { tab ->
         Text(stringResource(R.string.learning_tab_help), style = MaterialTheme.typography.bodySmall,
@@ -163,7 +167,7 @@ private fun LearningLesson(state: LearningUiState, page: LearningUiPage.Lesson, 
             fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodyLarge)
         Text(stringResource(lesson.practice!!), Modifier.testTag("learning_practice"), style = MaterialTheme.typography.bodyLarge)
     }
-    lesson.concept?.let { LearningTheory(state, it, eventSink) }
+    if (lesson != LessonUi.CircleOfFifths) lesson.concept?.let { LearningTheory(state, it, eventSink) }
     if (page.completed) Text(stringResource(R.string.learning_completed), Modifier.testTag("learning_completed"),
         style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
     else Button(onClick = { eventSink(LearningEvent.Complete) }, modifier = Modifier.fillMaxWidth().testTag("learning_complete")) {
@@ -196,8 +200,11 @@ private fun LearningLesson(state: LearningUiState, page: LearningUiPage.Lesson, 
 
 @Composable
 private fun LearningTheory(state: LearningUiState, concept: LearningConceptUi, eventSink: (LearningEvent) -> Unit) {
-    LearningChoice(stringResource(R.string.learning_root), state.root, state.roots, "learning_root",
-        optionTags = state.roots.map { "learning_key_$it" }) { eventSink(LearningEvent.SetRoot(it)) }
+    if (concept == LearningConceptUi.CircleOfFifths) LearningCircle(state, eventSink)
+    if (concept != LearningConceptUi.CircleOfFifths) {
+        LearningChoice(stringResource(R.string.learning_root), state.root, state.roots, "learning_root",
+            optionTags = state.roots.map { "learning_key_$it" }) { eventSink(LearningEvent.SetRoot(it)) }
+    }
     when (concept) {
         LearningConceptUi.NotesIntervals -> LearningChoice(stringResource(R.string.learning_interval),
             stringResource(state.interval.learningLabel), TrainingIntervalUi.entries.map { stringResource(it.learningLabel) }, "learning_interval") {
@@ -223,7 +230,6 @@ private fun LearningTheory(state: LearningUiState, concept: LearningConceptUi, e
                 })
         }
     }
-    if (concept == LearningConceptUi.CircleOfFifths) LearningCircle(state, eventSink)
     Text(state.notes.joinToString(" · ") { "${it.name} (${it.degree})" }, Modifier.testTag("learning_notes"),
         style = MaterialTheme.typography.titleMedium)
     Text(stringResource(R.string.learning_degrees), style = MaterialTheme.typography.bodySmall,
@@ -300,24 +306,96 @@ private fun LearningFretboard(frets: List<LearningFretUi>) {
 
 @Composable
 private fun LearningCircle(state: LearningUiState, eventSink: (LearningEvent) -> Unit) {
-    val diameter = with(LocalDensity.current) { MaterialTheme.typography.labelLarge.fontSize.toDp() * 25 }.coerceAtLeast(360.dp)
-    val nodeSize = diameter / 5
-    val summary = stringResource(R.string.learning_circle_description)
-    Text(summary, style = MaterialTheme.typography.bodyLarge)
-    Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("learning_circle")) {
-        Box(Modifier.size(diameter)) {
-            state.circle.forEachIndexed { index, key ->
-                val angle = Math.PI * 2 * index / state.circle.size - Math.PI / 2
-                val center = diameter / 2
-                val radius = diameter * 0.40f
-                val x = center + radius * cos(angle).toFloat() - nodeSize / 2
-                val y = center + radius * sin(angle).toFloat() - nodeSize / 2
-                val rootIndex = state.roots.indexOf(key.tonic)
-                val label = stringResource(R.string.learning_circle_key, key.tonic, key.relativeMinor)
-                FilterChip(selected = state.root == key.tonic, onClick = { if (rootIndex >= 0) eventSink(LearningEvent.SetRoot(rootIndex)) },
-                    modifier = Modifier.padding(start = x.coerceAtLeast(0.dp), top = y.coerceAtLeast(0.dp)).width(nodeSize).heightIn(min = 48.dp)
-                        .testTag("learning_circle_${key.tonic}").semantics { contentDescription = label },
-                    label = { Text("${key.tonic}\n${key.relativeMinor}m", style = MaterialTheme.typography.labelLarge) })
+    val selectedIndex = state.circle.indexOfFirst { it.tonic == state.root }
+    val selected = state.circle.getOrNull(selectedIndex)
+    val colors = MaterialTheme.colorScheme
+    val nodeSize = with(LocalDensity.current) { MaterialTheme.typography.titleMedium.fontSize.toDp() * 3 }.coerceAtLeast(48.dp)
+    Text(stringResource(R.string.learning_circle_description), style = MaterialTheme.typography.bodyMedium)
+    Text(stringResource(R.string.learning_circle_rings), style = MaterialTheme.typography.labelLarge,
+        color = colors.onSurfaceVariant)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val diameter = maxWidth.coerceAtMost(420.dp).coerceAtLeast(nodeSize * 6.5f)
+        val scrollable = diameter > maxWidth
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (scrollable) Text(stringResource(R.string.learning_circle_scroll), style = MaterialTheme.typography.bodySmall)
+            Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("learning_circle"), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(diameter).drawBehind {
+                    val hole = size.minDimension * 0.18f
+                    val step = 360f / state.circle.size.coerceAtLeast(1)
+                    state.circle.indices.forEach { index ->
+                        drawArc(if (index == selectedIndex) colors.primaryContainer else colors.surfaceContainerLow,
+                            -90f - step / 2 + index * step, step, useCenter = true)
+                    }
+                    drawCircle(colors.outlineVariant, style = Stroke(1.dp.toPx()))
+                    drawCircle(colors.outlineVariant, size.minDimension * 0.35f, style = Stroke(1.dp.toPx()))
+                    state.circle.indices.forEach { index ->
+                        val angle = Math.toRadians((-90f - step / 2 + index * step).toDouble())
+                        val direction = Offset(cos(angle).toFloat(), sin(angle).toFloat())
+                        drawLine(colors.outlineVariant, center + direction * hole,
+                            center + direction * (size.minDimension / 2), 1.dp.toPx())
+                    }
+                    drawCircle(colors.surface, hole)
+                    drawCircle(colors.outlineVariant, hole, style = Stroke(1.dp.toPx()))
+                }) {
+                    Column(Modifier.align(Alignment.Center).width(diameter * 0.30f).clearAndSetSemantics {},
+                        horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(state.root, style = MaterialTheme.typography.headlineMedium, color = colors.primary)
+                        Text(stringResource(R.string.learning_circle_major), style = MaterialTheme.typography.labelMedium)
+                    }
+                    state.circle.forEachIndexed { index, key ->
+                        val angle = Math.PI * 2 * index / state.circle.size - Math.PI / 2
+                        val center = diameter / 2
+                        val radius = center - nodeSize / 2
+                        val active = index == selectedIndex
+                        val rootIndex = state.roots.indexOf(key.tonic)
+                        val label = stringResource(R.string.learning_circle_key, key.tonic, key.relativeMinor) + ", " +
+                            stringResource(R.string.learning_circle_signature, key.signature)
+                        Surface(selected = active, onClick = { eventSink(LearningEvent.SetRoot(rootIndex)) }, enabled = rootIndex >= 0,
+                            modifier = Modifier.absoluteOffset(center + radius * cos(angle).toFloat() - nodeSize / 2,
+                                center + radius * sin(angle).toFloat() - nodeSize / 2).size(nodeSize)
+                                .testTag("learning_circle_${key.tonic}").semantics { contentDescription = label },
+                            shape = CircleShape, color = if (active) colors.primary else colors.surfaceContainerLow,
+                            contentColor = if (active) colors.onPrimary else colors.onSurface) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                Text(key.tonic, style = MaterialTheme.typography.titleMedium)
+                                Text(key.signature, style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                        Box(Modifier.absoluteOffset(center + diameter * 0.27f * cos(angle).toFloat() - nodeSize / 2,
+                            center + diameter * 0.27f * sin(angle).toFloat() - nodeSize / 4)
+                            .width(nodeSize).height(nodeSize / 2).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
+                            Text("${key.relativeMinor}m", style = MaterialTheme.typography.labelMedium,
+                                color = if (active) colors.onPrimaryContainer else colors.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    selected?.let { key ->
+        Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.learning_circle_pair, key.tonic, key.relativeMinor),
+                    Modifier.testTag("learning_circle_pair"), style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.learning_circle_signature, key.signature),
+                    Modifier.testTag("learning_circle_signature"), style = MaterialTheme.typography.bodyMedium)
+                Text(if (key.alteredNotes.isEmpty()) stringResource(R.string.learning_circle_naturals) else key.alteredNotes.joinToString(" · "),
+                    Modifier.testTag("learning_circle_altered_notes"), style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant)
+            }
+        }
+        Text(stringResource(R.string.learning_circle_neighbors), style = MaterialTheme.typography.bodyMedium)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val previous = state.circle[(selectedIndex + state.circle.size - 1) % state.circle.size]
+            val next = state.circle[(selectedIndex + 1) % state.circle.size]
+            OutlinedButton(onClick = { eventSink(LearningEvent.SetRoot(state.roots.indexOf(previous.tonic))) },
+                modifier = Modifier.weight(1f).testTag("learning_circle_previous")) {
+                Text(stringResource(R.string.learning_circle_counterclockwise, previous.tonic), textAlign = TextAlign.Center)
+            }
+            OutlinedButton(onClick = { eventSink(LearningEvent.SetRoot(state.roots.indexOf(next.tonic))) },
+                modifier = Modifier.weight(1f).testTag("learning_circle_next")) {
+                Text(stringResource(R.string.learning_circle_clockwise, next.tonic), textAlign = TextAlign.Center)
             }
         }
     }

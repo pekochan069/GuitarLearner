@@ -15,6 +15,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -94,9 +95,16 @@ class LearningLayoutTest {
             assertFalse("$locale course goal clips at 200% text size", courseGoals.single().hasVisualOverflow)
             compose.onNodeWithTag("learning_course_continue").performScrollTo().assertHeightIsAtLeast(48.dp).performClick()
             compose.runOnIdle { assertEquals(LearningEvent.ContinueCourse(CourseUi.Theory), events.last()) }
-            for (scale in listOf(1.2f, 2f)) {
+            for (scale in listOf(1f, 1.2f, 2f)) {
                 compose.runOnIdle { fontScale.value = scale; page.value = LearningUiPage.Lesson(LessonUi.CircleOfFifths) }
+                circle.forEach { key ->
+                    compose.onNodeWithTag("learning_circle_${key.tonic}").assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+                }
                 val controls = circle.map { compose.onNodeWithTag("learning_circle_${it.tonic}").getUnclippedBoundsInRoot() }
+                if (scale == 1f) {
+                    val viewport = compose.onNodeWithTag("learning_circle").getUnclippedBoundsInRoot()
+                    assertTrue("$locale normal-size circle fits the content width", controls.all { it.left >= viewport.left && it.right <= viewport.right })
+                }
                 controls.forEachIndexed { index, first ->
                     controls.drop(index + 1).forEach { second ->
                         assertFalse("$locale circle key touch targets overlap at $scale font scale",

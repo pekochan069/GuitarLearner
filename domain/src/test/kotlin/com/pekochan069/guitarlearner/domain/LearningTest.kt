@@ -131,6 +131,10 @@ class LearningTest {
             "F♯/D♯m", "D♭/B♭m", "A♭/Fm", "E♭/Cm", "B♭/Gm", "F/Dm",
         ), circle.map { it.tonic.symbol + "/" + it.relativeMinor.symbol + "m" })
         assertEquals(12, circle.map { it.tonic.pitchClass }.toSet().size)
+        assertEquals(listOf(
+            "", "F♯", "F♯ C♯", "F♯ C♯ G♯", "F♯ C♯ G♯ D♯", "F♯ C♯ G♯ D♯ A♯",
+            "F♯ C♯ G♯ D♯ A♯ E♯", "B♭ E♭ A♭ D♭ G♭", "B♭ E♭ A♭ D♭", "B♭ E♭ A♭", "B♭ E♭", "B♭",
+        ), circle.map { key -> key.keySignature.joinToString(" ") { it.symbol } })
         assertEquals(LearningRelations.tonics.toSet(), circle.map { it.tonic }.toSet())
         val selected = model(LessonId.CircleOfFifths, LearningSelection(tonic = SpelledNote(NoteLetter.F), scale = BeginnerScale.NaturalMinor))
         assertEquals(listOf("F", "G", "A", "B♭", "C", "D", "E", "F"), names(selected.notes))
