@@ -50,7 +50,7 @@ class AndroidTrainingHostTest {
         rig.host.submit(TrainingRequest.Replay(session.key, TrainingSound.Comparison))
         runCurrent()
         assertTrue(first.stopped)
-        assertEquals(listOf(60), rig.outputs.last().tone!!.pitches)
+        assertEquals(listOf(listOf(60)), rig.outputs.last().tone!!.steps)
         assertEquals(TrainingAnswer.Note(PitchClass.F), rig.session().response!!.chosen)
         rig.host.submit(TrainingRequest.Replay(session.key, TrainingSound.Question))
         runCurrent()
@@ -89,7 +89,7 @@ class AndroidTrainingHostTest {
             runCurrent()
             rig.host.submit(TrainingRequest.Replay(session.key, TrainingSound.Comparison))
             runCurrent()
-            assertEquals(listOf(60), rig.outputs.last().tone!!.pitches)
+            assertEquals(listOf(listOf(60)), rig.outputs.last().tone!!.steps)
             assertEquals(instrument, rig.outputs.last().tone!!.instrument)
             rig.host.submit(TrainingRequest.Answer(session.key, session.question.answer))
             rig.host.submit(TrainingRequest.Next(session.key))
@@ -125,6 +125,23 @@ class AndroidTrainingHostTest {
         runCurrent()
         assertEquals(TrainingAudioStatus.Failed(TrainingSound.Question, TrainingFailure.PlaybackFailed), rig.host.current.value.audio)
         assertEquals(1, rig.session().responses.size)
+    }
+
+    @Test fun intervalPresentationsKeepTrainingDirectionAndSimultaneity() = runTest {
+        for (presentation in IntervalPresentation.entries) {
+            val rig = Rig(this)
+            rig.host.submit(TrainingRequest.SetSettings(TrainingSettings(subject = TrainingSubject.Interval,
+                intervalPresentation = presentation, intervals = setOf(TrainingInterval.Octave))))
+            runCurrent()
+            rig.start()
+            val expected = when (presentation) {
+                IntervalPresentation.Ascending -> listOf(listOf(40), listOf(52))
+                IntervalPresentation.Descending -> listOf(listOf(52), listOf(40))
+                IntervalPresentation.Harmonic -> listOf(listOf(40, 52))
+            }
+            assertEquals(expected, rig.outputs.single().tone!!.steps)
+            rig.host.close()
+        }
     }
 
     @Test fun latePlaybackCompletionAndMetronomeStartCannotRestoreOldAnswersOrSound() = runTest {

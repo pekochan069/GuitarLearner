@@ -25,6 +25,15 @@ A finite sequence of identification questions with results for the completed seq
 **Learning**:
 Explanations and visualizations of music theory, harmony, and guitar techniques. The menu category is 학습 in Korean and Learning in English.
 
+**Lesson**:
+A short learning unit about a music-theory concept or guitar technique, with explanations and visualizations.
+
+**Course**:
+A recommended sequence of lessons for learning related concepts or techniques.
+
+**Free exploration**:
+Learning by exploring musical concepts and their relationships without following a lesson sequence.
+
 **Metronome**:
 A practice tool that produces audible clicks at a chosen tempo and indicates the current beat.
 

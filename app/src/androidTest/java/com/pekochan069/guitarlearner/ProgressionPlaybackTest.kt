@@ -13,6 +13,10 @@ import android.media.AudioManager
 import android.media.session.MediaSession
 import android.media.session.MediaController
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.lifecycle.ViewModelProvider
 import androidx.core.os.BundleCompat
 import arrow.core.Either
 import com.pekochan069.guitarlearner.adapters.AndroidMetronomeHost
@@ -233,6 +237,30 @@ class ProgressionPlaybackTest {
             host.execute(ProgressionCommand.Play()).success()
             await { it is ProgressionPlayback.Playing }
         } finally { manager.abandonAudioFocusRequest(interruption) }
+    }
+
+    @Test fun learningAndProgressionExamplesUseNativeFocusWithoutMixingOrLosingTheLesson(): Unit = runBlocking {
+        host.execute(ProgressionCommand.Play()).success()
+        await { it is ProgressionPlayback.Playing }
+        compose.onNodeWithTag("feature_Learning").performScrollTo().performClick()
+        compose.onNodeWithTag("learning_lesson_Scales").performScrollTo().performClick()
+        val learning = compose.runOnIdle { ViewModelProvider(compose.activity)[LearningSessionOwner::class.java].host }
+        val started = async(start = CoroutineStart.UNDISPATCHED) {
+            withTimeout(10_000) { learning.current.first { it.audio is LearningAudioState.Playing } }
+        }
+        compose.onNodeWithTag("learning_listen").performScrollTo().performClick()
+        started.await()
+        await { it == ProgressionPlayback.Stopped(StopReason.FocusLoss) }
+        assertTrue(learning.current.value.audio is LearningAudioState.Playing)
+        host.execute(ProgressionCommand.Play()).success()
+        await { it is ProgressionPlayback.Playing }
+        withTimeout(5_000) {
+            learning.current.first { it.audio == LearningAudioState.Failed(LearningFailure.OutputInterrupted) }
+        }
+        compose.onNodeWithTag("learning_explanation").assertExists()
+        compose.onNodeWithTag("learning_fretboard").assertExists()
+        compose.onNodeWithTag("learning_retry_audio").assertExists()
+        assertEquals(LessonId.Scales, learning.current.value.progress.lastViewed)
     }
 
     @Test fun outputFailureIsTypedAndStaleCallbacksCannotStopTheManualRetry(): Unit = runBlocking {

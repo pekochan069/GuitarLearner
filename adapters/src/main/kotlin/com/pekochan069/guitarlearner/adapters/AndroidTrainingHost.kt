@@ -120,7 +120,10 @@ class AndroidTrainingHost internal constructor(
                         } }
                         output = requestedOutput
                         val pitches = if (sound == TrainingSound.Comparison) listOf(60) else session.question.positions.map { it.midi }
-                        requestedOutput.play(TrainingTone(pitches, session.settings.intervalPresentation, session.settings.instrument)) {
+                        require(pitches.size in 1..2)
+                        val ordered = if (session.settings.intervalPresentation == IntervalPresentation.Descending) pitches.reversed() else pitches
+                        val steps = if (session.settings.intervalPresentation == IntervalPresentation.Harmonic) listOf(ordered) else ordered.map { listOf(it) }
+                        requestedOutput.play(TrainingTone(steps, session.settings.instrument)) {
                             withContext(main) {
                                 if (accepts(token, key)) snapshot.value = snapshot.value.copy(audio = TrainingAudioStatus.Playing(sound))
                             }

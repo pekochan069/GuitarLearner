@@ -15,7 +15,6 @@ import androidx.core.content.ContextCompat
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
-import com.pekochan069.guitarlearner.domain.IntervalPresentation
 import com.pekochan069.guitarlearner.domain.TrainingFailure
 import com.pekochan069.guitarlearner.domain.TrainingInstrument
 import java.io.IOException
@@ -30,8 +29,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
 
-internal data class TrainingTone(val pitches: List<Int>, val presentation: IntervalPresentation, val instrument: TrainingInstrument = TrainingInstrument.Piano) {
-    init { require(pitches.size in 1..2 && pitches.all { it in 40..76 }) }
+internal data class TrainingTone(val steps: List<List<Int>>, val instrument: TrainingInstrument = TrainingInstrument.Piano) {
+    init { require(steps.isNotEmpty() && steps.all { it.isNotEmpty() && it.all { midi -> midi in 40..76 } }) }
 }
 
 internal interface TrainingToneOutput {
@@ -49,16 +48,15 @@ internal object TrainingPcm {
     const val GAP_FRAMES: Int = 6_720
 
     fun render(tone: TrainingTone, samples: (TrainingInstrument, Int) -> ShortArray): ShortArray {
-        val simultaneous = tone.presentation == IntervalPresentation.Harmonic || tone.pitches.size == 1
-        val pitches = if (tone.presentation == IntervalPresentation.Descending) tone.pitches.reversed() else tone.pitches
-        val sources = pitches.map { midi -> samples(tone.instrument, midi).also { require(it.size == NOTE_FRAMES) } }
-        val frames = if (simultaneous) NOTE_FRAMES else NOTE_FRAMES * 2 + GAP_FRAMES
+        val sources = tone.steps.map { pitches ->
+            pitches.map { midi -> samples(tone.instrument, midi).also { require(it.size == NOTE_FRAMES) } }
+        }
+        val frames = NOTE_FRAMES * sources.size + GAP_FRAMES * (sources.size - 1)
         return ShortArray(frames) { frame ->
-            val local = if (simultaneous) frame else frame % (NOTE_FRAMES + GAP_FRAMES)
+            val local = frame % (NOTE_FRAMES + GAP_FRAMES)
             if (local >= NOTE_FRAMES) 0 else {
-                val value = if (simultaneous) sources.sumOf { it[local].toInt() }.toDouble() / sources.size
-                    else sources[frame / (NOTE_FRAMES + GAP_FRAMES)][local].toDouble()
-                value.toInt().toShort()
+                val step = sources[frame / (NOTE_FRAMES + GAP_FRAMES)]
+                (step.sumOf { it[local].toInt() }.toDouble() / step.size).toInt().toShort()
             }
         }
     }
@@ -125,7 +123,7 @@ internal class AndroidTrainingToneOutput(
                     Unit.right()
                 }.fold({ return@withContext it.left() }, {})
                 var elapsed = 0
-                while (elapsed < samples.size * 1000 / TrainingPcm.SAMPLE_RATE + 1000) {
+                while (elapsed < samples.size.toLong() * 1000 / TrainingPcm.SAMPLE_RATE + 1000) {
                     coroutineContext.ensureActive()
                     val finished = synchronized(gate) { stopped || audio.playbackHeadPosition >= samples.size }
                     if (finished) return@withContext Unit.right()

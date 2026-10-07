@@ -1,0 +1,17 @@
+<resources>
+    <string name="learning_theory_course_goal">Connect note distances, scales, chords, and key relationships so you can explain how a simple progression fits together.</string>
+    <string name="learning_technique_course_goal">Learn how seven common guitar movements change the sound, then try each movement slowly with its short TAB example.</string>
+    <string name="learning_course_progress">Lessons completed: %1$d / %2$d</string>
+    <string name="learning_course_start">Start: %1$s</string>
+    <string name="learning_course_continue">Continue: %1$s</string>
+    <string name="learning_course_review">Review: %1$s</string>
+    <string name="learning_course_view">View all lessons</string>
+    <string name="learning_course_unlocked">Follow this order, or open any lesson. Marking a lesson complete records your choice to finish it.</string>
+    <string name="learning_course_lesson">%1$d. %2$s</string>
+    <string name="learning_course_step">%1$s · Lesson %2$d of %3$d</string>
+    <string name="learning_next_lesson">Next: %1$s</string>
+    <string name="learning_previous_lesson">Previous: %1$s</string>
+    <string name="learning_course_overview">Return to course</string>
+    <string name="learning_back_course">Back to course</string>
+    <string name="learning_back_courses">Back to courses</string>
+</resources>
